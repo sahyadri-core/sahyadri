@@ -1,0 +1,73 @@
+[package]
+name = "sahyadrid"
+description = "Sahyadri full node daemon"
+keywords = ["csm", "sahyadridag"]
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "sahyadrid_lib"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+sahyadri-alloc.workspace = true # This changes the global allocator for all of the next dependencies so should be kept first
+
+sahyadri-addresses.workspace = true
+sahyadri-addressmanager.workspace = true
+sahyadri-consensus-core.workspace = true
+sahyadri-consensus-notify.workspace = true
+sahyadri-consensus.workspace = true
+sahyadri-consensusmanager.workspace = true
+sahyadri-core.workspace = true
+sahyadri-database.workspace = true
+sahyadri-grpc-server.workspace = true
+sahyadri-hashes.workspace = true
+sahyadri-index-processor.workspace = true
+sahyadri-mining.workspace = true
+sahyadri-notify.workspace = true
+sahyadri-p2p-flows.workspace = true
+sahyadri-p2p-lib.workspace = true
+sahyadri-p2p-mining.workspace = true
+sahyadri-perf-monitor.workspace = true
+sahyadri-rpc-core.workspace = true
+sahyadri-rpc-service.workspace = true
+sahyadri-txscript.workspace = true
+sahyadri-utils.workspace = true
+sahyadri-utils-tower.workspace = true
+sahyadri-utxoindex.workspace = true
+sahyadri-wrpc-server.workspace = true
+
+async-channel.workspace = true
+cfg-if.workspace = true
+clap = { workspace = true, features = ["env"]}
+dhat = { workspace = true, optional = true }
+dirs.workspace = true
+futures-util.workspace = true
+itertools.workspace = true
+log.workspace = true
+num_cpus.workspace = true
+rand.workspace = true
+rayon.workspace = true
+rocksdb.workspace = true
+serde.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "rt-multi-thread"] }
+workflow-log.workspace = true
+serde_json.workspace = true
+
+toml = "0.8.10"
+serde_with = "3.7.0"
+
+[features]
+heap = ["dhat", "sahyadri-alloc/heap"]
+devnet-prealloc = ["sahyadri-consensus/devnet-prealloc"]
+semaphore-trace = ["sahyadri-utils/semaphore-trace"]
+
+[lints]
+workspace = true

@@ -1,0 +1,66 @@
+[package]
+name = "sahyadri-stratum-bridge"
+description = "Sahyadri Stratum Bridge - Mining connectivity for Sahyadri Stratum miners"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Sahyadri dependencies - using workspace versions
+sahyadri-consensus-core = { workspace = true }
+sahyadri-hashes = { workspace = true }
+sahyadri-pow = { workspace = true }
+sahyadri-addresses = { workspace = true }
+sahyadri-rpc-core = { workspace = true }
+sahyadri-rpc-service = { workspace = true }
+sahyadri-grpc-client = { workspace = true }
+sahyadri-notify = { workspace = true }
+sahyadri-core = { workspace = true }
+sahyadri-utils = { workspace = true }
+sahyadrid = { workspace = true }
+dirs = { workspace = true }
+
+# External dependencies - using workspace versions where available
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+hex = { workspace = true }
+num-traits = { workspace = true }
+async-trait = { workspace = true }
+once_cell = { workspace = true }
+futures-util = { workspace = true }
+parking_lot = { workspace = true }
+regex = { workspace = true }
+uuid = { workspace = true }
+
+# CLI
+clap = { workspace = true, features = ["derive"] }
+
+# External dependencies not in workspace (add specific versions)
+anyhow = "1.0"
+tracing = "0.1"
+tracing-log = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+blake2 = "0.10"
+num-bigint = "0.4"
+prometheus = "0.13"
+yaml-rust = "0.4"
+faster-hex = "0.1"
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Console"] }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[[bin]]
+name = "stratum-bridge"
+path = "src/main.rs"
+
+[lints]
+workspace = true

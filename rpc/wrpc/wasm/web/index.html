@@ -1,0 +1,12 @@
+<html>
+    <head>
+        <script type="module">
+            import * as sahyadri from './sahyadri-rpc/sahyadri-rpc.js';
+            (async () => {
+                await sahyadri.default('./sahyadri-rpc/sahyadri-rpc_bg.wasm');
+                console.log(sahyadri.version());
+            })();
+        </script>
+    </head>
+    <body></body>
+</html>

@@ -1,0 +1,89 @@
+#!/bin/bash
+# This script builds the Rusty Sahyadri WASM32 SDK release.
+
+# make the script fail for any failed command
+set -e
+
+# Workaround for Rust 1.87.0
+# https://github.com/rust-lang/rust/issues/141048
+export RUSTFLAGS=-Ctarget-cpu=mvp
+
+rm -rf release/*
+rm -rf web/*
+rm -rf nodejs/*
+rm -rf docs/*
+rm -rf examples/nodejs/typescript/lib
+
+mkdir -p release/sahyadri-wasm32-sdk/web
+mkdir -p release/sahyadri-wasm32-sdk/nodejs
+mkdir -p release/sahyadri-wasm32-sdk/docs
+
+# pushd .
+# cd ../rpc/wrpc/wasm
+# wasm-pack build --target web --out-name sahyadri-rpc --out-dir web/sahyadri-rpc --features wasm32-sdk $@
+# popd
+
+wasm-pack build --weak-refs --target web --out-name sahyadri --out-dir web/sahyadri-keygen --features wasm32-keygen $@
+wasm-pack build --weak-refs --dev --target web --out-name sahyadri --out-dir web/sahyadri-keygen-dev --features wasm32-keygen $@
+
+wasm-pack build --weak-refs --target web --out-name sahyadri --out-dir web/sahyadri-rpc --features wasm32-rpc $@
+wasm-pack build --weak-refs --dev --target web --out-name sahyadri --out-dir web/sahyadri-rpc-dev --features wasm32-rpc $@
+
+wasm-pack build --weak-refs --target web --out-name sahyadri --out-dir web/sahyadri-core --features wasm32-core $@
+wasm-pack build --weak-refs --dev --target web --out-name sahyadri --out-dir web/sahyadri-core-dev --features wasm32-core $@
+
+wasm-pack build --weak-refs --target web --out-name sahyadri --out-dir web/sahyadri --features wasm32-sdk $@
+wasm-pack build --weak-refs --dev --target web --out-name sahyadri --out-dir web/sahyadri-dev --features wasm32-sdk $@
+
+wasm-pack build --weak-refs --target nodejs --out-name sahyadri --out-dir nodejs/sahyadri --features wasm32-sdk $@
+wasm-pack build --weak-refs --dev --target nodejs --out-name sahyadri --out-dir nodejs/sahyadri-dev --features wasm32-sdk $@
+
+# wasm-pack build --target web --dev --out-name sahyadri --out-dir build/docs/sahyadri --features wasm32-sdk $@
+typedoc --name "Sahyadri WASM32 SDK - Key Generation" --sourceLinkExternal --readme ./README.md --options ./build/docs/ --out docs/sahyadri-keygen ./build/docs/sahyadri-keygen.ts
+typedoc --name "Sahyadri WASM32 SDK - RPC" --sourceLinkExternal --readme ./README.md --options ./build/docs/ --out docs/sahyadri-rpc ./build/docs/sahyadri-rpc.ts
+typedoc --name "Sahyadri WASM32 SDK - Core" --sourceLinkExternal --readme ./README.md --options ./build/docs/ --out docs/sahyadri-core ./build/docs/sahyadri-core.ts
+typedoc --name "Sahyadri WASM32 SDK" --sourceLinkExternal --readme ./README.md --options ./build/docs/ --out docs/sahyadri ./build/docs/sahyadri.ts
+
+# cp -r ../rpc/wrpc/wasm/web/sahyadri-rpc release/sahyadri-wasm32-sdk/web/sahyadri-rpc
+cp -r web/sahyadri-keygen release/sahyadri-wasm32-sdk/web/sahyadri-keygen
+cp -r web/sahyadri-keygen-dev release/sahyadri-wasm32-sdk/web/sahyadri-keygen-dev
+
+cp -r web/sahyadri-rpc release/sahyadri-wasm32-sdk/web/sahyadri-rpc
+cp -r web/sahyadri-rpc-dev release/sahyadri-wasm32-sdk/web/sahyadri-rpc-dev
+
+cp -r web/sahyadri-core release/sahyadri-wasm32-sdk/web/sahyadri-core
+cp -r web/sahyadri-core-dev release/sahyadri-wasm32-sdk/web/sahyadri-core-dev
+
+cp -r web/sahyadri release/sahyadri-wasm32-sdk/web/sahyadri
+cp -r web/sahyadri-dev release/sahyadri-wasm32-sdk/web/sahyadri-dev
+
+cp -r nodejs/sahyadri release/sahyadri-wasm32-sdk/nodejs/sahyadri
+cp -r nodejs/sahyadri-dev release/sahyadri-wasm32-sdk/nodejs/sahyadri-dev
+
+cp -r docs/sahyadri-keygen release/sahyadri-wasm32-sdk/docs/sahyadri-keygen
+cp -r docs/sahyadri-rpc release/sahyadri-wasm32-sdk/docs/sahyadri-rpc
+cp -r docs/sahyadri-core release/sahyadri-wasm32-sdk/docs/sahyadri-core
+cp -r docs/sahyadri release/sahyadri-wasm32-sdk/docs/sahyadri
+
+mkdir -p release/sahyadri-wasm32-sdk/examples/data
+cp -r examples/data/.gitignore release/sahyadri-wasm32-sdk/examples/data/.gitignore
+cp -r examples/nodejs release/sahyadri-wasm32-sdk/examples/
+cp -r examples/web release/sahyadri-wasm32-sdk/examples/
+cp -r examples/init.js release/sahyadri-wasm32-sdk/examples/
+cp -r examples/jsconfig.json release/sahyadri-wasm32-sdk/examples/
+cp -r examples/package.json release/sahyadri-wasm32-sdk/examples/
+
+pushd .
+cd release/sahyadri-wasm32-sdk/examples
+npm install
+popd
+
+# tsc release/sahyadri-wasm32-sdk/examples/nodejs/typescript/
+
+cp index.html release/sahyadri-wasm32-sdk/index.html
+cp README.md release/sahyadri-wasm32-sdk/README.md
+cp CHANGELOG.md release/sahyadri-wasm32-sdk/CHANGELOG.md
+cp LICENSE release/sahyadri-wasm32-sdk/LICENSE
+
+node build/package-sizes.js
+cp package-sizes.js release/sahyadri-wasm32-sdk/package-sizes.js

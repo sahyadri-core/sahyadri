@@ -1,0 +1,22 @@
+[package]
+name = "sahyadri-wrpc-vcc-v2"
+description = "Sahyadri VCCV2 example"
+publish = false
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+futures.workspace = true
+sahyadri-rpc-core.workspace = true
+sahyadri-wrpc-client.workspace = true
+sahyadri-addresses.workspace = true
+tokio.workspace = true
+
+
+[lints]
+workspace = true

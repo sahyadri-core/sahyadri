@@ -1,0 +1,51 @@
+[package]
+name = "simpa"
+description = "Sahyadri Network Simulator"
+publish = false
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sahyadri-alloc.workspace = true            # This changes the global allocator for all of the next dependencies so should be kept first
+sahyadri-consensus-core.workspace = true
+sahyadri-consensus-notify.workspace = true
+sahyadri-consensus.workspace = true
+sahyadri-core.workspace = true
+sahyadri-database.workspace = true
+sahyadri-hashes.workspace = true
+sahyadri-perf-monitor.workspace = true
+sahyadri-utils.workspace = true
+
+async-channel.workspace = true
+cfg-if.workspace = true
+clap.workspace = true
+dhat = { workspace = true, optional = true }
+futures-util.workspace = true
+futures.workspace = true
+flate2.workspace = true
+indexmap.workspace = true
+itertools.workspace = true
+log.workspace = true
+num_cpus.workspace = true
+rand_distr.workspace = true
+rand.workspace = true
+rayon.workspace = true
+secp256k1.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "rt-multi-thread"] }
+serde_json.workspace = true
+serde.workspace = true
+faster-hex.workspace = true
+sahyadri-testing-integration.workspace = true
+
+
+[features]
+heap = ["dhat", "sahyadri-alloc/heap"]
+semaphore-trace = ["sahyadri-utils/semaphore-trace"]
+
+[lints]
+workspace = true

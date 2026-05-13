@@ -1,0 +1,43 @@
+[package]
+name = "sahyadri-p2p-flows"
+description = "Sahyadri p2p flows"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sahyadri-core.workspace = true
+sahyadri-consensus-core.workspace = true
+sahyadri-consensus-notify.workspace = true
+sahyadri-p2p-lib.workspace = true
+sahyadri-p2p-mining.workspace = true
+sahyadri-utils.workspace = true
+sahyadri-utils-tower.workspace = true
+sahyadri-hashes.workspace = true
+sahyadri-muhash.workspace = true
+sahyadri-connectionmanager.workspace = true
+sahyadri-addressmanager.workspace = true
+sahyadri-consensusmanager.workspace = true
+sahyadri-mining.workspace = true
+sahyadri-notify.workspace = true
+
+async-trait.workspace = true
+futures = { workspace = true, features = ["alloc"] }
+indexmap.workspace = true
+itertools.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+tokio-stream = { workspace = true, features = ["net"] }
+uuid = { workspace = true, features = ["v4", "fast-rng"] }
+chrono.workspace = true
+sahyadri-addresses.workspace = true
+
+[lints]
+workspace = true

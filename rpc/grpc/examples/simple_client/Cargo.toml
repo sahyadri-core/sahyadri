@@ -1,0 +1,21 @@
+[package]
+name = "sahyadri-grpc-simple-client-example"
+description = "Sahyadri GRPC simple client example"
+publish = false
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+futures.workspace = true
+sahyadri-rpc-core.workspace = true
+sahyadri-grpc-client.workspace = true
+tokio.workspace = true
+
+
+[lints]
+workspace = true

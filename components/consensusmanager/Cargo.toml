@@ -1,0 +1,28 @@
+[package]
+name = "sahyadri-consensusmanager"
+description = "Sahyadri consensus library"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+duration-string.workspace = true
+futures-util.workspace = true
+futures.workspace = true
+itertools.workspace = true
+sahyadri-addresses.workspace=true
+sahyadri-consensus-core.workspace = true
+sahyadri-consensus-notify.workspace = true
+sahyadri-core.workspace = true
+sahyadri-utils.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,6 @@
+/target
+/Cargo.lock
+/web/sahyadri-rpc
+/nodejs/sahyadri-rpc
+/nodejs/node_modules
+/nodejs/package-lock.json

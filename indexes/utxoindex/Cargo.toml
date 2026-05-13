@@ -1,0 +1,32 @@
+[package]
+name = "sahyadri-utxoindex"
+description = "Sahyadri UTXO index"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+futures.workspace = true
+sahyadri-consensus-core.workspace = true
+sahyadri-consensusmanager.workspace = true
+sahyadri-core.workspace = true
+sahyadri-database.workspace = true
+sahyadri-hashes.workspace = true
+sahyadri-index-core.workspace = true
+sahyadri-utils.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+rocksdb.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+sahyadri-consensus.workspace = true
+rand = { workspace = true, features = ["small_rng"] }
+
+[lints]
+workspace = true

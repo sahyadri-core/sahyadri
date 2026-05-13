@@ -1,0 +1,1 @@
+wasm-pack build --target web --out-name sahyadri-wallet --out-dir web/sahyadri-wallet $@

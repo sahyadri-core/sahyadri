@@ -1,0 +1,48 @@
+[package]
+name = "sahyadri-grpc-server"
+description = "Sahyadri gRPC server"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sahyadri-consensus-core.workspace = true
+sahyadri-core.workspace = true
+sahyadri-grpc-core.workspace = true
+sahyadri-notify.workspace = true
+sahyadri-rpc-core.workspace = true
+sahyadri-rpc-macros.workspace = true
+sahyadri-rpc-service.workspace = true
+sahyadri-utils-tower.workspace = true
+sahyadri-utils.workspace = true
+
+async-channel.workspace = true
+async-stream.workspace = true
+async-trait.workspace = true
+faster-hex.workspace = true
+futures.workspace = true
+h2.workspace = true
+itertools.workspace = true
+log.workspace = true
+once_cell.workspace = true
+parking_lot.workspace = true
+paste.workspace = true
+prost.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio-stream.workspace = true
+tonic = { workspace = true, features = ["gzip"] }
+triggered.workspace = true
+uuid.workspace = true
+rustls.workspace = true
+
+[dev-dependencies]
+sahyadri-grpc-client.workspace = true
+
+[lints]
+workspace = true

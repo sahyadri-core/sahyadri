@@ -1,0 +1,25 @@
+[package]
+name = "sahyadri-wrpc-example-subscriber"
+description = "Sahyadri wRPC subscription example"
+publish = false
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+futures.workspace = true
+sahyadri-consensus-core.workspace = true
+sahyadri-rpc-core.workspace = true
+sahyadri-wrpc-client.workspace = true
+sahyadri-notify.workspace = true
+tokio.workspace = true
+workflow-core.workspace = true
+workflow-log.workspace = true
+ctrlc.workspace = true
+
+[lints]
+workspace = true

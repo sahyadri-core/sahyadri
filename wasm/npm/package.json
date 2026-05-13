@@ -1,0 +1,28 @@
+{
+  "name": "csm",
+  "version": "0.13.5",
+  "description": "Sahyadri SDK",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sahyadrinet/rusty-sahyadri.git"
+  },
+  "keywords": [
+    "csm",
+    "wasm",
+    "sdk"
+  ],
+  "author": "Sahyadri developers",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sahyadrinet/rusty-sahyadri/issues"
+  },
+  "homepage": "https://github.com/sahyadrinet/rusty-sahyadri#readme",
+  "dependencies": {
+    "websocket": "1.0.34",
+    "sahyadri-wasm": "0.13.5"
+  }
+}

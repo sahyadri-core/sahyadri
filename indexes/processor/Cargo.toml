@@ -1,0 +1,41 @@
+[package]
+name = "sahyadri-index-processor"
+description = "Sahyadri index processor"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sahyadri-consensus-core.workspace = true
+sahyadri-consensus-notify.workspace = true
+sahyadri-consensusmanager.workspace = true
+sahyadri-core.workspace = true
+sahyadri-database.workspace = true
+sahyadri-hashes.workspace = true
+sahyadri-index-core.workspace = true
+sahyadri-notify.workspace = true
+sahyadri-utils.workspace = true
+sahyadri-utxoindex.workspace = true
+
+async-channel.workspace = true
+async-trait.workspace = true
+derive_more.workspace = true
+futures.workspace = true
+log.workspace = true
+paste.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = [ "rt-multi-thread", "macros", "signal" ]}
+triggered.workspace = true
+
+[dev-dependencies]
+sahyadri-consensus.workspace = true
+parking_lot.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }
+rand = {workspace = true,  features = [ "small_rng" ]}
+
+[lints]
+workspace = true

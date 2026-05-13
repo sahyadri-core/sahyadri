@@ -1,0 +1,3 @@
+#!/bin/bash
+
+wasm-pack build --target web --out-name sahyadri-rpc --out-dir web/sahyadri-rpc --features wasm32-sdk
