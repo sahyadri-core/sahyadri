@@ -4,6 +4,7 @@
 
 use crate::imports::*;
 use sahyadri_bip32::PrivateKey;
+use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair_from_seed}; use sahyadri_bip32::DilithiumSeed;
 use sahyadri_consensus_core::{sign::sign_with_multiple_v2, tx::SignableTransaction};
 
 pub trait SignerT: Send + Sync + 'static {
@@ -14,7 +15,7 @@ struct Inner {
     keydata: PrvKeyData,
     account: Arc<dyn Account>,
     payment_secret: Option<Secret>,
-    keys: Mutex<AHashMap<Address, [u8; 32]>>,
+    keys: Mutex<AHashMap<Address, DilithiumKeyPair>>,
 }
 
 pub struct Signer {
@@ -40,7 +41,7 @@ impl Signer {
                 addresses.as_slice(),
             )?;
             for (address, private_key) in private_keys {
-                keys.insert(address.clone(), private_key.to_bytes());
+                keys.insert(address.clone(), generate_keypair_from_seed(&private_key.to_bytes()));
             }
         }
 
@@ -53,10 +54,8 @@ impl SignerT for Signer {
         self.ingest(addresses)?;
 
         let keys = self.inner.keys.lock().unwrap();
-        let mut keys_for_signing = addresses.iter().map(|address| *keys.get(address).unwrap()).collect::<Vec<_>>();
-        // TODO - refactor for multisig
+        let keys_for_signing: Vec<&DilithiumKeyPair> = addresses.iter().map(|address| keys.get(address).unwrap()).collect();
         let signable_tx = sign_with_multiple_v2(mutable_tx, &keys_for_signing).fully_signed()?;
-        keys_for_signing.zeroize();
         Ok(signable_tx)
     }
 }
@@ -64,7 +63,7 @@ impl SignerT for Signer {
 // ---
 
 struct KeydataSignerInner {
-    keys: HashMap<Address, [u8; 32]>,
+    keys: HashMap<Address, DilithiumKeyPair>,
 }
 
 pub struct KeydataSigner {
@@ -72,18 +71,15 @@ pub struct KeydataSigner {
 }
 
 impl KeydataSigner {
-    pub fn new(keydata: Vec<(Address, secp256k1::SecretKey)>) -> Self {
-        let keys = keydata.into_iter().map(|(address, key)| (address, key.to_bytes())).collect();
+    pub fn new(keydata: Vec<(Address, DilithiumSeed)>) -> Self {
+        let keys = keydata.into_iter().map(|(address, key)| (address, generate_keypair_from_seed(&key.0))).collect();
         Self { inner: Arc::new(KeydataSignerInner { keys }) }
     }
 }
-
 impl SignerT for KeydataSigner {
     fn try_sign(&self, mutable_tx: SignableTransaction, addresses: &[Address]) -> Result<SignableTransaction> {
-        let mut keys_for_signing = addresses.iter().map(|address| *self.inner.keys.get(address).unwrap()).collect::<Vec<_>>();
-        // TODO - refactor for multisig
+        let keys_for_signing: Vec<&DilithiumKeyPair> = addresses.iter().map(|address| self.inner.keys.get(address).unwrap()).collect();
         let signable_tx = sign_with_multiple_v2(mutable_tx, &keys_for_signing).fully_signed()?;
-        keys_for_signing.zeroize();
         Ok(signable_tx)
     }
 }
