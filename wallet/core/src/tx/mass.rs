@@ -12,7 +12,7 @@ use sahyadri_consensus_core::{config::params::Params, constants::*, subnets::SUB
 use sahyadri_hashes::HASH_SIZE;
 
 // pub const ECDSA_SIGNATURE_SIZE: u64 = 64;
-// pub const SCHNORR_SIGNATURE_SIZE: u64 = 64;
+// pub const DILITHIUM3_SIGNATURE_SIZE: u64 = 64;
 pub const SIGNATURE_SIZE: u64 = 1 + 64 + 1; //1 byte for OP_DATA_65 + 64 (length of signature) + 1 byte for sig hash type
 
 /// MINIMUM_RELAY_TRANSACTION_FEE specifies the minimum transaction fee for a transaction to be accepted to
