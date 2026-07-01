@@ -10,7 +10,7 @@ use crate::tx::PaymentOutputs;
 use futures::stream;
 use sahyadri_bip32::{DerivationPath, KeyFingerprint, PrivateKey};
 use sahyadri_consensus_client::UtxoEntry as ClientUTXO;
-use sahyadri_consensus_core::hashing::sighash::{SigHashReusedValuesUnsync, calc_schnorr_signature_hash};
+use sahyadri_consensus_core::hashing::sighash::{SigHashReusedValuesUnsync, calc_signature_hash};
 use sahyadri_consensus_core::tx::VerifiableTransaction;
 use sahyadri_consensus_core::tx::{TransactionInput, UtxoEntry};
 use sahyadri_txscript::extract_script_pub_key_address;
@@ -23,8 +23,7 @@ use sahyadri_wallet_pskt::prelude::KeySource;
 use sahyadri_wallet_pskt::prelude::lock_script_sig_templating_bytes;
 use sahyadri_wallet_pskt::prelude::{Finalizer, Inner, SignInputOk, Signature, Signer};
 pub use sahyadri_wallet_pskt::pskt::{Creator, PSKT};
-use secp256k1::schnorr;
-use secp256k1::{Message, PublicKey};
+use sahyadri_dilithium::{generate_keypair_from_seed, sign_bytes};
 use std::iter;
 
 struct PSKBSignerInner {
@@ -64,23 +63,24 @@ impl PSKBSigner {
         Ok(())
     }
 
-    fn public_key(&self, for_address: &Address) -> Result<PublicKey> {
+    fn public_key_bytes(&self, for_address: &Address) -> Result<Vec<u8>> {
         let keys = self.inner.keys.lock()?;
         match keys.get(for_address) {
             Some(private_key) => {
-                let kp = secp256k1::Keypair::from_seckey_slice(secp256k1::SECP256K1, private_key)?;
-                Ok(kp.public_key())
+                let kp = generate_keypair_from_seed(private_key);
+                Ok(kp.public_key().to_vec())
             }
             None => Err(Error::from("PSKBSigner address coverage error")),
         }
     }
 
-    fn sign_schnorr(&self, for_address: &Address, message: Message) -> Result<schnorr::Signature> {
+    fn sign_dilithium(&self, for_address: &Address, message: &[u8]) -> Result<Vec<u8>> {
         let keys = self.inner.keys.lock()?;
         match keys.get(for_address) {
             Some(private_key) => {
-                let schnorr_key = secp256k1::Keypair::from_seckey_slice(secp256k1::SECP256K1, private_key)?;
-                Ok(schnorr_key.sign_schnorr(message))
+                let kp = generate_keypair_from_seed(private_key);
+                let sig = sign_bytes(message, &kp).map_err(|e| Error::custom(format!("Dilithium sign failed: {e}")))?;
+                Ok(sig.as_bytes().to_vec())
             }
             None => Err(Error::from("PSKBSigner address coverage error")),
         }
@@ -219,8 +219,8 @@ pub async fn pskb_signer_for_address(
                         .iter()
                         .enumerate()
                         .map(|(input_idx, _input)| {
-                            let hash = calc_schnorr_signature_hash(&tx.as_verifiable(), input_idx, sighash[input_idx], &reused_values);
-                            let msg = secp256k1::Message::from_digest_slice(hash.as_bytes().as_slice()).map_err(|e| e.to_string())?;
+                            let hash = calc_signature_hash(&tx.as_verifiable(), input_idx, sighash[input_idx], &reused_values);
+                            let msg = hash.as_bytes().to_vec();
 
                             // Get the appropriate address for this input
                             let address = if let Some(sign_addr) = sign_for_address {
@@ -229,11 +229,14 @@ pub async fn pskb_signer_for_address(
                                 current_addresses.get(input_idx).ok_or_else(|| format!("No address found for input {}", input_idx))?
                             };
 
-                            let pub_key = signer.public_key(address).map_err(|e| format!("Failed to get public key: {}", e))?;
+                            let pub_key_vec = signer.public_key_bytes(address).map_err(|e| format!("Failed to get public key: {}", e))?;
+                            let mut pk_arr = [0u8; 32];
+                            pk_arr.copy_from_slice(&pub_key_vec[..32]);
+                            let pub_key = sahyadri_bip32::DilithiumPkHash(pk_arr);
 
-                            let signature = signer.sign_schnorr(address, msg).map_err(|e| format!("Failed to sign: {}", e))?;
-
-                            Ok(SignInputOk { signature: Signature::Schnorr(signature), pub_key, key_source: key_source.clone() })
+                            let signature = signer.sign_dilithium(address, &msg).map_err(|e| format!("Failed to sign: {}", e))?;
+                            
+                            Ok(SignInputOk { signature: Signature::Dilithium(signature), pub_key, key_source: key_source.clone() })
                         })
                         .collect()
                 })
