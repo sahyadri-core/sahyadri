@@ -3,16 +3,15 @@
 //!
 
 use crate::transaction::Transaction;
-use core::iter::once;
-use itertools::Itertools;
 use sahyadri_consensus_core::{
     hashing::{
-        sighash::{SigHashReusedValuesUnsync, calc_schnorr_signature_hash},
+        sighash::{SigHashReusedValuesUnsync, calc_signature_hash},
         sighash_type::SIG_HASH_ALL,
     },
     tx::PopulatedTransaction,
-    //sign::Signed,
 };
+use sahyadri_dilithium::{generate_keypair_from_seed, sign_bytes, DilithiumKeyPair};
+use sha2::{Sha256, Digest};
 use std::collections::BTreeMap;
 
 /// A wrapper enum that represents the transaction signed state. A transaction
@@ -32,16 +31,16 @@ impl<'a> Signed<'a> {
     }
 }
 
-/// TODO (aspect) - merge this with `v1` fn above or refactor wallet core to use the script engine.
-/// Sign a transaction using schnorr
+/// Sign a transaction using Dilithium3
 #[allow(clippy::result_large_err)]
-pub fn sign_with_multiple_v3<'a>(tx: &'a Transaction, privkeys: &[[u8; 32]]) -> crate::result::Result<Signed<'a>> {
-    let mut map = BTreeMap::new();
-    for privkey in privkeys {
-        let schnorr_key = secp256k1::Keypair::from_seckey_slice(secp256k1::SECP256K1, privkey).unwrap();
-        let schnorr_public_key = schnorr_key.public_key().x_only_public_key().0;
-        let script_pub_key_script = once(0x20).chain(schnorr_public_key.serialize().into_iter()).chain(once(0xac)).collect_vec();
-        map.insert(script_pub_key_script, schnorr_key);
+pub fn sign_with_multiple_v3<'a>(tx: &'a Transaction, seeds: &[[u8; 32]]) -> crate::result::Result<Signed<'a>> {
+    let mut map: BTreeMap<Vec<u8>, DilithiumKeyPair> = BTreeMap::new();
+    for seed in seeds {
+        let keypair = generate_keypair_from_seed(seed);
+        let pk_bytes = keypair.public_key();
+        let pk_hash = Sha256::digest(pk_bytes);
+        let script_pub_key_script: Vec<u8> = std::iter::once(0x14u8).chain(pk_hash[0..20].iter().copied()).chain(std::iter::once(0xac)).collect();
+        map.insert(script_pub_key_script, keypair);
     }
 
     let reused_values = SigHashReusedValuesUnsync::new();
@@ -60,12 +59,18 @@ pub fn sign_with_multiple_v3<'a>(tx: &'a Transaction, privkeys: &[[u8; 32]]) -> 
                 }
             };
             let script = script_pub_key.script();
-            if let Some(schnorr_key) = map.get(script) {
-                let sig_hash = calc_schnorr_signature_hash(&populated_transaction, i, SIG_HASH_ALL, &reused_values);
-                let msg = secp256k1::Message::from_digest_slice(sig_hash.as_bytes().as_slice()).unwrap();
-                let sig: [u8; 64] = *schnorr_key.sign_schnorr(msg).as_ref();
-                // This represents OP_DATA_65 <SIGNATURE+SIGHASH_TYPE> (since signature length is 64 bytes and SIGHASH_TYPE is one byte)
-                tx.set_signature_script(i, std::iter::once(65u8).chain(sig).chain([SIG_HASH_ALL.to_u8()]).collect())?;
+            if let Some(keypair) = map.get(script) {
+                let sig_hash = calc_signature_hash(&populated_transaction, i, SIG_HASH_ALL, &reused_values);
+                let sig = sign_bytes(sig_hash.as_bytes().as_slice(), keypair).expect("Dilithium signing failed");
+                let pk_bytes = keypair.public_key();
+                let mut sig_script = Vec::new();
+                let payload_len = (pk_bytes.len() + sig.as_bytes().len() + 1) as u16;
+                sig_script.push(0x4d); // OP_PUSHDATA2
+                sig_script.extend_from_slice(&payload_len.to_le_bytes());
+                sig_script.extend_from_slice(pk_bytes);
+                sig_script.extend_from_slice(&sig.as_bytes());
+                sig_script.push(SIG_HASH_ALL.to_u8());
+                tx.set_signature_script(i, sig_script)?;
             } else {
                 additional_signatures_required = true;
             }
