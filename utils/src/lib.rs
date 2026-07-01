@@ -1,7 +1,7 @@
 //!
 //! # Sahyadri Utilities
 //!
-//! General purpose utilities and various type extensions used across the Rusty Sahyadri codebase.
+//! General purpose utilities and various type extensions used across the Sahyadri codebase.
 //!
 
 pub mod any;
