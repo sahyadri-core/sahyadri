@@ -19,8 +19,8 @@ pub fn hash(tx: &Transaction) -> Hash {
     hasher.finalize()
 }
 
-/// Returns the transaction hash pre-crescendo (which excludes the mass commitment)
-pub fn hash_pre_crescendo(tx: &Transaction) -> Hash {
+/// Returns the transaction hash pre-raigad (which excludes the mass commitment)
+pub fn hash_pre_raigad(tx: &Transaction) -> Hash {
     let mut hasher = sahyadri_hashes::TransactionHash::new();
     write_transaction(&mut hasher, tx, TxEncodingFlags::EXCLUDE_MASS_COMMIT);
     hasher.finalize()
