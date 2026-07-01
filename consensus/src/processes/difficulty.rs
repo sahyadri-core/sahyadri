@@ -8,7 +8,7 @@ use sahyadri_consensus_core::{
     config::params::MAX_DIFFICULTY_TARGET_AS_F64,
     errors::difficulty::{DifficultyError, DifficultyResult},
 };
-use sahyadri_core::{info, log::CRESCENDO_KEYWORD};
+use sahyadri_core::{info, log::RAIGAD_KEYWORD};
 use sahyadri_hashes::Hash;
 use sahyadri_math::{Uint256, Uint320};
 use std::{
@@ -78,11 +78,11 @@ trait DifficultyManagerExtension {
 }
 
 #[derive(Clone)]
-struct _CrescendoLogger {
+struct _RaigadLogger {
     _steps: Arc<AtomicU8>,
 }
 
-impl _CrescendoLogger {
+impl _RaigadLogger {
     fn _new() -> Self {
         Self { _steps: Arc::new(AtomicU8::new(Self::_ACTIVATE)) }
     }
@@ -95,7 +95,7 @@ impl _CrescendoLogger {
         if self._steps.compare_exchange(step, step + 1, AtomicOrdering::SeqCst, AtomicOrdering::SeqCst).is_ok() {
             match step {
                 Self::_ACTIVATE => {
-                    info!(target: CRESCENDO_KEYWORD,
+                    info!(target: RAIGAD_KEYWORD,
                         r#"
         ____                                  _             
        / ___|_ __ ___  ___  ___ ___ _ __   __| | ___        
@@ -110,7 +110,7 @@ impl _CrescendoLogger {
          |_|                                     |_|    
 "#
                     );
-                    info!(target: CRESCENDO_KEYWORD, "[Crescendo] Accelerating block rate 10 fold")
+                    info!(target: RAIGAD_KEYWORD, "[Raigad] Accelerating block rate 10 fold")
                 }
                 Self::_DYNAMIC => {}
                 Self::_FULL => {}
