@@ -1,5 +1,5 @@
 //!
-//! WASM bindings for the [Rusty Sahyadri p2p Node wRPC Client](sahyadri-wrpc-client)
+//! WASM bindings for the [Sahyadri p2p Node wRPC Client](sahyadri-wrpc-client)
 //!
 
 #![allow(unused_imports)]
