@@ -4,7 +4,7 @@ pub const KEY_SIZE: usize = 32;
 /// Bytes which represent a public key.
 ///
 /// Includes an extra byte for an SEC1 tag.
-pub type PublicKeyBytes = [u8; KEY_SIZE + 1];
+pub type PublicKeyBytes = [u8; KEY_SIZE];
 
 /// Bytes which represent a private key.
 pub type PrivateKeyBytes = [u8; KEY_SIZE];
