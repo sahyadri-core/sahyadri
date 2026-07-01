@@ -6,18 +6,18 @@ pub fn calc_hash_merkle_root<'a>(txs: impl ExactSizeIterator<Item = &'a Transact
     calc_merkle_root(txs.map(hashing::tx::hash))
 }
 
-pub fn calc_hash_merkle_root_pre_crescendo<'a>(txs: impl ExactSizeIterator<Item = &'a Transaction>) -> Hash {
-    calc_merkle_root(txs.map(hashing::tx::hash_pre_crescendo))
+pub fn calc_hash_merkle_root_pre_raigad<'a>(txs: impl ExactSizeIterator<Item = &'a Transaction>) -> Hash {
+    calc_merkle_root(txs.map(hashing::tx::hash_pre_raigad))
 }
 
-pub fn calc_accepted_id_merkle_root_pre_crescendo(mut accepted_tx_ids: Vec<Hash>) -> Hash {
+pub fn calc_accepted_id_merkle_root_pre_raigad(mut accepted_tx_ids: Vec<Hash>) -> Hash {
     accepted_tx_ids.sort();
     sahyadri_merkle::calc_merkle_root(accepted_tx_ids.into_iter())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::merkle::{calc_hash_merkle_root, calc_hash_merkle_root_pre_crescendo};
+    use crate::merkle::{calc_hash_merkle_root, calc_hash_merkle_root_pre_raigad};
     use crate::{
         subnets::{SUBNETWORK_ID_COINBASE, SUBNETWORK_ID_NATIVE},
         tx::{ScriptPublicKey, Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput, scriptvec},
@@ -265,9 +265,9 @@ mod tests {
             ])
         );
 
-        // Make sure that pre-crescendo hash is unaffected by the mass set
+        // Make sure that pre-raigad hash is unaffected by the mass set
         assert_eq!(
-            calc_hash_merkle_root_pre_crescendo(txs.iter()),
+            calc_hash_merkle_root_pre_raigad(txs.iter()),
             Hash::from_slice(&[
                 0x46, 0xec, 0xf4, 0x5b, 0xe3, 0xba, 0xca, 0x34, 0x9d, 0xfe, 0x8a, 0x78, 0xde, 0xaf, 0x05, 0x3b, 0x0a, 0xa6, 0xd5,
                 0x38, 0x97, 0x4d, 0xa5, 0x0f, 0xd6, 0xef, 0xb4, 0xd2, 0x66, 0xbc, 0x8d, 0x21,
