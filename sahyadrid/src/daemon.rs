@@ -52,7 +52,7 @@ use sahyadri_wrpc_server::service::{Options as WrpcServerOptions, WebSocketCount
 /// for the sahyadrid process.
 pub const DESIRED_DAEMON_SOFT_FD_LIMIT: u64 = 8 * 1024;
 /// Minimum acceptable soft FD limit for the sahyadrid
-/// process. (Rusty Sahyadri will operate with the minimal
+/// process. (Sahyadri will operate with the minimal
 /// acceptable limit of `4096`, but a setting below
 /// this value may impact the database performance).
 pub const MINIMUM_DAEMON_SOFT_FD_LIMIT: u64 = 4 * 1024;
@@ -81,9 +81,9 @@ fn get_home_dir() -> PathBuf {
 /// Get the default application directory.
 pub fn get_app_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
-    return get_home_dir().join("rusty-sahyadri");
+    return get_home_dir().join("sahyadri");
     #[cfg(not(target_os = "windows"))]
-    return get_home_dir().join(".rusty-sahyadri");
+    return get_home_dir().join(".sahyadri");
 }
 
 pub fn validate_args(args: &Args) -> ConfigResult<()> {
