@@ -38,7 +38,7 @@ pub struct Payload {
 }
 
 impl Payload {
-    pub fn new(xpub_keys: Arc<Vec<ExtendedPublicKeySecp256k1>>, ecdsa: bool) -> Self {
+    pub fn new(xpub_keys: Arc<Vec<ExtendedPublicKeyDilithium>>, ecdsa: bool) -> Self {
         Self { xpub_keys, ecdsa }
     }
 
@@ -92,7 +92,7 @@ impl Bip32Watch {
 
         let public_key = xpub_keys.first().ok_or_else(|| Error::Bip32WatchXpubRequired)?.public_key();
 
-        let (id, storage_key) = make_account_hashes(from_bip32_watch(public_key));
+        let (id, storage_key) = make_account_hashes(from_bip32_watch(&sahyadri_wallet_keys::prelude::PublicKey { bytes: public_key.0.to_vec() }));
 
         let inner = Arc::new(Inner::new(wallet, id, storage_key, settings));
 
