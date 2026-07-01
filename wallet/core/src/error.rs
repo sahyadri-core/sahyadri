@@ -52,9 +52,6 @@ pub enum Error {
     #[error("Poison error -> {0}")]
     PoisonError(String),
 
-    #[error("Secp256k1 -> {0}")]
-    Secp256k1Error(#[from] secp256k1::Error),
-
     #[error("(consensus core sign()) {0}")]
     CoreSignError(#[from] CoreSignError),
 
