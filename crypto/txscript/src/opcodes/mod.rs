@@ -8,7 +8,6 @@ use crate::{
 };
 use blake2b_simd::Params;
 use sahyadri_consensus_core::hashing::sighash::SigHashReusedValues;
-use sahyadri_consensus_core::hashing::sighash_type::SigHashType;
 use sahyadri_consensus_core::tx::VerifiableTransaction;
 use sha2::{Digest, Sha256};
 use std::{
@@ -731,7 +730,7 @@ opcode_list! {
     }
 
     opcode OpCheckMultiSigECDSA<0xa9, 1>(self, vm) {
-        vm.op_check_multisig_schnorr_or_ecdsa(true)
+        vm.op_check_multisig(true)
     }
 
     opcode OpBlake2b<0xaa, 1>(self, vm) {
@@ -743,47 +742,28 @@ opcode_list! {
     }
 
     opcode OpCheckSigECDSA<0xab, 1>(self, vm) {
-        let [mut sig, key] = vm.dstack.pop_raw()?;
-        // Hash type
-        match sig.pop() {
-            Some(typ) => {
-                let hash_type = SigHashType::from_u8(typ).map_err(|e| TxScriptError::InvalidSigHashType(typ))?;
-                match vm.check_ecdsa_signature(hash_type, key.as_slice(), sig.as_slice()) {
-                    Ok(valid) => {
-                        vm.dstack.push_item(valid)?;
-                        Ok(())
-                    },
-                    Err(e) => {
-                        Err(e)
-                    }
-                }
-            }
-            None => {
-                vm.dstack.push_item(false)?;
+        // Deprecated: now same as OpCheckSig (Dilithium)
+        let [sig_blob, pk_hash] = vm.dstack.pop_raw()?;
+        match vm.check_dilithium_signature(pk_hash.as_slice(), sig_blob.as_slice()) {
+            Ok(valid) => {
+                vm.dstack.push_item(valid)?;
                 Ok(())
+            },
+            Err(e) => {
+                Err(e)
             }
         }
     }
 
     opcode OpCheckSig<0xac, 1>(self, vm) {
-        let [mut sig, key] = vm.dstack.pop_raw()?;
-        // Hash type
-        match sig.pop() {
-            Some(typ) => {
-                let hash_type = SigHashType::from_u8(typ).map_err(|e| TxScriptError::InvalidSigHashType(typ))?;
-                match vm.check_schnorr_signature(hash_type, key.as_slice(), sig.as_slice()) {
-                    Ok(valid) => {
-                        vm.dstack.push_item(valid)?;
-                        Ok(())
-                    },
-                    Err(e) => {
-                        Err(e)
-                    }
-                }
-            }
-            None => {
-                vm.dstack.push_item(false)?;
+        let [sig_blob, pk_hash] = vm.dstack.pop_raw()?;
+        match vm.check_dilithium_signature(pk_hash.as_slice(), sig_blob.as_slice()) {
+            Ok(valid) => {
+                vm.dstack.push_item(valid)?;
                 Ok(())
+            },
+            Err(e) => {
+                Err(e)
             }
         }
     }
@@ -799,7 +779,7 @@ opcode_list! {
     }
 
     opcode OpCheckMultiSig<0xae, 1>(self, vm) {
-        vm.op_check_multisig_schnorr_or_ecdsa(false)
+        vm.op_check_multisig(false)
     }
 
     opcode OpCheckMultiSigVerify<0xaf, 1>(self, vm) {
