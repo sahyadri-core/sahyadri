@@ -6,7 +6,7 @@ use crate::derivation::create_xpub_from_xprv;
 use crate::imports::*;
 use sahyadri_bip32::{ExtendedPrivateKey, ExtendedPublicKey, Language, Mnemonic};
 use sahyadri_utils::hex::ToHex;
-use secp256k1::SecretKey;
+use sahyadri_wallet_keys::prelude::PrivateKey as SecretKey;
 use xxhash_rust::xxh3::xxh3_64;
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
@@ -27,7 +27,7 @@ pub enum PrvKeyDataVariant {
     Bip39Seed(String),
     // Extended Private Key (XPrv)
     ExtendedPrivateKey(String),
-    // secp256k1::SecretKey
+    // Dilithium3::SecretKey
     SecretKey(String),
 }
 
@@ -78,7 +78,7 @@ impl PrvKeyDataVariant {
     }
 
     pub fn from_secret_key(secret_key: SecretKey) -> Self {
-        PrvKeyDataVariant::SecretKey(secret_key.secret_bytes().to_vec().to_hex())
+        PrvKeyDataVariant::SecretKey(secret_key.seed_bytes().to_vec().to_hex())
     }
 
     pub fn get_string(&self) -> Zeroizing<String> {
@@ -129,22 +129,22 @@ impl PrvKeyDataPayload {
         Ok(Self { prv_key_variant: PrvKeyDataVariant::from_secret_key(secret_key) })
     }
 
-    pub fn get_xprv(&self, payment_secret: Option<&Secret>) -> Result<ExtendedPrivateKey<SecretKey>> {
+    pub fn get_xprv(&self, payment_secret: Option<&Secret>) -> Result<ExtendedPrivateKey<sahyadri_bip32::DilithiumSeed>> {
         let payment_secret = payment_secret.map(|s| std::str::from_utf8(s.as_ref())).transpose()?;
 
         match &self.prv_key_variant {
             PrvKeyDataVariant::Mnemonic(mnemonic) => {
                 let mnemonic = Mnemonic::new(mnemonic, Language::English)?;
-                let xkey = ExtendedPrivateKey::<SecretKey>::new(mnemonic.to_seed(payment_secret.unwrap_or_default()))?;
+                let xkey = ExtendedPrivateKey::<sahyadri_bip32::DilithiumSeed>::new(mnemonic.to_seed(payment_secret.unwrap_or_default()))?;
                 Ok(xkey)
             }
             PrvKeyDataVariant::Bip39Seed(seed) => {
                 let seed = Zeroizing::new(Vec::from_hex(seed.as_ref())?);
-                let xkey = ExtendedPrivateKey::<SecretKey>::new(seed)?;
+                let xkey = ExtendedPrivateKey::<sahyadri_bip32::DilithiumSeed>::new(seed)?;
                 Ok(xkey)
             }
             PrvKeyDataVariant::ExtendedPrivateKey(extended_private_key) => {
-                let xkey: ExtendedPrivateKey<SecretKey> = extended_private_key.parse()?;
+                let xkey: ExtendedPrivateKey<sahyadri_bip32::DilithiumSeed> = extended_private_key.parse()?;
                 Ok(xkey)
             }
             PrvKeyDataVariant::SecretKey(_) => Err(Error::XPrvSupport),
@@ -162,9 +162,14 @@ impl PrvKeyDataPayload {
         Zeroizing::new(self.prv_key_variant.clone())
     }
 
-    pub fn as_secret_key(&self) -> Result<Option<SecretKey>> {
+    pub fn as_secret_key(&self) -> Result<Option<sahyadri_bip32::DilithiumSeed>> {
         match &self.prv_key_variant {
-            PrvKeyDataVariant::SecretKey(private_key) => Ok(Some(SecretKey::from_str(private_key)?)),
+            PrvKeyDataVariant::SecretKey(private_key) => {
+                let bytes: Vec<u8> = sahyadri_utils::hex::FromHex::from_hex(private_key.as_str()).map_err(|e| crate::error::Error::Custom(format!("hex decode: {}", e)))?;
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&bytes);
+                Ok(Some(sahyadri_bip32::DilithiumSeed(arr)))
+            }
             _ => Ok(None),
         }
     }
@@ -202,13 +207,13 @@ impl PrvKeyData {
         payment_secret: Option<&Secret>,
         account_kind: AccountKind,
         account_index: u64,
-    ) -> Result<ExtendedPublicKey<secp256k1::PublicKey>> {
+    ) -> Result<ExtendedPublicKey<sahyadri_bip32::DilithiumPkHash>> {
         let payload = self.payload.decrypt(payment_secret)?;
         let xprv = payload.get_xprv(payment_secret)?;
         create_xpub_from_xprv(xprv, account_kind, account_index).await
     }
 
-    pub fn get_xprv(&self, payment_secret: Option<&Secret>) -> Result<ExtendedPrivateKey<secp256k1::SecretKey>> {
+    pub fn get_xprv(&self, payment_secret: Option<&Secret>) -> Result<ExtendedPrivateKey<sahyadri_bip32::DilithiumSeed>> {
         let payload = self.payload.decrypt(payment_secret)?;
         payload.get_xprv(payment_secret)
     }
@@ -241,13 +246,13 @@ impl PrvKeyData {
         Ok(prv_key_data)
     }
 
-    pub fn as_secret_key(&self, payment_secret: Option<&Secret>) -> Result<Option<SecretKey>> {
+    pub fn as_secret_key(&self, payment_secret: Option<&Secret>) -> Result<Option<sahyadri_bip32::DilithiumSeed>> {
         let payload = self.payload.decrypt(payment_secret)?;
         payload.as_secret_key()
     }
 
     pub fn try_from_secret_key(
-        secret_key: SecretKey,
+        secret_key: sahyadri_wallet_keys::prelude::PrivateKey,
         payment_secret: Option<&Secret>,
         encryption_kind: EncryptionKind,
         name: Option<String>,
@@ -305,7 +310,7 @@ impl PrvKeyData {
     }
 
     pub fn try_new_from_secret_key(
-        secret_key: SecretKey,
+        secret_key: sahyadri_wallet_keys::prelude::PrivateKey,
         payment_secret: Option<&Secret>,
         encryption_kind: EncryptionKind,
     ) -> Result<Self> {
