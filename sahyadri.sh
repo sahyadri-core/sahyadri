@@ -14,4 +14,4 @@ echo "---------------------------------------------------"
 NODE_BIN=~/sahyadri-final/sahyadri/target/release/sahyadrid
 
 # Run the node
-$NODE_BIN --utxoindex --archival --rpclisten-borsh=0.0.0.0:27110 --rpclisten-json=0.0.0.0:27112
+$NODE_BIN --utxoindex --archival --enable-unsynced-mining --rpclisten-borsh=0.0.0.0:27110 --rpclisten-json=0.0.0.0:27112
