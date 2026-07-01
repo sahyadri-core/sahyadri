@@ -1,5 +1,5 @@
 //! PSKT input structure.
-
+use sahyadri_bip32::DilithiumPkHash;
 use crate::pskt::{KeySource, PartialSigs};
 use crate::utils::{Error as CombineMapErr, combine_if_no_conflicts};
 use derive_builder::Builder;
@@ -42,7 +42,7 @@ pub struct Input {
     pub sig_op_count: Option<u8>,
     /// A map from public keys needed to sign this input to their corresponding
     /// master key fingerprints and derivation paths.
-    pub bip32_derivations: BTreeMap<secp256k1::PublicKey, Option<KeySource>>,
+    pub bip32_derivations: BTreeMap<DilithiumPkHash, Option<KeySource>>,
     #[serde(with = "sahyadri_utils::serde_bytes_optional")]
     /// The finalized, fully-constructed scriptSig with signatures and any other
     /// scripts necessary for this input to pass validation.
@@ -160,7 +160,7 @@ pub enum CombineError {
     NotCompatibleUtxos { this: UtxoEntry, that: UtxoEntry },
 
     #[error("Two different derivations for the same key")]
-    NotCompatibleBip32Derivations(#[from] CombineMapErr<secp256k1::PublicKey, Option<KeySource>>),
+    NotCompatibleBip32Derivations(#[from] CombineMapErr<DilithiumPkHash, Option<KeySource>>),
     #[error("Two different unknown field values")]
     NotCompatibleUnknownField(CombineMapErr<String, serde_value::Value>),
     #[error("Two different proprietary values")]
