@@ -1,62 +1,57 @@
 //!
-//! Private Key
+//! Private Key (Dilithium seed-based)
 //!
 
 use crate::imports::*;
 use crate::keypair::Keypair;
 use js_sys::{Array, Uint8Array};
+use sahyadri_dilithium::generate_keypair_from_seed;
+use sha2::{Sha256, Digest};
 
-/// Data structure that envelops a Private Key.
+/// Data structure that envelops a Private Key (32-byte seed for Dilithium key derivation).
 /// @category Wallet SDK
 #[derive(Clone, Debug, CastFromJs)]
 #[wasm_bindgen]
 pub struct PrivateKey {
-    inner: secp256k1::SecretKey,
+    #[wasm_bindgen(skip)]
+    pub inner: [u8; 32],
 }
 
 impl PrivateKey {
-    pub fn secret_bytes(&self) -> [u8; 32] {
-        self.inner.secret_bytes()
-    }
-}
-
-impl From<&secp256k1::SecretKey> for PrivateKey {
-    fn from(value: &secp256k1::SecretKey) -> Self {
-        Self { inner: *value }
-    }
-}
-
-impl From<&PrivateKey> for [u8; 32] {
-    fn from(key: &PrivateKey) -> Self {
-        key.secret_bytes()
+    pub fn seed_bytes(&self) -> &[u8; 32] {
+        &self.inner
     }
 }
 
 #[wasm_bindgen]
 impl PrivateKey {
-    /// Create a new [`PrivateKey`] from a hex-encoded string.
+    /// Create a new [`PrivateKey`] from a hex-encoded 32-byte seed string.
     #[wasm_bindgen(constructor)]
     pub fn try_new(key: &str) -> Result<PrivateKey> {
-        Ok(Self { inner: secp256k1::SecretKey::from_str(key)? })
+        let mut seed = [0u8; 32];
+        faster_hex::hex_decode(key.as_bytes(), &mut seed)
+            .map_err(|_| Error::custom("Invalid hex for PrivateKey seed"))?;
+        Ok(Self { inner: seed })
     }
 }
 
 impl PrivateKey {
     pub fn try_from_slice(data: &[u8]) -> Result<PrivateKey> {
-        Ok(Self { inner: secp256k1::SecretKey::from_slice(data)? })
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&data[..32]);
+        Ok(Self { inner: seed })
     }
 }
 
 #[wasm_bindgen]
 impl PrivateKey {
-    /// Returns the [`PrivateKey`] key encoded as a hex string.
+    /// Returns the [`PrivateKey`] seed encoded as a hex string.
     #[wasm_bindgen(js_name = toString)]
     pub fn to_hex(&self) -> String {
-        use sahyadri_utils::hex::ToHex;
-        self.secret_bytes().to_vec().to_hex()
+        self.inner.to_vec().to_hex()
     }
 
-    /// Generate a [`Keypair`] from this [`PrivateKey`].
+    /// Generate a [`Keypair`] from this [`PrivateKey`] seed.
     #[wasm_bindgen(js_name = toKeypair)]
     pub fn to_keypair(&self) -> Result<Keypair, JsError> {
         Keypair::from_private_key(self)
@@ -64,31 +59,16 @@ impl PrivateKey {
 
     #[wasm_bindgen(js_name = toPublicKey)]
     pub fn to_public_key(&self) -> Result<PublicKey, JsError> {
-        Ok(PublicKey::from(secp256k1::PublicKey::from_secret_key_global(&self.inner)))
+        let kp = generate_keypair_from_seed(&self.inner);
+        Ok(PublicKey::from(kp.public_key().to_vec()))
     }
 
-    /// Get the [`Address`] of the PublicKey generated from this PrivateKey.
-    /// Receives a [`NetworkType`](sahyadri_consensus_core::network::NetworkType)
-    /// to determine the prefix of the address.
-    /// JavaScript: `let address = privateKey.toAddress(NetworkType.MAINNET);`.
+    /// Get the [`Address`] derived from this PrivateKey's Dilithium public key.
     #[wasm_bindgen(js_name = toAddress)]
     pub fn to_address(&self, network: &NetworkTypeT) -> Result<Address> {
-        let public_key = secp256k1::PublicKey::from_secret_key_global(&self.inner);
-        let (x_only_public_key, _) = public_key.x_only_public_key();
-        let payload = x_only_public_key.serialize();
-        let address = Address::new(network.try_into()?, AddressVersion::PubKey, &payload);
-        Ok(address)
-    }
-
-    /// Get `ECDSA` [`Address`] of the PublicKey generated from this PrivateKey.
-    /// Receives a [`NetworkType`](sahyadri_consensus_core::network::NetworkType)
-    /// to determine the prefix of the address.
-    /// JavaScript: `let address = privateKey.toAddress(NetworkType.MAINNET);`.
-    #[wasm_bindgen(js_name = toAddressECDSA)]
-    pub fn to_address_ecdsa(&self, network: &NetworkTypeT) -> Result<Address> {
-        let public_key = secp256k1::PublicKey::from_secret_key_global(&self.inner);
-        let payload = public_key.serialize();
-        let address = Address::new(network.try_into()?, AddressVersion::PubKeyECDSA, &payload);
+        let kp = generate_keypair_from_seed(&self.inner);
+        let payload = &Sha256::digest(kp.public_key())[..20];
+        let address = Address::new(network.try_into()?, AddressVersion::PubKeyDilithium, payload);
         Ok(address)
     }
 }
