@@ -1,5 +1,5 @@
 //! PSKT output structure.
-
+use sahyadri_bip32::DilithiumPkHash;
 use crate::pskt::KeySource;
 use crate::utils::combine_if_no_conflicts;
 use derive_builder::Builder;
@@ -21,7 +21,7 @@ pub struct Output {
     pub redeem_script: Option<Vec<u8>>,
     /// A map from public keys needed to spend this output to their
     /// corresponding master key fingerprints and derivation paths.
-    pub bip32_derivations: BTreeMap<secp256k1::PublicKey, Option<KeySource>>,
+    pub bip32_derivations: BTreeMap<DilithiumPkHash, Option<KeySource>>,
     /// Proprietary key-value pairs for this output.
     pub proprietaries: BTreeMap<String, serde_value::Value>,
     #[serde(flatten)]
@@ -77,7 +77,7 @@ pub enum CombineError {
     NotCompatibleRedeemScripts { this: Vec<u8>, that: Vec<u8> },
 
     #[error("Two different derivations for the same key")]
-    NotCompatibleBip32Derivations(#[from] crate::utils::Error<secp256k1::PublicKey, Option<KeySource>>),
+    NotCompatibleBip32Derivations(#[from] crate::utils::Error<DilithiumPkHash, Option<KeySource>>),
     #[error("Two different unknown field values")]
     NotCompatibleUnknownField(crate::utils::Error<String, serde_value::Value>),
     #[error("Two different proprietary values")]
