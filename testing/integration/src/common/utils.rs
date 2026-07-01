@@ -20,7 +20,7 @@ use sahyadri_grpc_client::GrpcClient;
 use sahyadri_rpc_core::{BlockAddedNotification, Notification, RpcUtxoEntry, VirtualDaaScoreChangedNotification, api::rpc::RpcApi};
 use sahyadri_txscript::pay_to_address_script;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use secp256k1::Keypair;
+use sahyadri_dilithium::DilithiumKeyPair;
 use std::{
     collections::{HashMap, HashSet, hash_map::Entry::Occupied},
     future::Future,
@@ -44,7 +44,7 @@ pub const fn required_fee(num_inputs: usize, num_outputs: u64) -> u64 {
 /// Builds a TX DAG based on the initial UTXO set and on constant params
 pub fn generate_tx_dag(
     mut utxoset: UtxoCollection,
-    schnorr_key: Keypair,
+    keypair: DilithiumKeyPair,
     spk: ScriptPublicKey,
     target_levels: usize,
     target_width: usize,
@@ -82,7 +82,7 @@ pub fn generate_tx_dag(
                     .map(|_| TransactionOutput { value: total_out / num_outputs, script_public_key: spk.clone() })
                     .collect_vec();
                 let unsigned_tx = Transaction::new(TX_VERSION, inputs, outputs, 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
-                sign(SignableTransaction::with_entries(unsigned_tx, entries), schnorr_key)
+                sign(SignableTransaction::with_entries(unsigned_tx, entries), &keypair)
             })
             .collect::<Vec<_>>()
             .into_iter()
@@ -135,7 +135,7 @@ where
 }
 
 pub fn generate_tx(
-    schnorr_key: Keypair,
+    keypair: DilithiumKeyPair,
     utxos: &[(TransactionOutpoint, UtxoEntry)],
     amount: u64,
     num_outputs: u64,
@@ -154,7 +154,7 @@ pub fn generate_tx(
         .collect_vec();
     let unsigned_tx = Transaction::new(TX_VERSION, inputs, outputs, 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
     let signed_tx =
-        sign(MutableTransaction::with_entries(unsigned_tx, utxos.iter().map(|(_, entry)| entry.clone()).collect_vec()), schnorr_key);
+        sign(MutableTransaction::with_entries(unsigned_tx, utxos.iter().map(|(_, entry)| entry.clone()).collect_vec()), &keypair);
     signed_tx.tx
 }
 
