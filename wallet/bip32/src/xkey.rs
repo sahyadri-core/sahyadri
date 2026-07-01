@@ -19,12 +19,12 @@ pub struct ExtendedKey {
     /// Key material (may be public or private).
     ///
     /// Includes an extra byte for a public key's SEC1 tag.
-    pub key_bytes: [u8; KEY_SIZE + 1],
+    pub key_bytes: [u8; KEY_SIZE],
 }
 
 impl ExtendedKey {
     /// Size of an extended key when deserialized into bytes from Base58.
-    pub const BYTE_SIZE: usize = 78;
+    pub const BYTE_SIZE: usize = 77;
 
     /// Maximum size of a Base58Check-encoded extended key in bytes.
     ///
@@ -43,7 +43,7 @@ impl ExtendedKey {
         bytes[5..9].copy_from_slice(&self.attrs.parent_fingerprint);
         bytes[9..13].copy_from_slice(&self.attrs.child_number.to_bytes());
         bytes[13..45].copy_from_slice(&self.attrs.chain_code);
-        bytes[45..78].copy_from_slice(&self.key_bytes);
+        bytes[45..77].copy_from_slice(&self.key_bytes);
 
         //println!("serialized {}", hex::encode(&bytes));
         let base58_len = bs58::encode(&bytes).with_check().onto(buffer.as_mut())?;
@@ -85,7 +85,7 @@ impl FromStr for ExtendedKey {
         let parent_fingerprint = bytes[5..9].try_into()?;
         let child_number = ChildNumber::from_bytes(bytes[9..13].try_into()?);
         let chain_code = bytes[13..45].try_into()?;
-        let key_bytes = bytes[45..78].try_into()?;
+        let key_bytes = bytes[45..77].try_into()?;
         bytes.zeroize();
 
         let attrs = ExtendedKeyAttrs { depth, parent_fingerprint, child_number, chain_code };
