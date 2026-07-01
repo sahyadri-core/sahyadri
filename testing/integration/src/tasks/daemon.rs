@@ -11,6 +11,8 @@ use sahyadri_utils::{fd_budget, triggers::SingleTrigger};
 use sahyadrid_lib::args::Args;
 use std::{iter::once, sync::Arc};
 use tokio::task::JoinHandle;
+use sahyadri_dilithium;
+use sha2::Digest;
 
 /// Arguments for configuring a [`DaemonTask`]
 #[derive(Parser, Debug)]
@@ -96,13 +98,13 @@ impl DaemonArgs {
     }
 
     pub fn prealloc_address(&self) -> Address {
-        let mut private_key_bytes = [0u8; 32];
-        faster_hex::hex_decode(self.private_key.as_bytes(), &mut private_key_bytes).unwrap();
-        let schnorr_key = secp256k1::Keypair::from_seckey_slice(secp256k1::SECP256K1, &private_key_bytes).unwrap();
+        let mut seed = [0u8; 32];
+        faster_hex::hex_decode(self.private_key.as_bytes(), &mut seed).unwrap();
+        let kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
         Address::new(
             NetworkType::Simnet.into(),
-            sahyadri_addresses::Version::PubKey,
-            &schnorr_key.public_key().x_only_public_key().0.serialize(),
+            sahyadri_addresses::Version::PubKeyDilithium,
+            &sha2::Sha256::digest(kp.public_key())[0..20],
         )
     }
 
