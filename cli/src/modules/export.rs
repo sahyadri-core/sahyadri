@@ -44,14 +44,13 @@ async fn export_multisig_account(ctx: Arc<SahyadriCli>, account: Arc<MultiSig>) 
             tprintln!(ctx, "");
 
             let prv_key_data_store = ctx.store().as_prv_key_data_store()?;
-            let mut generated_xpub_keys = Vec::with_capacity(prv_key_data_ids.len());
+            let mut generated_xpub_keys = Vec::new();
 
             for (id, prv_key_data_id) in prv_key_data_ids.iter().enumerate() {
                 let prv_key_data = prv_key_data_store.load_key_data(&wallet_secret, prv_key_data_id).await?.unwrap();
                 let mnemonic = prv_key_data.as_mnemonic(None).unwrap().unwrap();
 
-                let xpub_key: sahyadri_bip32::ExtendedPublicKey<sahyadri_bip32::secp256k1::PublicKey> =
-                    prv_key_data.create_xpub(None, MULTISIG_ACCOUNT_KIND.into(), 0).await?; // todo it can be done concurrently
+                let xpub_key = prv_key_data.create_xpub(None, MULTISIG_ACCOUNT_KIND.into(), 0).await?;
 
                 tprintln!(ctx, "");
                 tprintln!(ctx, "extended public key {}:", id + 1);
@@ -66,8 +65,8 @@ async fn export_multisig_account(ctx: Arc<SahyadriCli>, account: Arc<MultiSig>) 
 
                 generated_xpub_keys.push(xpub_key);
             }
-            let test = account.xpub_keys();
 
+            let test = account.xpub_keys();
             if let Some(keys) = test {
                 let additional = keys.iter().filter(|item| !generated_xpub_keys.contains(item));
                 additional.enumerate().for_each(|(idx, xpub)| {
@@ -106,7 +105,7 @@ async fn export_single_key_account(ctx: Arc<SahyadriCli>, account: Arc<dyn Accou
     let prv_key_data = keydata.payload.decrypt(payment_secret.as_ref())?;
     let mnemonic = prv_key_data.as_ref().as_mnemonic()?;
 
-    let xpub_key = keydata.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0).await?; // todo it can be done concurrently
+    let xpub_key = keydata.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0).await?;
 
     tprintln!(ctx, "extended public key:");
     tprintln!(ctx, "");
@@ -127,9 +126,9 @@ async fn export_single_key_account(ctx: Arc<SahyadriCli>, account: Arc<dyn Accou
             tpara!(
                 ctx,
                 "\
-                                IMPORTANT: to recover your private key using this mnemonic in the future \
-                                you will need your payment password. Your payment password is permanently associated with \
-                                this mnemonic.",
+                IMPORTANT: to recover your private key using this mnemonic in the future \
+                you will need your payment password. Your payment password is permanently associated with \
+                this mnemonic.",
             );
             tprintln!(ctx, "");
             tprintln!(ctx, "mnemonic:");
