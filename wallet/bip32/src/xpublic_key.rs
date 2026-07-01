@@ -1,7 +1,7 @@
 //! Extended public keys
 //!
 use crate::{
-    ChildNumber, DerivationPath, Error, ExtendedKey, ExtendedKeyAttrs, ExtendedPrivateKey, KEY_SIZE, KeyFingerprint, Prefix,
+    ChildNumber, DerivationPath, DilithiumPkHash, Error, ExtendedKey, ExtendedKeyAttrs, ExtendedPrivateKey, KEY_SIZE, KeyFingerprint, Prefix,
     PrivateKey, PublicKey, PublicKeyBytes, Result, types::*,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -10,9 +10,9 @@ use hmac::Mac;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::fmt;
 
-///// Extended public secp256k1 ECDSA verification key.
-//#[cfg(feature = "secp256k1")]
-//#[cfg_attr(docsrs, doc(cfg(feature = "secp256k1")))]
+///// Extended public Dilithium3 ECDSA verification key.
+//#[cfg(feature = "Dilithium3")]
+//#[cfg_attr(docsrs, doc(cfg(feature = "Dilithium3")))]
 //pub type XPub = ExtendedPublicKey<k256::ecdsa::VerifyingKey>;
 
 /// Extended public keys derived using BIP32.
@@ -130,12 +130,12 @@ where
         if extended_key.prefix.is_public() {
             Ok(ExtendedPublicKey { public_key: PublicKey::from_bytes(extended_key.key_bytes)?, attrs: extended_key.attrs.clone() })
         } else {
-            Err(Error::Crypto(secp256k1::Error::InvalidPublicKey))
+            Err(Error::String("Invalid extended public key".into()))
         }
     }
 }
 
-impl fmt::Display for ExtendedPublicKey<secp256k1::PublicKey> {
+impl fmt::Display for ExtendedPublicKey<DilithiumPkHash> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.to_string(None).fmt(f)
     }
@@ -183,7 +183,7 @@ where
             return Err(std::io::Error::other("Invalid extended public key version"));
         }
 
-        let mut public_key_bytes: [u8; KEY_SIZE + 1] = [0; KEY_SIZE + 1];
+        let mut public_key_bytes: [u8; KEY_SIZE] = [0; KEY_SIZE];
         reader.read_exact(&mut public_key_bytes)?;
         let public_key = K::from_bytes(public_key_bytes).map_err(|_| std::io::Error::other("Invalid extended public key"))?;
         let attrs = ExtendedKeyAttrs::deserialize_reader(reader)?;
