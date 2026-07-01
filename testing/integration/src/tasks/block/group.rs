@@ -11,9 +11,9 @@ use sahyadri_addresses::Address;
 use sahyadri_consensus_core::network::NetworkId;
 use sahyadri_core::debug;
 use sahyadri_utils::triggers::SingleTrigger;
-use rand::thread_rng;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
+use sha2::Digest;
 
 pub struct MinerGroupTask {
     submitter: Arc<BlockSubmitterTask>,
@@ -38,10 +38,10 @@ impl MinerGroupTask {
         let submitter = BlockSubmitterTask::build(client_manager.clone(), submitter_pool_size, stopper).await;
 
         // Mining key and address
-        let (sk, pk) = &secp256k1::generate_keypair(&mut thread_rng());
+        let kp = sahyadri_dilithium::generate_keypair().expect("generate dilithium keypair");
         let pay_address =
-            Address::new(network.network_type().into(), sahyadri_addresses::Version::PubKey, &pk.x_only_public_key().0.serialize());
-        debug!("Generated private key {} and address {}", sk.display_secret(), pay_address);
+            Address::new(network.network_type().into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(kp.public_key())[0..20]);
+        debug!("Generated address {}", pay_address);
 
         // Block template receiver
         let client = Arc::new(client_manager.new_client().await);
