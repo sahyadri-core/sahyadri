@@ -8,7 +8,7 @@ use crate::imports::*;
 use crate::storage::PrvKeyDataId;
 use sahyadri_hashes::Hash;
 use sahyadri_utils::as_slice::AsSlice;
-use secp256k1::PublicKey;
+use sahyadri_wallet_keys::prelude::PublicKey;
 
 /// Deterministic byte sequence derived from account data (can be used for auxiliary data storage encryption).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
@@ -77,7 +77,7 @@ impl std::fmt::Display for AccountId {
     }
 }
 
-seal! { 0x544d, {
+seal! { 0xcd2c, {
     // IMPORTANT: This data structure is meant to be deterministic
     // so it can not contain any new fields or be changed.
     #[derive(BorshSerialize)]
@@ -86,7 +86,7 @@ seal! { 0x544d, {
         prv_key_data_ids: &'data Option<T>,
         ecdsa: Option<bool>,
         account_index: Option<u64>,
-        secp256k1_public_key: Option<Vec<u8>>,
+        dilithium_public_key: Option<Vec<u8>>,
         data: Option<Vec<u8>>,
     }
 }}
@@ -116,7 +116,7 @@ pub fn from_bip32<const N: usize>(prv_key_data_id: &PrvKeyDataId, data: &bip32::
         prv_key_data_ids: &Some([*prv_key_data_id]),
         ecdsa: Some(data.ecdsa),
         account_index: Some(data.account_index),
-        secp256k1_public_key: None,
+        dilithium_public_key: None,
         data: None,
     };
     make_hashes(hashable)
@@ -129,7 +129,7 @@ pub fn from_legacy<const N: usize>(prv_key_data_id: &PrvKeyDataId, _data: &legac
         prv_key_data_ids: &Some([*prv_key_data_id]),
         ecdsa: Some(false),
         account_index: Some(0),
-        secp256k1_public_key: None,
+        dilithium_public_key: None,
         data: None,
     };
     make_hashes(hashable)
@@ -142,7 +142,7 @@ pub fn from_multisig<const N: usize>(prv_key_data_ids: &Option<Arc<Vec<PrvKeyDat
         prv_key_data_ids,
         ecdsa: Some(data.ecdsa),
         account_index: None,
-        secp256k1_public_key: None,
+        dilithium_public_key: None,
         data: Some(borsh::to_vec(&data.xpub_keys).unwrap()),
     };
     make_hashes(hashable)
@@ -158,7 +158,7 @@ pub fn from_bip32_watch_multisig<const N: usize>(
         prv_key_data_ids,
         ecdsa: Some(data.ecdsa),
         account_index: None,
-        secp256k1_public_key: None,
+        dilithium_public_key: None,
         data: Some(borsh::to_vec(&data.xpub_keys).unwrap()),
     };
     make_hashes(hashable)
@@ -171,7 +171,7 @@ pub(crate) fn from_keypair<const N: usize>(prv_key_data_id: &PrvKeyDataId, data:
         prv_key_data_ids: &Some([*prv_key_data_id]),
         ecdsa: Some(data.ecdsa),
         account_index: None,
-        secp256k1_public_key: Some(data.public_key.serialize().to_vec()),
+        dilithium_public_key: Some(data.public_key.bytes.clone()),
         data: None,
     };
     make_hashes(hashable)
@@ -184,7 +184,7 @@ pub fn from_public_key<const N: usize>(account_kind: &AccountKind, public_key: &
         prv_key_data_ids: &None,
         ecdsa: None,
         account_index: None,
-        secp256k1_public_key: Some(public_key.serialize().to_vec()),
+        dilithium_public_key: Some(public_key.bytes.clone()),
         data: None,
     };
     make_hashes(hashable)
@@ -197,7 +197,7 @@ pub fn from_bip32_watch<const N: usize>(public_key: &PublicKey) -> [Hash; N] {
         prv_key_data_ids: &None,
         ecdsa: None,
         account_index: Some(0),
-        secp256k1_public_key: Some(public_key.serialize().to_vec()),
+        dilithium_public_key: Some(public_key.bytes.clone()),
         data: None,
     };
     make_hashes(hashable)
@@ -210,7 +210,7 @@ pub fn from_data<const N: usize>(account_kind: &AccountKind, data: &[u8]) -> [Ha
         prv_key_data_ids: &None,
         ecdsa: None,
         account_index: None,
-        secp256k1_public_key: None,
+        dilithium_public_key: None,
         data: Some(data.to_vec()),
     };
     make_hashes(hashable)
