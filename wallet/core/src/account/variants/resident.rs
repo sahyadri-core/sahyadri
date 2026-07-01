@@ -5,7 +5,7 @@
 use crate::account::Inner;
 use crate::imports::*;
 use sahyadri_addresses::Version;
-use secp256k1::{PublicKey, SecretKey};
+use sahyadri_wallet_keys::prelude::{PublicKey, PrivateKey};
 
 pub const RESIDENT_ACCOUNT_KIND: &str = "sahyadri-resident-standard";
 
@@ -14,11 +14,11 @@ pub struct Resident {
     public_key: PublicKey,
 
     #[allow(dead_code)]
-    secret_key: Option<SecretKey>,
+    secret_key: Option<PrivateKey>,
 }
 
 impl Resident {
-    pub async fn try_load(wallet: &Arc<Wallet>, public_key: PublicKey, secret_key: Option<SecretKey>) -> Result<Self> {
+    pub async fn try_load(wallet: &Arc<Wallet>, public_key: PublicKey, secret_key: Option<PrivateKey>) -> Result<Self> {
         let (id, storage_key) = make_account_hashes(from_public_key(&RESIDENT_ACCOUNT_KIND.into(), &public_key));
         let inner = Arc::new(Inner::new(wallet, id, storage_key, Default::default()));
 
@@ -55,13 +55,15 @@ impl Account for Resident {
     }
 
     fn receive_address(&self) -> Result<Address> {
-        let (xonly_public_key, _) = self.public_key.x_only_public_key();
-        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &xonly_public_key.serialize()))
+    use sha2::{Sha256, Digest};
+        let hash = Sha256::digest(&self.public_key.bytes);
+        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }
 
     fn change_address(&self) -> Result<Address> {
-        let (xonly_public_key, _) = self.public_key.x_only_public_key();
-        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &xonly_public_key.serialize()))
+    use sha2::{Sha256, Digest};
+        let hash = Sha256::digest(&self.public_key.bytes);
+        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }
 
     fn to_storage(&self) -> Result<AccountStorage> {
