@@ -1502,10 +1502,9 @@ mod tests {
     }
 
     fn get_miner_data(prefix: Prefix) -> MinerData {
-        let secp = secp256k1::Secp256k1::new();
-        let mut rng = rand::thread_rng();
-        let (_sk, pk) = secp.generate_keypair(&mut rng);
-        let address = Address::new(prefix, Version::PubKeyECDSA, &pk.serialize());
+        let kp = sahyadri_dilithium::generate_keypair().unwrap();
+        let pk_hash = sha2::Sha256::digest(kp.public_key());
+        let address = Address::new(prefix, Version::PubKeyDilithium, &pk_hash[0..20]);
         let script = pay_to_address_script(&address);
         MinerData::new(script, vec![])
     }
