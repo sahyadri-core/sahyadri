@@ -95,7 +95,7 @@ impl PendingTransaction {
     ) -> Result<HexString> {
         let signature = self.inner.create_input_signature(
             input_index.into(),
-            &private_key.secret_bytes(),
+            &private_key.seed_bytes(),
             sighash_type.unwrap_or(SighashType::All).into(),
         )?;
 
@@ -112,7 +112,7 @@ impl PendingTransaction {
     /// and an optional SighashType.
     #[wasm_bindgen(js_name = signInput)]
     pub fn sign_input(&self, input_index: u8, private_key: &PrivateKey, sighash_type: Option<SighashType>) -> Result<()> {
-        self.inner.sign_input(input_index.into(), &private_key.secret_bytes(), sighash_type.unwrap_or(SighashType::All).into())?;
+        self.inner.sign_input(input_index.into(), &private_key.seed_bytes(), sighash_type.unwrap_or(SighashType::All).into())?;
 
         Ok(())
     }
@@ -125,7 +125,7 @@ impl PendingTransaction {
                 .iter()
                 .map(PrivateKey::try_owned_from)
                 .collect::<std::result::Result<Vec<_>, sahyadri_wallet_keys::error::Error>>()?;
-            let mut keys = keys.iter().map(|key| key.secret_bytes()).collect::<Vec<_>>();
+            let mut keys: Vec<[u8; 32]> = keys.iter().map(|key| *key.seed_bytes()).collect();
             self.inner.try_sign_with_keys(&keys, check_fully_signed)?;
             keys.zeroize();
             Ok(())
