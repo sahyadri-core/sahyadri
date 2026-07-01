@@ -1,5 +1,4 @@
 use sahyadri_addresses::Version;
-use sahyadri_bip32::secp256k1::XOnlyPublicKey;
 use sahyadri_wallet_core::message::SignMessageOptions;
 use sahyadri_wallet_core::{
     account::{BIP32_ACCOUNT_KIND, KEYPAIR_ACCOUNT_KIND},
@@ -38,11 +37,9 @@ impl Message {
                 if argv.len() != 2 {
                     return self.display_help(ctx, argv).await;
                 }
-
                 let sahyadri_address = argv[1].as_str();
                 let asked_message = ctx.term().ask(false, "Message: ").await?;
                 let message = asked_message.as_str();
-
                 self.sign(ctx, sahyadri_address, message).await?;
             }
             "verify" => {
@@ -53,7 +50,6 @@ impl Message {
                 let signature = argv[2].as_str();
                 let asked_message = ctx.term().ask(false, "Message: ").await?;
                 let message = asked_message.as_str();
-
                 self.verify(ctx, sahyadri_address, signature, message).await?;
             }
             v => {
@@ -69,14 +65,10 @@ impl Message {
         ctx.term().help(
             &[
                 ("sign <sahyadri_address>", "Sign a message with the private key that matches the given address. Prompts for message."),
-                (
-                    "verify <sahyadri_address> <signature>",
-                    "Verify the signature against the message and sahyadri_address. Prompts for message.",
-                ),
+                ("verify <sahyadri_address> <signature>", "Verify the signature against the message and sahyadri_address. Prompts for message."),
             ],
             None,
         )?;
-
         Ok(())
     }
 
@@ -90,9 +82,7 @@ impl Message {
         let privkey = self.get_address_private_key(&ctx, sahyadri_address).await?;
         let sign_options = SignMessageOptions { no_aux_rand: false };
 
-        let sig_result = sign_message(&pm, &privkey, &sign_options);
-
-        match sig_result {
+        match sign_message(&pm, &privkey, &sign_options) {
             Ok(signature) => {
                 let sig_hex = faster_hex::hex_string(signature.as_slice());
                 tprintln!(ctx, "Signature: {}", sig_hex);
@@ -108,24 +98,22 @@ impl Message {
             return Err(Error::custom("Address not supported for message signing. Only supports PubKey addresses"));
         }
 
-        let pubkey = XOnlyPublicKey::from_slice(&sahyadri_address.payload[0..32]).unwrap();
+        let pubkey_bytes = sahyadri_address.payload.as_slice();
 
-        let mut signature_hex = [0u8; 64];
-        faster_hex::hex_decode(signature.as_bytes(), &mut signature_hex)?;
+        let sig_len = signature.len() / 2;
+        let mut signature_bytes = vec![0u8; sig_len];
+        faster_hex::hex_decode(signature.as_bytes(), &mut signature_bytes)?;
 
         let pm = PersonalMessage(message);
-        let verify_result = verify_message(&pm, &signature_hex.to_vec(), &pubkey);
 
-        match verify_result {
-            Ok(()) => {
+        match verify_message(&pm, &signature_bytes, pubkey_bytes) {
+            Ok(true) => {
                 tprintln!(ctx, "Message verified successfully!");
+                Ok(())
             }
-            Err(_) => {
-                return Err(Error::custom("Verification failed"));
-            }
+            Ok(false) => Err(Error::custom("Verification failed: signature does not match")),
+            Err(e) => Err(Error::custom(format!("Verification error: {}", e))),
         }
-
-        Ok(())
     }
 
     async fn get_address_private_key(self: Arc<Self>, ctx: &Arc<SahyadriCli>, sahyadri_address: Address) -> Result<[u8; 32]> {
@@ -141,10 +129,9 @@ impl Message {
                 let private_keys = account.create_private_keys(&keydata, &payment_secret, &receive, &change)?;
                 for (address, private_key) in private_keys {
                     if sahyadri_address == *address {
-                        return Ok(private_key.secret_bytes());
+                        return Ok(private_key.0);
                     }
                 }
-
                 Err(Error::custom("Could not find address in any derivation path in account"))
             }
             KEYPAIR_ACCOUNT_KIND => {
@@ -152,7 +139,7 @@ impl Message {
                 let keydata = account.prv_key_data(wallet_secret).await?;
                 let decrypted_privkey = keydata.payload.decrypt(payment_secret.as_ref()).unwrap();
                 let secretkey = decrypted_privkey.as_secret_key()?.unwrap();
-                Ok(secretkey.secret_bytes())
+                Ok(secretkey.0)
             }
             _ => Err(Error::custom("Unsupported account kind")),
         }
