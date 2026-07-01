@@ -1,12 +1,12 @@
 
-## WASM32 bindings for Rusty Sahyadri SDK
+## WASM32 bindings for Sahyadri SDK
 
-[<img alt="github" src="https://img.shields.io/badge/github-sahyadrinet/rusty--sahyadri-8da0cb?style=for-the-badge&labelColor=555555&color=8da0cb&logo=github" height="20">](https://github.com/sahyadrinet/rusty-sahyadri/tree/master/wasm)
+[<img alt="github" src="https://img.shields.io/badge/github-sahyadrinet/sahyadri-8da0cb?style=for-the-badge&labelColor=555555&color=8da0cb&logo=github" height="20">](https://github.com/sahyadrinet/sahyadri/tree/master/wasm)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/sahyadri-wasm.svg?maxAge=2592000&style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/sahyadri-wasm)
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-sahyadri--wasm-56c2a5?maxAge=2592000&style=for-the-badge&logo=docs.rs" height="20">](https://docs.rs/sahyadri-wasm)
 <img alt="license" src="https://img.shields.io/crates/l/sahyadri-wasm.svg?maxAge=2592000&color=6ac&style=for-the-badge&logoColor=fff" height="20">
 
-Rusty-Sahyadri WASM32 bindings offer direct integration of Rust code and Rusty-Sahyadri
+Sahyadri WASM32 bindings offer direct integration of Rust code and Sahyadri
 codebase within JavaScript and TypeScript environments such as Node.js and Web Browsers.
 
 ## Documentation
@@ -28,7 +28,7 @@ The SDK is currently separated into the following top-level categories:
 
 - **RPC API** — RPC API for the Sahyadri node using WebSockets.
 - **Wallet SDK** — Bindings for primitives related to key management and transactions.
-- **Wallet API** — API for the Rusty Sahyadri Wallet framework.
+- **Wallet API** — API for the Sahyadri Wallet framework.
 
 ## WASM32 SDK release packages
 
@@ -43,16 +43,16 @@ For NodeJS, the SDK is built as a single package containing all features.
 
 The following is a brief overview of the SDK folder structure (as available in the release):
 
-- `web/sahyadri` - **full** Rusty Sahyadri WASM32 SDK bindings for use in web browsers.
+- `web/sahyadri` - **full** Sahyadri WASM32 SDK bindings for use in web browsers.
 - `web/sahyadri-rpc` - only the RPC bindings for use in web browsers (reduced WASM binary size).
-- `nodejs/sahyadri` - **full** Rusty Sahyadri WASM32 SDK bindings for use with NodeJS.
-- `docs` - Rusty Sahyadri WASM32 SDK documentation.
+- `nodejs/sahyadri` - **full** Sahyadri WASM32 SDK bindings for use with NodeJS.
+- `docs` - Sahyadri WASM32 SDK documentation.
 - `examples` folders contain examples for NodeJS and web browsers.
 - `examples/data` - folder used by examples for configuration and wallet data storage.
 - `examples/javascript` - JavaScript examples.
 - `examples/javascript/general` - General SDK examples (keys & derivation, addresses, encryption, etc.).
 - `examples/javascript/transactions` - Creating, sending and receiving transactions.
-- `examples/javascript/wallet` - Interfacing with the Rusty Sahyadri Wallet framework.
+- `examples/javascript/wallet` - Interfacing with the Sahyadri Wallet framework.
 - `examples/typescript` - TypeScript examples.
 
 If you are using JavaScript and Visual Studio Code, it is highly recommended you replicate 
@@ -65,7 +65,7 @@ file in a web browser.
 ## Building from Source
 
 To build the WASM32 SDK from source, you need to have the Rust environment installed. To do that,
-follow instructions in the [Rusty Sahyadri README](https://github.com/sahyadrinet/rusty-sahyadri).
+follow instructions in the [Sahyadri README](https://github.com/sahyadrinet/sahyadri).
 
 Once you have Rust installed, you can build the WASM32 SDK as follows:
 
@@ -80,7 +80,7 @@ Please note that to build from source, you need to have TypeDoc installed global
 
 **IMPORTANT:** To view web examples, you need to serve them from a local web server and
 serve them from the root of the SDK folder (`sahyadri-wasm32-sdk` if using a redistributable or
-`rusty-sahyadri/wasm` if building from source). This is because examples use relative paths.
+`sahyadri/wasm` if building from source). This is because examples use relative paths.
 WASM32 currently can not be loaded using the `file://` protocol.
 
 You can use any web server of your choice. If you don't have one, you can run one as follows:
