@@ -235,7 +235,7 @@ pub fn hash_script_public_key(hasher: &mut impl Hasher, script_public_key: &Scri
     hasher.write_var_bytes(script_public_key.script());
 }
 
-pub fn calc_schnorr_signature_hash(
+pub fn calc_signature_hash(
     verifiable_tx: &impl VerifiableTransaction,
     input_index: usize,
     hash_type: SigHashType,
@@ -270,7 +270,7 @@ pub fn calc_ecdsa_signature_hash(
     hash_type: SigHashType,
     reused_values: &impl SigHashReusedValues,
 ) -> Hash {
-    let hash = calc_schnorr_signature_hash(tx, input_index, hash_type, reused_values);
+    let hash = calc_signature_hash(tx, input_index, hash_type, reused_values);
     let mut hasher = TransactionSigningHashECDSA::new();
     hasher.update(hash);
     hasher.finalize()
@@ -681,7 +681,7 @@ mod tests {
             let populated_tx = PopulatedTransaction::new(&tx, entries);
             let reused_values = SigHashReusedValuesUnsync::new();
             assert_eq!(
-                calc_schnorr_signature_hash(&populated_tx, test.input_index, test.hash_type, &reused_values).to_string(),
+                calc_signature_hash(&populated_tx, test.input_index, test.hash_type, &reused_values).to_string(),
                 test.expected_hash,
                 "test {} failed",
                 test.name
