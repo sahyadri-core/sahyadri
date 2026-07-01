@@ -2,7 +2,7 @@
 //!  Module handling bip32 address derivation (bip32+bip44 and legacy accounts)
 //!
 
-use sahyadri_wallet_keys::derivation::gen0::{PubkeyDerivationManagerV0, WalletDerivationManagerV0};
+// use sahyadri_wallet_keys::derivation::gen0::{PubkeyDerivationManagerV0, WalletDerivationManagerV0};
 use sahyadri_wallet_keys::derivation::gen1::{PubkeyDerivationManager, WalletDerivationManager};
 
 pub use sahyadri_wallet_keys::derivation::traits::*;
@@ -14,7 +14,7 @@ use crate::account::create_private_keys;
 use crate::error::Error;
 use crate::imports::*;
 use crate::result::Result;
-use sahyadri_bip32::{AddressType, DerivationPath, ExtendedPrivateKey, ExtendedPublicKey, Language, Mnemonic, SecretKeyExt};
+use sahyadri_bip32::{AddressType, DerivationPath, DilithiumPkHash, DilithiumSeed, ExtendedPrivateKey, ExtendedPublicKey, Language, Mnemonic};
 use sahyadri_consensus_core::network::{NetworkType, NetworkTypeT};
 use sahyadri_txscript::{
     extract_script_pub_key_address, multisig_redeem_script, multisig_redeem_script_ecdsa, pay_to_script_hash_script,
@@ -101,9 +101,10 @@ impl AddressManager {
         Ok(address)
     }
 
-    fn create_address(&self, keys: Vec<secp256k1::PublicKey>) -> Result<Address> {
+    fn create_address(&self, keys: Vec<DilithiumPkHash>) -> Result<Address> {
         let address_prefix = self.wallet.address_prefix()?;
-        create_address(self.minimum_signatures, keys, address_prefix, self.ecdsa, Some(self.account_kind))
+        let pub_keys: Vec<PublicKey> = keys.iter().map(|k| PublicKey { bytes: k.0.to_vec() }).collect();
+        create_address(self.minimum_signatures, pub_keys, address_prefix, self.ecdsa, Some(self.account_kind))
     }
 
     pub fn index(&self) -> u32 {
@@ -202,7 +203,7 @@ impl AddressDerivationManager {
         let mut derivators = vec![];
         for xpub in keys.iter() {
             let derivator: Arc<dyn WalletDerivationManagerTrait> = match account_kind.as_ref() {
-                LEGACY_ACCOUNT_KIND => Arc::new(WalletDerivationManagerV0::from_extended_public_key(xpub.clone(), cosigner_index)?),
+                LEGACY_ACCOUNT_KIND => Arc::new(WalletDerivationManager::from_extended_public_key(xpub.clone(), cosigner_index)?),
                 MULTISIG_ACCOUNT_KIND => {
                     let cosigner_index = cosigner_index.unwrap_or(0);
                     Arc::new(WalletDerivationManager::from_extended_public_key(xpub.clone(), Some(cosigner_index))?)
@@ -249,12 +250,12 @@ impl AddressDerivationManager {
     pub fn create_legacy_pubkey_managers(
         wallet: &Arc<Wallet>,
         account_index: u64,
-        address_derivation_indexes: AddressDerivationMeta,
+        address_derivation_indexes: AddressDerivationMeta, xprv: &str,
     ) -> Result<Arc<AddressDerivationManager>> {
         let mut receive_pubkey_managers = vec![];
         let mut change_pubkey_managers = vec![];
         let derivator: Arc<dyn WalletDerivationManagerTrait> =
-            Arc::new(WalletDerivationManagerV0::create_uninitialized(account_index, None, None)?);
+            Arc::new(WalletDerivationManager::from_master_xprv(xprv, false, account_index, None)?);
         receive_pubkey_managers.push(derivator.receive_pubkey_manager());
         change_pubkey_managers.push(derivator.change_pubkey_manager());
 
@@ -297,8 +298,8 @@ impl AddressDerivationManager {
         &self,
         indexes: std::ops::Range<u32>,
         update_indexes: bool,
-        xkey: &ExtendedPrivateKey<secp256k1::SecretKey>,
-    ) -> Result<Vec<(Address, secp256k1::SecretKey)>> {
+        xkey: &ExtendedPrivateKey<DilithiumSeed>,
+    ) -> Result<Vec<(Address, DilithiumSeed)>> {
         self.get_range_with_keys_impl(false, indexes, update_indexes, xkey).await
     }
 
@@ -306,8 +307,8 @@ impl AddressDerivationManager {
         &self,
         indexes: std::ops::Range<u32>,
         update_indexes: bool,
-        xkey: &ExtendedPrivateKey<secp256k1::SecretKey>,
-    ) -> Result<Vec<(Address, secp256k1::SecretKey)>> {
+        xkey: &ExtendedPrivateKey<DilithiumSeed>,
+    ) -> Result<Vec<(Address, DilithiumSeed)>> {
         self.get_range_with_keys_impl(true, indexes, update_indexes, xkey).await
     }
 
@@ -316,8 +317,8 @@ impl AddressDerivationManager {
         change_address: bool,
         indexes: std::ops::Range<u32>,
         update_indexes: bool,
-        xkey: &ExtendedPrivateKey<secp256k1::SecretKey>,
-    ) -> Result<Vec<(Address, secp256k1::SecretKey)>> {
+        xkey: &ExtendedPrivateKey<DilithiumSeed>,
+    ) -> Result<Vec<(Address, DilithiumSeed)>> {
         let start = indexes.start;
         let addresses = if change_address {
             self.change_address_manager.get_range_with_args(indexes, update_indexes)?
@@ -332,7 +333,7 @@ impl AddressDerivationManager {
         let private_keys =
             create_private_keys(&self.account_kind, self.cosigner_index.unwrap_or(0), self.account_index, xkey, &receive, &change)?;
 
-        let mut result = vec![];
+        let mut result: Vec<(Address, DilithiumSeed)> = vec![];
         for (address, private_key) in private_keys {
             result.push((address.clone(), private_key));
         }
@@ -418,8 +419,8 @@ impl AddressDerivationManagerTrait for AddressDerivationManager {
         change_address: bool,
         indexes: std::ops::Range<u32>,
         update_indexes: bool,
-        xkey: &ExtendedPrivateKey<secp256k1::SecretKey>,
-    ) -> Result<Vec<(Address, secp256k1::SecretKey)>> {
+        xkey: &ExtendedPrivateKey<DilithiumSeed>,
+    ) -> Result<Vec<(Address, DilithiumSeed)>> {
         Ok(self.get_range_with_keys_impl(change_address, indexes, update_indexes, xkey).await?)
     }
 }
@@ -435,20 +436,20 @@ pub trait AddressDerivationManagerTrait: AnySync + Send + Sync + 'static {
         change_address: bool,
         indexes: std::ops::Range<u32>,
         update_indexes: bool,
-        xkey: &ExtendedPrivateKey<secp256k1::SecretKey>,
-    ) -> Result<Vec<(Address, secp256k1::SecretKey)>>;
+        xkey: &ExtendedPrivateKey<DilithiumSeed>,
+    ) -> Result<Vec<(Address, DilithiumSeed)>>;
 }
 
 pub fn create_multisig_address(
     minimum_signatures: usize,
-    keys: Vec<secp256k1::PublicKey>,
+    keys: Vec<PublicKey>,
     prefix: Prefix,
     ecdsa: bool,
 ) -> Result<Address> {
     let script = if !ecdsa {
-        multisig_redeem_script(keys.iter().map(|pk| pk.x_only_public_key().0.serialize()), minimum_signatures)
+        multisig_redeem_script(keys.iter().map(|pk| { let mut h = [0u8; 32]; h.copy_from_slice(&pk.bytes[..32]); h }), minimum_signatures)
     } else {
-        multisig_redeem_script_ecdsa(keys.iter().map(|pk| pk.serialize()), minimum_signatures)
+        multisig_redeem_script_ecdsa(keys.iter().map(|pk| { let mut h = [0u8; 33]; h[..32].copy_from_slice(&pk.bytes[..32]); h[32] = 0x02; h }), minimum_signatures)
     }?;
     let script_pub_key = pay_to_script_hash_script(&script);
     let address = extract_script_pub_key_address(&script_pub_key, prefix)?;
@@ -463,10 +464,10 @@ pub fn create_address_js(
     ecdsa: Option<bool>,
     account_kind: Option<AccountKind>,
 ) -> Result<Address> {
-    let public_key = PublicKey::try_cast_from(key)?;
+    let public_key = PublicKey::try_cast_from(key)?.into_owned();
     create_address(
         1,
-        vec![public_key.as_ref().try_into()?],
+        vec![public_key],
         NetworkType::try_from(network)?.into(),
         ecdsa.unwrap_or(false),
         account_kind,
@@ -482,12 +483,15 @@ pub fn create_multisig_address_js(
     ecdsa: Option<bool>,
     account_kind: Option<AccountKind>,
 ) -> Result<Address> {
-    create_address(minimum_signatures, keys.try_into()?, network_type.into(), ecdsa.unwrap_or(false), account_kind)
+    let pub_keys: Vec<PublicKey> = keys.iter()
+        .map(|v| Ok(PublicKey::try_cast_from(&v)?.into_owned()))
+        .collect::<Result<Vec<_>>>()?;
+    create_address(minimum_signatures, pub_keys, network_type.into(), ecdsa.unwrap_or(false), account_kind)
 }
 
 pub fn create_address(
     minimum_signatures: usize,
-    keys: Vec<secp256k1::PublicKey>,
+    keys: Vec<PublicKey>,
     prefix: Prefix,
     ecdsa: bool,
     account_kind: Option<AccountKind>,
@@ -502,9 +506,9 @@ pub fn create_address(
     }
 
     if account_kind.map(|kind| kind == LEGACY_ACCOUNT_KIND).unwrap_or(false) {
-        Ok(PubkeyDerivationManagerV0::create_address(&keys[0], prefix, ecdsa)?)
+        Ok(PubkeyDerivationManager::create_address(&DilithiumPkHash(keys[0].bytes[..32].try_into().unwrap_or_default()), prefix, ecdsa)?)
     } else {
-        Ok(PubkeyDerivationManager::create_address(&keys[0], prefix, ecdsa)?)
+        Ok(PubkeyDerivationManager::create_address(&DilithiumPkHash(keys[0].bytes[..32].try_into().unwrap_or_default()), prefix, ecdsa)?)
     }
 }
 
@@ -512,35 +516,35 @@ pub async fn create_xpub_from_mnemonic(
     seed_words: &str,
     account_kind: AccountKind,
     account_index: u64,
-) -> Result<ExtendedPublicKey<secp256k1::PublicKey>> {
+) -> Result<ExtendedPublicKey<DilithiumPkHash>> {
     let mnemonic = Mnemonic::new(seed_words, Language::English)?;
     let seed = mnemonic.to_seed("");
-    let xkey = ExtendedPrivateKey::<secp256k1::SecretKey>::new(seed)?;
+    let xkey = ExtendedPrivateKey::<DilithiumSeed>::new(seed)?;
 
     let (secret_key, attrs) = match account_kind.as_ref() {
-        LEGACY_ACCOUNT_KIND => WalletDerivationManagerV0::derive_extended_key_from_master_key(xkey, false, account_index)?,
+        LEGACY_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xkey, false, account_index)?,
         MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xkey, true, account_index)?,
         _ => WalletDerivationManager::derive_extended_key_from_master_key(xkey, false, account_index)?,
     };
 
-    let xkey = ExtendedPublicKey { public_key: secret_key.get_public_key(), attrs };
+    let xkey = ExtendedPublicKey { public_key: sahyadri_bip32::PrivateKey::public_key(&secret_key), attrs };
 
     Ok(xkey)
 }
 
 pub async fn create_xpub_from_xprv(
-    xprv: ExtendedPrivateKey<secp256k1::SecretKey>,
+    xprv: ExtendedPrivateKey<DilithiumSeed>,
     account_kind: AccountKind,
     account_index: u64,
-) -> Result<ExtendedPublicKey<secp256k1::PublicKey>> {
+) -> Result<ExtendedPublicKey<DilithiumPkHash>> {
     let (secret_key, attrs) = match account_kind.as_ref() {
-        LEGACY_ACCOUNT_KIND => WalletDerivationManagerV0::derive_extended_key_from_master_key(xprv, false, account_index)?,
+        LEGACY_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xprv, false, account_index)?,
         MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xprv, true, account_index)?,
         BIP32_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xprv, false, account_index)?,
         _ => panic!("create_xpub_from_xprv not supported for account kind: {:?}", account_kind),
     };
 
-    let xkey = ExtendedPublicKey { public_key: secret_key.get_public_key(), attrs };
+    let xkey = ExtendedPublicKey { public_key: sahyadri_bip32::PrivateKey::public_key(&secret_key), attrs };
 
     Ok(xkey)
 }
@@ -552,7 +556,7 @@ pub fn build_derivate_path(
     address_type: AddressType,
 ) -> Result<DerivationPath> {
     match account_kind.as_ref() {
-        LEGACY_ACCOUNT_KIND => Ok(WalletDerivationManagerV0::build_derivate_path(account_index, Some(address_type))?),
+        LEGACY_ACCOUNT_KIND => Ok(WalletDerivationManager::build_derivate_path(false, account_index, None, Some(address_type))?),
         BIP32_ACCOUNT_KIND => Ok(WalletDerivationManager::build_derivate_path(false, account_index, None, Some(address_type))?),
         MULTISIG_ACCOUNT_KIND => {
             Ok(WalletDerivationManager::build_derivate_path(true, account_index, Some(cosigner_index), Some(address_type))?)
