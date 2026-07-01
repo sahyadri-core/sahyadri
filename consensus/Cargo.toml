@@ -38,7 +38,6 @@ once_cell.workspace = true
 parking_lot.workspace = true
 rayon.workspace = true
 rocksdb.workspace = true
-secp256k1.workspace = true
 serde.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true
