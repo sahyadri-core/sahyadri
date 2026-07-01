@@ -297,9 +297,8 @@ async fn double_search_disqualified_test() {
 }
 
 fn new_miner_data() -> MinerData {
-    let secp = secp256k1::Secp256k1::new();
-    let mut rng = rand::thread_rng();
-    let (_sk, pk) = secp.generate_keypair(&mut rng);
-    let script = ScriptVec::from_slice(&pk.serialize());
+    let kp = sahyadri_dilithium::generate_keypair().unwrap();
+    let pk_hash = sha2::Sha256::digest(kp.public_key());
+    let script: ScriptVec = std::iter::once(0x14u8).chain(pk_hash[0..20].iter().copied()).chain(std::iter::once(0xac)).collect();
     MinerData::new(ScriptPublicKey::new(0, script), vec![])
 }
