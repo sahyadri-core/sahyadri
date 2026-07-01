@@ -1,5 +1,4 @@
 use crate::imports::*;
-use crate::message::*;
 use sahyadri_wallet_keys::privatekey::PrivateKey;
 use sahyadri_wallet_keys::publickey::PublicKey;
 use sahyadri_wasm_core::types::HexString;
@@ -31,14 +30,11 @@ pub fn js_sign_message(value: ISignMessage) -> Result<HexString, Error> {
     if let Some(object) = Object::try_from(&value) {
         let private_key = object.cast_into::<PrivateKey>("privateKey")?;
         let raw_msg = object.get_string("message")?;
-        let no_aux_rand = object.get_bool("noAuxRand").unwrap_or(false);
-        let mut privkey_bytes = [0u8; 32];
-        privkey_bytes.copy_from_slice(&private_key.secret_bytes());
-        let pm = PersonalMessage(&raw_msg);
-        let sign_options = SignMessageOptions { no_aux_rand };
-        let sig_vec = sign_message(&pm, &privkey_bytes, &sign_options)?;
-        privkey_bytes.zeroize();
-        Ok(faster_hex::hex_string(sig_vec.as_slice()).into())
+        let _no_aux_rand = object.get_bool("noAuxRand").unwrap_or(false);
+        let keypair = sahyadri_dilithium::generate_keypair_from_seed(&private_key.seed_bytes());
+        let sig = sahyadri_dilithium::sign_bytes(raw_msg.as_bytes(), &keypair)
+            .map_err(|e| Error::custom(format!("Dilithium signing failed: {e}")))?;
+        Ok(faster_hex::hex_string(sig.as_bytes()).into())
     } else {
         Err(Error::custom("Failed to parse input"))
     }
@@ -73,11 +69,9 @@ pub fn js_verify_message(value: IVerifyMessage) -> Result<bool, Error> {
         let raw_msg = object.get_string("message")?;
         let signature = object.get_string("signature")?;
 
-        let pm = PersonalMessage(&raw_msg);
-        let mut signature_bytes = [0u8; 64];
-        faster_hex::hex_decode(signature.as_bytes(), &mut signature_bytes)?;
-
-        Ok(verify_message(&pm, &signature_bytes.to_vec(), &public_key.xonly_public_key).is_ok())
+        let mut signature_bytes = vec![0u8; signature.len() / 2];
+        faster_hex::hex_decode(signature.as_bytes(), &mut signature_bytes).map_err(|e| Error::custom(format!("hex decode: {e}")))?;
+        Ok(sahyadri_dilithium::verify_signature_bytes(&raw_msg, &signature_bytes, &public_key.bytes))
     } else {
         Err(Error::custom("Failed to parse input"))
     }
