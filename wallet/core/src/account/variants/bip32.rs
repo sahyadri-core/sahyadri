@@ -33,13 +33,13 @@ impl Factory for Ctor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub struct Payload {
-    pub xpub_keys: Arc<Vec<ExtendedPublicKeySecp256k1>>,
+    pub xpub_keys: Arc<Vec<ExtendedPublicKeyDilithium>>,
     pub account_index: u64,
     pub ecdsa: bool,
 }
 
 impl Payload {
-    pub fn new(account_index: u64, xpub_keys: Arc<Vec<ExtendedPublicKeySecp256k1>>, ecdsa: bool) -> Self {
+    pub fn new(account_index: u64, xpub_keys: Arc<Vec<ExtendedPublicKeyDilithium>>, ecdsa: bool) -> Self {
         Self { account_index, xpub_keys, ecdsa }
     }
 
