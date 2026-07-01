@@ -757,7 +757,7 @@ impl Wallet {
             let xpub_keys = xpub_keys
                 .into_iter()
                 .map(|xpub_key| {
-                    ExtendedPublicKeySecp256k1::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
+                    ExtendedPublicKeyDilithium::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -777,7 +777,7 @@ impl Wallet {
             let xpub_keys = xpub_keys
                 .into_iter()
                 .map(|xpub_key| {
-                    ExtendedPublicKeySecp256k1::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
+                    ExtendedPublicKeyDilithium::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -856,7 +856,7 @@ impl Wallet {
             xpub_keys
                 .into_iter()
                 .map(|xpub_key| {
-                    ExtendedPublicKeySecp256k1::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
+                    ExtendedPublicKeyDilithium::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
                 })
                 .collect::<Result<Vec<_>>>()?,
         );
@@ -930,8 +930,10 @@ impl Wallet {
             .map_err(|_| Error::custom("Invalid private key"))?
             .ok_or(Error::custom("Sectet key is required"))?;
 
-        let secp = secp256k1::Secp256k1::new();
-        let public_key = secret_key.public_key(&secp);
+        let public_key = {
+            let kp = sahyadri_dilithium::generate_keypair_from_seed(&secret_key.0);
+            sahyadri_wallet_keys::prelude::PublicKey::from(kp.public_key().to_vec())
+        };
         let prv_key_data_id = prv_key_data.id;
         let account: Arc<dyn Account> =
             Arc::new(keypair::Keypair::try_new(self, account_name, public_key, prv_key_data_id, ecdsa).await?);
@@ -978,8 +980,7 @@ impl Wallet {
                 PrvKeyData::try_from_mnemonic(mnemonic.clone(), payment_secret.as_ref(), self.store().encryption_kind()?, name)?
             }
             PrvKeyDataVariantKind::SecretKey => {
-                //let secp = secp256k1::Secp256k1::new();
-                let secret_key = secp256k1::SecretKey::from_slice(secret.as_ref())?;
+                let secret_key = sahyadri_wallet_keys::prelude::PrivateKey::try_from_slice(secret.as_ref())?;
                 //let public_key = secret_key.public_key(&secp);
                 //log_info!("public_key: {}", public_key.to_string());
                 PrvKeyData::try_from_secret_key(secret_key, payment_secret.as_ref(), self.store().encryption_kind()?, name)?
@@ -1709,7 +1710,7 @@ impl Wallet {
         let xpub_keys = xpub_keys
             .into_iter()
             .map(|xpub_key| {
-                ExtendedPublicKeySecp256k1::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
+                ExtendedPublicKeyDilithium::from_str(&xpub_key).map_err(|err| Error::InvalidExtendedPublicKey(xpub_key, err))
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -1779,7 +1780,7 @@ impl Wallet {
         }
     }
 
-    pub fn network_format_xpub(&self, xpub_key: &ExtendedPublicKeySecp256k1) -> String {
+    pub fn network_format_xpub(&self, xpub_key: &ExtendedPublicKeyDilithium) -> String {
         NetworkTaggedXpub::from((xpub_key.clone(), self.network_id().unwrap())).to_string()
     }
 }
