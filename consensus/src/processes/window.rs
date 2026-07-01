@@ -409,10 +409,10 @@ impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCac
             for merged in sahyadri_consensus.unordered_mergeset() {
                 cover.insert(merged);
                 if unvisited.remove(&merged) {
-                    // [Crescendo]: for each block in the original window save its selected parent as well
+                    // [Raigad]: for each block in the original window save its selected parent as well
                     // since it is required for checking whether the block was activated (when building the
                     // window by the syncee or when rebuilding following pruning)
-                    // TODO (relaxed): remove this once most of the network upgrades from crescendo version
+                    // TODO (relaxed): remove this once most of the network upgrades from raigad version
                     cover.insert(self.sahyadri_consensus_store.get_selected_parent(merged).unwrap());
                 }
             }
