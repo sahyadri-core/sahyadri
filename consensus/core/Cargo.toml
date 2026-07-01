@@ -13,6 +13,7 @@ repository.workspace = true
 devnet-prealloc = []
 wasm32-sdk = []
 default = []
+zkp = ["sahyadri-plonky3"]
 
 [dependencies]
 arc-swap.workspace = true
@@ -34,7 +35,9 @@ sahyadri-muhash.workspace = true
 sahyadri-txscript-errors.workspace = true
 sahyadri-utils.workspace = true
 rand.workspace = true
-secp256k1.workspace = true
+sahyadri-dilithium.workspace = true
+sahyadri-plonky3 = { path = "../../crypto/plonky3", optional = true }
+sha2.workspace = true
 serde_json.workspace = true
 serde-wasm-bindgen.workspace = true
 serde.workspace = true
