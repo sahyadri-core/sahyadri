@@ -1,0 +1,19 @@
+[package]
+name = "sahyadri-plonky3"
+description = "Plonky3 ZKP batch verification for Sahyadri — compress 10K Dilithium sigs into ~500 byte proof"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sha2.workspace = true
+hex.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
