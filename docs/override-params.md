@@ -25,7 +25,7 @@ If the file cannot be read or parsed, `sahyadrid` prints the error and exits.
 ```json
 {
   "timestamp_deviation_tolerance": 600,
-  "pre_crescendo_target_time_per_block": 1000,
+  "pre_raigad_target_time_per_block": 1000,
   "past_median_time_window_size": 27,
   "difficulty_window_size": 661,
   "min_difficulty_window_size": 150,
@@ -53,7 +53,7 @@ If the file cannot be read or parsed, `sahyadrid` prints the error and exits.
     "pruning_depth": 1080000,
     "coinbase_maturity": 200
   },
-  "crescendo_activation": 0
+  "raigad_activation": 0
 }
 ```
 
@@ -65,7 +65,7 @@ because they have logical relations and should be modified as a unit.
 | Field                                       | Description                |
 |---------------------------------------------|----------------------------|
 | timestamp_deviation_tolerance               | Timestamp deviation tolerance |
-| pre_crescendo_target_time_per_block         | Pre-crescendo target time per block |
+| pre_raigad_target_time_per_block         | Pre-raigad target time per block |
 | past_median_time_window_size                | Past median time window size |
 | difficulty_window_size                      | Difficulty window size |
 | min_difficulty_window_size                  | Minimum difficulty window size |
@@ -86,7 +86,7 @@ because they have logical relations and should be modified as a unit.
 | max_block_level                             | Maximum block level           |
 | pruning_proof_m                             | Pruning proof M parameter                        |
 | blockrate                                   | Blockrate-related parameters            |
-| crescendo_activation                        | Crescendo DAA score                        |
+| raigad_activation                        | Raigad DAA score                        |
 
 **blockrate sub-fields:**
 
@@ -107,13 +107,13 @@ Refer to the source definition in
 `consensus/core/src/config/params.rs` for the full list of available fields and
 their meaning.
 
-## Use simpa params
+## Use yugat params
 
-If you want to run `sahyadrid` with the simpa generated database, you'll need to ask it to generate an override params file as well, so you can run `sahyadrid` with the same parameters.
+If you want to run `sahyadrid` with the yugat generated database, you'll need to ask it to generate an override params file as well, so you can run `sahyadrid` with the same parameters.
 
 This can be done by passing the `--override-params-output` param, for example:
 ```bash
-cargo run --release --bin simpa -- --override-params-output overrides.json -o=/path/to/simpa/database
+cargo run --release --bin yugat -- --override-params-output overrides.json -o=/path/to/yugat/database
 ```
 
 And then launch sahyadrid with:
@@ -121,12 +121,12 @@ And then launch sahyadrid with:
 sahyadrid --simnet
 ```
 
-and immedeiately close it. This will create the simnet datadir at `~/.rusty-sahyadri/sahyadri-simnet`.
+and immedeiately close it. This will create the simnet datadir at `~/.sahyadri/sahyadri-simnet`.
 
-You can then override it with the simpa database by running:
+You can then override it with the yugat database by running:
 ```bash
-rm -rf ~/.rusty-sahyadri/sahyadri-simnet/datadir/consensus/consensus-001/
-mv /path/to/simpa/database ~/.rusty-sahyadri/sahyadri-simnet/datadir/consensus/consensus-001/
+rm -rf ~/.sahyadri/sahyadri-simnet/datadir/consensus/consensus-001/
+mv /path/to/yugat/database ~/.sahyadri/sahyadri-simnet/datadir/consensus/consensus-001/
 ```
 
 And finally launch sahyadrid with:
