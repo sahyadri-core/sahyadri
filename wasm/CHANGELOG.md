@@ -48,7 +48,7 @@ the maturity DAA periods for user and coinbase transactions.
 
 ### Release 2024-04-14
 
-- Merge with Rusty Sahyadri master (0.13.6)
+- Merge with Sahyadri master (0.13.6)
 
 ### Release 2024-04-13
 
