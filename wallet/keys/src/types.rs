@@ -4,6 +4,6 @@
 
 use std::sync::Arc;
 
-pub type ExtendedPublicKeySecp256k1 = sahyadri_bip32::ExtendedPublicKey<secp256k1::PublicKey>;
+pub type ExtendedPublicKeyDilithium = sahyadri_bip32::ExtendedPublicKey<sahyadri_bip32::DilithiumPkHash>;
 
-pub type ExtendedPublicKeys = Arc<Vec<ExtendedPublicKeySecp256k1>>;
+pub type ExtendedPublicKeys = Arc<Vec<ExtendedPublicKeyDilithium>>;
