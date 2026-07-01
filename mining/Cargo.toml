@@ -35,7 +35,8 @@ faster-hex.workspace = true
 [dev-dependencies]
 sahyadri-txscript.workspace = true
 criterion.workspace = true
-secp256k1.workspace = true
+sahyadri-dilithium.workspace = true
+sha2.workspace = true
 
 [[bench]]
 name = "bench"
