@@ -1,6 +1,6 @@
-# Sahyadri Testnet 10 (TN10) – Crescendo Hardfork Node Setup Guide
+# Sahyadri Testnet 10 (TN10) – Raigad Hardfork Node Setup Guide
 
-Sahyadri is about to take a significant leap with the **Crescendo Hardfork**, as detailed in [KIP14](https://github.com/sahyadrinet/kips/blob/master/kip-0014.md), transitioning from 1 to 10 blocks per second. To ensure a stable rollout, **Testnet 10 (TN10)** will first undergo this shift on approximately **March 6, 2025, 18:30 UTC**. By running TN10 and providing feedback, you help prepare for a smooth mainnet upgrade, tentatively planned for the end of April or early May.
+Sahyadri is about to take a significant leap with the **Raigad Hardfork**, as detailed in [KIP14](https://github.com/sahyadrinet/kips/blob/master/kip-0014.md), transitioning from 1 to 10 blocks per second. To ensure a stable rollout, **Testnet 10 (TN10)** will first undergo this shift on approximately **March 6, 2025, 18:30 UTC**. By running TN10 and providing feedback, you help prepare for a smooth mainnet upgrade, tentatively planned for the end of April or early May.
 
 ---
 
@@ -26,7 +26,7 @@ While the minimum specs suffice to sync and maintain a TN10 node with the accele
 ## 1. Install & Run Your TN10 Node
 
 1. **Obtain the latest Sahyadri binaries**  
-   Download and extract the latest [official release](https://github.com/sahyadrinet/rusty-sahyadri/releases/), or build from the `master` branch by following the instructions in the project README.
+   Download and extract the latest [official release](https://github.com/sahyadrinet/sahyadri/releases/), or build from the `master` branch by following the instructions in the project README.
 
 2. **Launch the Node**  
    While TN10 is the default netsuffix, specifying it explicitly is recommended:
@@ -52,18 +52,18 @@ Leave this process running. Closing it will stop your node.
 
 ---
 
-## 2. Generate Transactions with Rothschild
+## 2. Generate Transactions with Garud
 
 1. **Create a Wallet**
   ```
-  rothschild
+  garud
   ```
 
    This outputs a private key and a public address. Fund your wallet by mining to it or obtaining test coins from other TN10 participants.
 
 2. **Broadcast Transactions**  
   ```
-  rothschild --private-key <your-private-key> -t=10
+  garud --private-key <your-private-key> -t=10
   ```
 
    Replace <your-private-key> with the key from step 1. The `-t=10` flag sets your transaction rate to 10 TPS (feel free to try different rates, but keep it below 50 TPS).
@@ -80,7 +80,7 @@ Leave this process running. Closing it will stop your node.
   sahyadri-miner --testnet --mining-address <your-address> -p 16210 -t 1
   ```
 
-   Replace <your-address> with your TN10 address (e.g., from Rothschild) if you want to mine and generate transactions simultaneously.
+   Replace <your-address> with your TN10 address (e.g., from Garud) if you want to mine and generate transactions simultaneously.
 
 ---
 
@@ -89,9 +89,9 @@ Leave this process running. Closing it will stop your node.
 - **Node Sync:**  
   `sahyadrid --testnet --netsuffix=10 --utxoindex`
 - **Transaction Generation:**  
-  `rothschild --private-key <your-private-key> -t=10`
+  `garud --private-key <your-private-key> -t=10`
 - **Mining:**  
   `sahyadri-miner --testnet --mining-address <your-address> -p 16210 -t 1`  
 
-By participating in TN10, you help stress-test the Crescendo Hardfork environment and prepare for a robust mainnet upgrade in end of April / early May. Share any challenges or successes in the #testnet Discord channel, and thank you for supporting Sahyadri’s continued evolution.
+By participating in TN10, you help stress-test the Raigad Hardfork environment and prepare for a robust mainnet upgrade in end of April / early May. Share any challenges or successes in the #testnet Discord channel, and thank you for supporting Sahyadri’s continued evolution.
 
