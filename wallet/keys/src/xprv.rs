@@ -80,7 +80,7 @@ impl XPrv {
     #[wasm_bindgen(js_name = toPrivateKey)]
     pub fn to_private_key(&self) -> Result<PrivateKey> {
         let private_key = self.inner.private_key();
-        Ok(private_key.into())
+        Ok(PrivateKey { inner: private_key.0 })
     }
 
     // ~~~~ Getters ~~~~
