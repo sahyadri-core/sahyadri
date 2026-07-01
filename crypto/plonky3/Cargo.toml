@@ -1,0 +1,39 @@
+[package]
+name = "sahyadri-plonky3"
+version = "1.1.0"
+edition = "2021"
+description = "Plonky3 STARK ZKP — compress 10K Dilithium3 sigs (33MB) into one ~30KB proof, verify in ~1ms"
+authors = ["Sahyadri Labs <dev@sahyadri.io>"]
+license = "MIT"
+
+[dependencies]
+p3-air = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-uni-stark = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-baby-bear = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-goldilocks = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-field = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-matrix = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-fri = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-keccak = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-commit = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-challenger = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-merkle-tree = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-dft = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-symmetric = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+p3-util = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
+sahyadri-dilithium = { path = "../dilithium" }
+dilithium-rs = { workspace = true }
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+hex = "0.4"
+bincode = "1"
+thiserror = "1.0"
+anyhow = "1.0"
+log = "0.4"
+rand = "0.9"
+
+[dev-dependencies]
+
+[features]
+default = ["std"]
+std = []
