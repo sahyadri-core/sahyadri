@@ -58,7 +58,7 @@ pub fn generate_random_utxo(rng: &mut SmallRng) -> UtxoEntry {
     )
 }
 
-///Note: this generates schnorr p2pk script public keys.
+///Note: this generates Dilithium3 p2pk script public keys.
 pub fn generate_random_p2pk_script_public_key(rng: &mut SmallRng) -> ScriptPublicKey {
     let mut script: ScriptVec = (0..32).map(|_| rng.r#gen()).collect();
     script.insert(0, 0x20);
