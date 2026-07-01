@@ -43,19 +43,19 @@ use rayon::prelude::*;
 use smallvec::{SmallVec, smallvec};
 use std::{iter::once, ops::Deref};
 
-pub(crate) mod crescendo {
-    use sahyadri_core::{info, log::CRESCENDO_KEYWORD};
+pub(crate) mod raigad {
+    use sahyadri_core::{info, log::RAIGAD_KEYWORD};
     use std::sync::{
         Arc,
         atomic::{AtomicU8, Ordering},
     };
 
     #[derive(Clone)]
-    pub(crate) struct _CrescendoLogger {
+    pub(crate) struct _RaigadLogger {
         steps: Arc<AtomicU8>,
     }
 
-    impl _CrescendoLogger {
+    impl _RaigadLogger {
         pub fn _new() -> Self {
             Self { steps: Arc::new(AtomicU8::new(Self::_ACTIVATE)) }
         }
@@ -64,7 +64,7 @@ pub(crate) mod crescendo {
 
         pub fn _report_activation(&self) -> bool {
             if self.steps.compare_exchange(Self::_ACTIVATE, Self::_ACTIVATE + 1, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                info!(target: CRESCENDO_KEYWORD, "[Crescendo] [--------- Crescendo activated for UTXO state processing rules ---------]");
+                info!(target: RAIGAD_KEYWORD, "[Raigad] [--------- Raigad activated for UTXO state processing rules ---------]");
                 true
             } else {
                 false
