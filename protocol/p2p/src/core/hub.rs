@@ -56,7 +56,7 @@ impl Hub {
                                         ProtocolError::LoopbackConnection(_)
                                         | ProtocolError::PeerAlreadyExists(_)
                                         | ProtocolError::VersionMismatch(_, ..=6) => {
-                                            // version 6 and below is prior crescendo, silencing logs on deprecated versions
+                                            // version 6 and below is prior raigad, silencing logs on deprecated versions
                                             debug!("P2P, handshake failed for inbound peer {}: {}", new_router, err);
                                         }
                                         _ => {
