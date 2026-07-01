@@ -26,10 +26,9 @@ use crate::tx::PaymentOutput;
 use crate::tx::{Fees, Generator, GeneratorSettings, GeneratorSummary, PaymentDestination, PendingTransaction, Signer};
 use crate::utxo::UtxoContextBinding;
 use crate::utxo::balance::{AtomicBalance, BalanceStrings};
-use sahyadri_bip32::{ChildNumber, ExtendedPrivateKey, PrivateKey};
+use sahyadri_bip32::{ChildNumber, DilithiumSeed, ExtendedPrivateKey, PrivateKey};
 use sahyadri_consensus_client::UtxoEntry;
 use sahyadri_consensus_client::UtxoEntryReference;
-use sahyadri_wallet_keys::derivation::gen0::WalletDerivationManagerV0;
 use workflow_core::abortable::Abortable;
 
 /// Notification callback type used by [`Account::sweep`] and [`Account::send`].
@@ -535,7 +534,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         let network_id = self.wallet().clone().network_id()?;
         let (derivation_path, key_fingerprint) = if self.account_kind() == KEYPAIR_ACCOUNT_KIND {
             // let secret_key = keydata.as_secret_key(payment_secret.as_ref())?.ok_or(Error::Custom(format!("Private key not found for account")))?;
-            // (None, secp256k1::PublicKey::from_secret_key_global(&secret_key).fingerprint())
+            // (None, Dilithium3::PublicKey::from_secret_key_global(&secret_key).fingerprint())
             (None, None)
         } else {
             let derivation = self.as_derivation_capable()?;
@@ -665,7 +664,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         key_data: &PrvKeyData,
         payment_secret: &Option<Secret>,
         addresses: &[&'l Address],
-    ) -> Result<Vec<(&'l Address, secp256k1::SecretKey)>> {
+    ) -> Result<Vec<(&'l Address, DilithiumSeed)>> {
         let account = self.clone().as_derivation_capable().expect("expecting derivation capable account");
         let (receive, change) = account.derivation().addresses_indexes(addresses)?;
         let private_keys = account.create_private_keys(key_data, payment_secret, &receive, &change)?;
@@ -897,7 +896,7 @@ pub trait DerivationCapableAccount: Account {
         payment_secret: &Option<Secret>,
         receive: &[(&'l Address, u32)],
         change: &[(&'l Address, u32)],
-    ) -> Result<Vec<(&'l Address, secp256k1::SecretKey)>> {
+    ) -> Result<Vec<(&'l Address, DilithiumSeed)>> {
         let payload = key_data.payload.decrypt(payment_secret.as_ref())?;
         let xkey = payload.get_xprv(payment_secret.as_ref())?;
         create_private_keys(&self.account_kind(), self.cosigner_index(), self.account_index(), &xkey, receive, change)
@@ -922,34 +921,21 @@ pub(crate) fn create_private_keys<'l>(
     account_kind: &AccountKind,
     cosigner_index: u32,
     account_index: u64,
-    xkey: &ExtendedPrivateKey<secp256k1::SecretKey>,
+    xkey: &ExtendedPrivateKey<DilithiumSeed>,
     receive: &[(&'l Address, u32)],
     change: &[(&'l Address, u32)],
-) -> Result<Vec<(&'l Address, secp256k1::SecretKey)>> {
+) -> Result<Vec<(&'l Address, DilithiumSeed)>> {
     let paths = build_derivate_paths(account_kind, account_index, cosigner_index)?;
     let mut private_keys = vec![];
-    if matches!(account_kind.as_ref(), LEGACY_ACCOUNT_KIND) {
-        let (private_key, attrs) = WalletDerivationManagerV0::derive_key_by_path(xkey, paths.0)?;
-        for (address, index) in receive.iter() {
-            let (private_key, _) =
-                WalletDerivationManagerV0::derive_private_key(&private_key, &attrs, ChildNumber::new(*index, true)?)?;
-            private_keys.push((*address, private_key));
-        }
-        let (private_key, attrs) = WalletDerivationManagerV0::derive_key_by_path(xkey, paths.1)?;
-        for (address, index) in change.iter() {
-            let (private_key, _) =
-                WalletDerivationManagerV0::derive_private_key(&private_key, &attrs, ChildNumber::new(*index, true)?)?;
-            private_keys.push((*address, private_key));
-        }
-    } else {
+    {
         let receive_xkey = xkey.clone().derive_path(&paths.0)?;
         let change_xkey = xkey.clone().derive_path(&paths.1)?;
 
         for (address, index) in receive.iter() {
-            private_keys.push((*address, *receive_xkey.derive_child(ChildNumber::new(*index, false)?)?.private_key()));
+            private_keys.push((*address, receive_xkey.derive_child(ChildNumber::new(*index, false)?)?.private_key().clone()));
         }
         for (address, index) in change.iter() {
-            private_keys.push((*address, *change_xkey.derive_child(ChildNumber::new(*index, false)?)?.private_key()));
+            private_keys.push((*address, change_xkey.derive_child(ChildNumber::new(*index, false)?)?.private_key().clone()));
         }
     }
 
@@ -966,7 +952,7 @@ mod tests {
     use sahyadri_addresses::Prefix;
     use sahyadri_bip32::PrivateKey;
     use sahyadri_bip32::SecretKeyExt;
-    use sahyadri_bip32::secp256k1::SecretKey;
+    use sahyadri_bip32::DilithiumSeed;
     use sahyadri_wallet_keys::derivation::gen0::PubkeyDerivationManagerV0;
     use std::str::FromStr;
 
