@@ -21,11 +21,11 @@ use crate::imports::*;
 #[derive(Clone, CastFromJs)]
 #[wasm_bindgen(inspectable)]
 pub struct XPub {
-    inner: ExtendedPublicKey<secp256k1::PublicKey>,
+    inner: ExtendedPublicKey<DilithiumPkHash>,
 }
 
 impl XPub {
-    pub fn inner(&self) -> &ExtendedPublicKey<secp256k1::PublicKey> {
+    pub fn inner(&self) -> &ExtendedPublicKey<DilithiumPkHash> {
         &self.inner
     }
 }
@@ -34,7 +34,7 @@ impl XPub {
 impl XPub {
     #[wasm_bindgen(constructor)]
     pub fn try_new(xpub: &str) -> Result<XPub> {
-        let inner = ExtendedPublicKey::<secp256k1::PublicKey>::from_str(xpub)?;
+        let inner = ExtendedPublicKey::<DilithiumPkHash>::from_str(xpub)?;
         Ok(Self { inner })
     }
 
@@ -60,7 +60,7 @@ impl XPub {
 
     #[wasm_bindgen(js_name = toPublicKey)]
     pub fn public_key(&self) -> PublicKey {
-        self.inner.public_key().into()
+        PublicKey::from(&self.inner.public_key().0[..])
     }
 
     // ~~~~ Getters ~~~~
@@ -102,8 +102,8 @@ impl XPub {
     }
 }
 
-impl From<ExtendedPublicKey<secp256k1::PublicKey>> for XPub {
-    fn from(inner: ExtendedPublicKey<secp256k1::PublicKey>) -> Self {
+impl From<ExtendedPublicKey<DilithiumPkHash>> for XPub {
+    fn from(inner: ExtendedPublicKey<DilithiumPkHash>) -> Self {
         Self { inner }
     }
 }
@@ -127,7 +127,7 @@ impl TryCastFromJs for XPub {
 }
 
 pub struct NetworkTaggedXpub {
-    pub xpub: ExtendedPublicKey<secp256k1::PublicKey>,
+    pub xpub: ExtendedPublicKey<DilithiumPkHash>,
     pub network_id: NetworkId,
 }
 // impl NetworkTaggedXpub {
@@ -141,7 +141,7 @@ impl fmt::Display for NetworkTaggedXpub {
     }
 }
 
-type TaggedXpub = (ExtendedPublicKey<secp256k1::PublicKey>, NetworkId);
+type TaggedXpub = (ExtendedPublicKey<DilithiumPkHash>, NetworkId);
 
 impl From<TaggedXpub> for NetworkTaggedXpub {
     fn from(value: TaggedXpub) -> Self {
