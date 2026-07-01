@@ -124,8 +124,8 @@ where
     /// Serialize this key as an [`ExtendedKey`].
     pub fn to_extended_key(&self, prefix: Prefix) -> ExtendedKey {
         // Add leading `0` byte
-        let mut key_bytes = [0u8; KEY_SIZE + 1];
-        key_bytes[1..].copy_from_slice(&self.to_bytes());
+        let mut key_bytes = [0u8; KEY_SIZE];
+        key_bytes.copy_from_slice(&self.to_bytes());
 
         ExtendedKey { prefix, attrs: self.attrs.clone(), key_bytes }
     }
@@ -204,7 +204,7 @@ where
                 attrs: extended_key.attrs.clone(),
             })
         } else {
-            Err(Error::Crypto(secp256k1::Error::InvalidSecretKey))
+            Err(Error::String("Invalid extended private key".into()))
         }
     }
 }
