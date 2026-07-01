@@ -28,7 +28,7 @@ macro_rules! try_from {
 const TS_CATEGORY_WALLET: &'static str = r#"
 /**
  * @categoryDescription Wallet API
- * Wallet API for interfacing with Rusty Sahyadri Wallet implementation.
+ * Wallet API for interfacing with Sahyadri Wallet implementation.
  */
 "#;
 
