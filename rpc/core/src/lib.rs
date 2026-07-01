@@ -1,6 +1,6 @@
 //! # RPC Core
 //!
-//! This crate provides foundational primitives used in Rusty Sahyadri node RPC subsystem.
+//! This crate provides foundational primitives used in Sahyadri node RPC subsystem.
 //! These include the main [`RpcApi`](api::rpc::RpcApi) trait, [`RpcApiOps`](crate::api::ops::RpcApiOps)
 //! enum used in RPC method dispatching, and various data structures used in RPC method arguments.
 //!
