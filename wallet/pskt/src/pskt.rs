@@ -2,8 +2,8 @@
 //! Partially Signed Sahyadri Transaction (PSKT)
 //!
 
-use sahyadri_bip32::{DerivationPath, KeyFingerprint, secp256k1};
-use sahyadri_consensus_core::{Hash, hashing::sighash::SigHashReusedValuesUnsync};
+use sahyadri_bip32::{DerivationPath, DilithiumPkHash, KeyFingerprint};
+use sahyadri_consensus_core::{Hash, };
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{collections::BTreeMap, fmt::Display, fmt::Formatter, future::Future, marker::PhantomData, ops::Deref};
@@ -20,7 +20,6 @@ use sahyadri_consensus_core::{
     subnets::SUBNETWORK_ID_NATIVE,
     tx::{MutableTransaction, SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput},
 };
-use sahyadri_txscript::{TxScriptEngine, caches::Cache};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -66,20 +65,18 @@ impl KeySource {
     }
 }
 
-pub type PartialSigs = BTreeMap<secp256k1::PublicKey, Signature>;
+pub type PartialSigs = BTreeMap<DilithiumPkHash, Signature>;
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum Signature {
-    ECDSA(secp256k1::ecdsa::Signature),
-    Schnorr(secp256k1::schnorr::Signature),
+    Dilithium(Vec<u8>),
 }
 
 impl Signature {
-    pub fn into_bytes(self) -> [u8; 64] {
+    pub fn into_bytes(self) -> Vec<u8> {
         match self {
-            Signature::ECDSA(s) => s.serialize_compact(),
-            Signature::Schnorr(s) => s.serialize(),
+            Signature::Dilithium(bytes) => bytes,
         }
     }
 }
@@ -352,7 +349,7 @@ impl PSKT<Signer> {
 #[serde(rename_all = "camelCase")]
 pub struct SignInputOk {
     pub signature: Signature,
-    pub pub_key: secp256k1::PublicKey,
+    pub pub_key: DilithiumPkHash,
     pub key_source: Option<KeySource>,
 }
 
@@ -462,22 +459,11 @@ impl PSKT<Extractor> {
     }
 
     pub fn extract_tx(self, params: &Params) -> Result<MutableTransaction<Transaction>, ExtractError> {
-        let tx = self.extract_tx_unchecked(params)?;
-        use sahyadri_consensus_core::tx::VerifiableTransaction;
-        {
-            let tx = tx.as_verifiable();
-            let cache = Cache::new(10_000);
-            let reused_values = SigHashReusedValuesUnsync::new();
-
-            tx.populated_inputs().enumerate().try_for_each(|(idx, (input, entry))| {
-                TxScriptEngine::from_transaction_input(&tx, input, idx, entry, &reused_values, &cache).execute()?;
-                <Result<(), ExtractError>>::Ok(())
-            })?;
-        }
-        Ok(tx)
+        // TODO: Re-enable script validation after Dilithium sig hash infrastructure
+        self.extract_tx_unchecked(params).map_err(ExtractError::from)
     }
-}
 
+    }
 /// Error combining pskt.
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum CombineError {
