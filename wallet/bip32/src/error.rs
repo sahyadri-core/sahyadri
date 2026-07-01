@@ -56,8 +56,8 @@ pub enum Error {
     ChildNumber,
 
     /// Cryptographic errors.
-    #[error("Secp256k1 -> {0}")]
-    Crypto(#[from] secp256k1::Error),
+    #[error("Crypto -> {0}")]
+    Crypto(String),
 
     /// Decoding errors (not related to Base58).
     #[error("Decoding(TryFromSlice) -> {0}")]
@@ -78,10 +78,6 @@ pub enum Error {
     /// Seed length invalid.
     #[error("Invalid seed length")]
     SeedLength,
-
-    /// Scalar OutOfRangeError
-    #[error("Scalar bytes length invalid : {0}")]
-    ScalarOutOfRangeError(#[from] secp256k1::scalar::OutOfRangeError),
 
     /// Utf8Error
     #[error("Utf8Error -> {0}")]
