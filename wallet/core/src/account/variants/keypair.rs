@@ -1,11 +1,11 @@
 //!
-//! Secp256k1 keypair account implementation
+//! Dilithium keypair account implementation
 //!
 
 use crate::account::Inner;
 use crate::imports::*;
 use sahyadri_addresses::Version;
-use secp256k1::PublicKey;
+use sahyadri_wallet_keys::prelude::PublicKey;
 
 pub const KEYPAIR_ACCOUNT_KIND: &str = "sahyadri-keypair-standard";
 
@@ -18,7 +18,7 @@ impl Factory for Ctor {
     }
 
     fn description(&self) -> String {
-        "Secp265k1 Keypair Account".to_string()
+        "Dilithium Keypair Account".to_string()
     }
 
     async fn try_load(
@@ -34,12 +34,12 @@ impl Factory for Ctor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub struct Payload {
-    pub public_key: secp256k1::PublicKey,
+    pub public_key: sahyadri_wallet_keys::prelude::PublicKey,
     pub ecdsa: bool,
 }
 
 impl Payload {
-    pub fn new(public_key: secp256k1::PublicKey, ecdsa: bool) -> Self {
+    pub fn new(public_key: sahyadri_wallet_keys::prelude::PublicKey, ecdsa: bool) -> Self {
         Self { public_key, ecdsa }
     }
 
@@ -57,29 +57,26 @@ impl AccountStorable for Payload {}
 
 impl BorshSerialize for Payload {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        let public_key = self.public_key.serialize();
-
-        StorageHeader::new(Self::STORAGE_MAGIC, Self::STORAGE_VERSION).serialize(writer)?;
-
-        BorshSerialize::serialize(public_key.as_slice(), writer)?;
-        BorshSerialize::serialize(&self.ecdsa, writer)?;
-
-        Ok(())
-    }
+            StorageHeader::new(Self::STORAGE_MAGIC, Self::STORAGE_VERSION).serialize(writer)?;
+ 
+            BorshSerialize::serialize(&self.public_key.bytes, writer)?;
+            BorshSerialize::serialize(&self.ecdsa, writer)?;
+ 
+            Ok(())
+        }
 }
 
 impl BorshDeserialize for Payload {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> IoResult<Self> {
-        let StorageHeader { version: _, .. } =
-            StorageHeader::deserialize_reader(reader)?.try_magic(Self::STORAGE_MAGIC)?.try_version(Self::STORAGE_VERSION)?;
-
-        let public_key_bytes: Vec<u8> = BorshDeserialize::deserialize_reader(reader)?;
-        let public_key = secp256k1::PublicKey::from_slice(public_key_bytes.as_slice())
-            .map_err(|_| IoError::other("Unable to deserialize keypair account (invalid public key)"))?;
-        let ecdsa = BorshDeserialize::deserialize_reader(reader)?;
-
-        Ok(Self { public_key, ecdsa })
-    }
+            let StorageHeader { version: _, .. } =
+                StorageHeader::deserialize_reader(reader)?.try_magic(Self::STORAGE_MAGIC)?.try_version(Self::STORAGE_VERSION)?;
+ 
+            let public_key_bytes: Vec<u8> = BorshDeserialize::deserialize_reader(reader)?;
+            let public_key = sahyadri_wallet_keys::prelude::PublicKey::from(public_key_bytes);
+            let ecdsa = BorshDeserialize::deserialize_reader(reader)?;
+ 
+            Ok(Self { public_key, ecdsa })
+        }
 }
 
 pub struct Keypair {
@@ -93,7 +90,7 @@ impl Keypair {
     pub async fn try_new(
         wallet: &Arc<Wallet>,
         name: Option<String>,
-        public_key: secp256k1::PublicKey,
+        public_key: sahyadri_wallet_keys::prelude::PublicKey,
         prv_key_data_id: PrvKeyDataId,
         ecdsa: bool,
     ) -> Result<Self> {
@@ -143,18 +140,20 @@ impl Account for Keypair {
     }
 
     fn receive_address(&self) -> Result<Address> {
-        let (xonly_public_key, _) = self.public_key.x_only_public_key();
-        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &xonly_public_key.serialize()))
+        use sha2::{Sha256, Digest};
+        let hash = Sha256::digest(&self.public_key.bytes);
+        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }
 
     fn change_address(&self) -> Result<Address> {
-        let (xonly_public_key, _) = self.public_key.x_only_public_key();
-        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &xonly_public_key.serialize()))
+        use sha2::{Sha256, Digest};
+        let hash = Sha256::digest(&self.public_key.bytes);
+        Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }
 
     fn to_storage(&self) -> Result<AccountStorage> {
         let settings = self.context().settings.clone();
-        let storable = Payload::new(self.public_key, self.ecdsa);
+        let storable = Payload::new(self.public_key.clone(), self.ecdsa);
         let account_storage = AccountStorage::try_new(
             KEYPAIR_ACCOUNT_KIND.into(),
             self.id(),
@@ -194,14 +193,14 @@ impl Account for Keypair {
         key_data: &PrvKeyData,
         payment_secret: &Option<Secret>,
         addresses: &[&'l Address],
-    ) -> Result<Vec<(&'l Address, secp256k1::SecretKey)>> {
+    ) -> Result<Vec<(&'l Address, sahyadri_bip32::DilithiumSeed)>> {
         let private_key =
             key_data.as_secret_key(payment_secret.as_ref())?.ok_or(Error::Custom("Unable to derive private key".to_string()))?;
         let mut private_keys = vec![];
         let wallet_address = self.receive_address()?;
         for address in addresses.iter() {
             if **address == wallet_address {
-                private_keys.push((*address, private_key));
+                private_keys.push((*address, private_key.clone()));
             }
         }
         Ok(private_keys)
