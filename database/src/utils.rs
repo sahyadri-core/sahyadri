@@ -43,12 +43,12 @@ impl Drop for DbLifetime {
 
 pub fn get_sahyadri_tempdir() -> TempDir {
     let global_tempdir = std::env::temp_dir();
-    let sahyadri_tempdir = global_tempdir.join("rusty-sahyadri");
+    let sahyadri_tempdir = global_tempdir.join("sahyadri");
     std::fs::create_dir_all(sahyadri_tempdir.as_path()).unwrap();
     tempfile::tempdir_in(sahyadri_tempdir.as_path()).unwrap()
 }
 
-/// Creates a DB within a temp directory under `<OS SPECIFIC TEMP DIR>/rusty-sahyadri`
+/// Creates a DB within a temp directory under `<OS SPECIFIC TEMP DIR>/sahyadri`
 /// Callers must keep the `TempDbLifetime` guard for as long as they wish the DB to exist.
 #[macro_export]
 macro_rules! create_temp_db {
