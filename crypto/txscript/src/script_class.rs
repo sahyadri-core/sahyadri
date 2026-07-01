@@ -28,18 +28,22 @@ pub enum ScriptClass {
     PubKeyECDSA,
     /// Pay to script hash
     ScriptHash,
+    PubKeyDilithium,
 }
 
 const NON_STANDARD: &str = "nonstandard";
 const PUB_KEY: &str = "pubkey";
 const PUB_KEY_ECDSA: &str = "pubkeyecdsa";
 const SCRIPT_HASH: &str = "scripthash";
+const PUB_KEY_DILITHIUM: &str = "pubkeydilithium";
 
 impl ScriptClass {
     pub fn from_script(script_public_key: &ScriptPublicKey) -> Self {
         let script_public_key_ = script_public_key.script();
         if script_public_key.version() == MAX_SCRIPT_PUBLIC_KEY_VERSION {
-            if Self::is_pay_to_pubkey(script_public_key_) {
+            if Self::is_pay_to_pubkey_dilithium(script_public_key_) {
+                ScriptClass::PubKeyDilithium
+            } else if Self::is_pay_to_pubkey(script_public_key_) {
                 ScriptClass::PubKey
             } else if Self::is_pay_to_pubkey_ecdsa(script_public_key_) {
                 Self::PubKeyECDSA
@@ -81,12 +85,21 @@ impl ScriptClass {
         (script_public_key[34] == opcodes::codes::OpEqual)
     }
 
+    #[inline(always)]
+    pub fn is_pay_to_pubkey_dilithium(script_public_key: &[u8]) -> bool {
+        (script_public_key.len() == 22) && // 1 opcode + 20 data + 1 opcode
+        (script_public_key[0] == 0x14) &&  // OP_PUSHBYTES_20
+        (script_public_key[21] == opcodes::codes::OpCheckSig)
+    }
+
     fn as_str(&self) -> &'static str {
         match self {
             ScriptClass::NonStandard => NON_STANDARD,
             ScriptClass::PubKey => PUB_KEY,
             ScriptClass::PubKeyECDSA => PUB_KEY_ECDSA,
             ScriptClass::ScriptHash => SCRIPT_HASH,
+            ScriptClass::PubKeyDilithium => PUB_KEY_DILITHIUM,
+
         }
     }
 
@@ -96,6 +109,8 @@ impl ScriptClass {
             ScriptClass::PubKey => MAX_SCRIPT_PUBLIC_KEY_VERSION,
             ScriptClass::PubKeyECDSA => MAX_SCRIPT_PUBLIC_KEY_VERSION,
             ScriptClass::ScriptHash => MAX_SCRIPT_PUBLIC_KEY_VERSION,
+            ScriptClass::PubKeyDilithium => MAX_SCRIPT_PUBLIC_KEY_VERSION,
+
         }
     }
 }
@@ -115,6 +130,7 @@ impl FromStr for ScriptClass {
             PUB_KEY => Ok(ScriptClass::PubKey),
             PUB_KEY_ECDSA => Ok(ScriptClass::PubKeyECDSA),
             SCRIPT_HASH => Ok(ScriptClass::ScriptHash),
+            PUB_KEY_DILITHIUM => Ok(ScriptClass::PubKeyDilithium),
             _ => Err(Error::InvalidScriptClass(script_class.to_string())),
         }
     }
@@ -134,6 +150,7 @@ impl From<Version> for ScriptClass {
             Version::PubKey => ScriptClass::PubKey,
             Version::PubKeyECDSA => ScriptClass::PubKeyECDSA,
             Version::ScriptHash => ScriptClass::ScriptHash,
+            Version::PubKeyDilithium => ScriptClass::PubKeyDilithium,
         }
     }
 }
