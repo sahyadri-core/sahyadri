@@ -247,7 +247,7 @@ impl Transaction {
     }
 
     /// Set the storage mass commitment field of this transaction. This field has been activated on mainnet as part
-    /// of the Crescendo hardfork. The field has no effect on tx ID so no need to finalize following this call.
+    /// of the Raigad hardfork. The field has no effect on tx ID so no need to finalize following this call.
     pub fn set_mass(&self, mass: u64) {
         self.mass.0.store(mass, SeqCst)
     }
@@ -635,7 +635,7 @@ mod tests {
         let tx = test_transaction();
         let bts = bincode::serialize(&tx).unwrap();
 
-        // standard, based on https://github.com/sahyadrinet/rusty-sahyadri/commit/7e947a06d2434daf4bc7064d4cd87dc1984b56fe
+        // standard, based on https://github.com/sahyadrinet/sahyadri/commit/7e947a06d2434daf4bc7064d4cd87dc1984b56fe
         let expected_bts = vec![
             1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 22, 94, 56, 232, 179, 145, 69, 149, 217, 198, 65, 243, 184, 238, 194, 243, 70, 17, 137, 107,
             130, 26, 104, 59, 122, 78, 222, 254, 44, 0, 0, 0, 250, 255, 255, 255, 32, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8,
