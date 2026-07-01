@@ -152,7 +152,7 @@ impl SigHashCache {
     }
 }
 
-pub fn calc_schnorr_signature_hash(
+pub fn calc_signature_hash(
     tx : ITransaction,
     input : ITransactionInput,
     // utxo : IUtxoEntry,
@@ -209,7 +209,7 @@ pub fn calc_ecdsa_signature_hash(
     hash_type: SigHashType,
     // reused_values: &mut SigHashReusedValues,
 ) -> Result<Hash> {
-    let hash = calc_schnorr_signature_hash(tx, input_index, hash_type, reused_values)?;
+    let hash = calc_signature_hash(tx, input_index, hash_type, reused_values)?;
     let mut hasher = TransactionSigningHashECDSA::new();
     hasher.update(hash);
     hasher.finalize()
