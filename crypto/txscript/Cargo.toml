@@ -9,9 +9,6 @@ include.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[[example]]
-name = "kip-10"
-
 [features]
 wasm32-core = []
 wasm32-sdk = []
@@ -32,7 +29,7 @@ sahyadri-wasm-core.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
-secp256k1.workspace = true
+sahyadri-dilithium.workspace = true
 serde_json.workspace = true
 serde-wasm-bindgen.workspace = true
 serde.workspace = true
