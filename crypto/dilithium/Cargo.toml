@@ -1,0 +1,20 @@
+[package]
+name = "sahyadri-dilithium"
+description = "Post-quantum ML-DSA (Dilithium3) signing for Sahyadri"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+dilithium-rs.workspace = true
+sha2.workspace = true
+hex.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
