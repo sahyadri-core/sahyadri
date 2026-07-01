@@ -28,7 +28,7 @@ pub enum Error {
     InvalidTransactionOutpoint(String),
 
     #[error(transparent)]
-    Secp256k1(#[from] secp256k1::Error),
+    Dilithium(#[from] sahyadri_dilithium::DilithiumError),
 
     #[error(transparent)]
     Sign(#[from] sahyadri_consensus_core::sign::Error),
