@@ -216,18 +216,18 @@ pub struct OverrideParams {
     /// Blockrate-related params
     pub blockrate: Option<BlockrateParams>,
 
-    /// Target time per block prior to the crescendo hardfork (in milliseconds)
-    pub pre_crescendo_target_time_per_block: Option<u64>,
+    /// Target time per block prior to the raigad hardfork (in milliseconds)
+    pub pre_raigad_target_time_per_block: Option<u64>,
 
     /// Crescendo activation DAA score
-    pub crescendo_activation: Option<ForkActivation>,
+    pub raigad_activation: Option<ForkActivation>,
 }
 
 impl From<Params> for OverrideParams {
     fn from(p: Params) -> Self {
         Self {
             timestamp_deviation_tolerance: Some(p.timestamp_deviation_tolerance),
-            pre_crescendo_target_time_per_block: Some(p.pre_crescendo_target_time_per_block),
+            pre_raigad_target_time_per_block: Some(p.pre_raigad_target_time_per_block),
             difficulty_window_size: Some(p.difficulty_window_size),
             past_median_time_window_size: Some(p.past_median_time_window_size),
             min_difficulty_window_size: Some(p.min_difficulty_window_size),
@@ -248,7 +248,7 @@ impl From<Params> for OverrideParams {
             max_block_level: Some(p.max_block_level),
             pruning_proof_m: Some(p.pruning_proof_m),
             blockrate: Some(p.blockrate),
-            crescendo_activation: Some(p.crescendo_activation),
+            raigad_activation: Some(p.raigad_activation),
         }
     }
 }
@@ -307,12 +307,12 @@ pub struct Params {
     /// Blockrate-related params
     pub blockrate: BlockrateParams,
 
-    /// Target time per block prior to the crescendo hardfork (in milliseconds).
+    /// Target time per block prior to the raigad hardfork (in milliseconds).
     /// Required permanently in order to calculate the subsidy month from the current DAA score
-    pub pre_crescendo_target_time_per_block: u64,
+    pub pre_raigad_target_time_per_block: u64,
 
     /// Crescendo activation DAA score
-    pub crescendo_activation: ForkActivation,
+    pub raigad_activation: ForkActivation,
 }
 
 impl Params {
@@ -350,9 +350,9 @@ impl Params {
     #[must_use]
     pub fn bps_history(&self) -> ForkedParam<u64> {
         ForkedParam::new(
-            1000 / self.pre_crescendo_target_time_per_block,
+            1000 / self.pre_raigad_target_time_per_block,
             1000 / self.blockrate.target_time_per_block,
-            self.crescendo_activation,
+            self.raigad_activation,
         )
     }
 
@@ -476,11 +476,11 @@ impl Params {
 
             blockrate: overrides.blockrate.clone().unwrap_or(self.blockrate.clone()),
 
-            pre_crescendo_target_time_per_block: overrides
-                .pre_crescendo_target_time_per_block
-                .unwrap_or(self.pre_crescendo_target_time_per_block),
+            pre_raigad_target_time_per_block: overrides
+                .pre_raigad_target_time_per_block
+                .unwrap_or(self.pre_raigad_target_time_per_block),
 
-            crescendo_activation: overrides.crescendo_activation.unwrap_or(self.crescendo_activation),
+            raigad_activation: overrides.raigad_activation.unwrap_or(self.raigad_activation),
         }
     }
 }
@@ -568,10 +568,10 @@ pub const MAINNET_PARAMS: Params = Params {
 
     blockrate: BlockrateParams::new::<1>(),
 
-    pre_crescendo_target_time_per_block: 1000,
+    pre_raigad_target_time_per_block: 1000,
 
     // Roughly 2025-05-05 1500 UTC
-    crescendo_activation: ForkActivation::new(110_165_000),
+    raigad_activation: ForkActivation::new(110_165_000),
 };
 
 pub const TESTNET_PARAMS: Params = Params {
@@ -623,10 +623,10 @@ pub const TESTNET_PARAMS: Params = Params {
 
     blockrate: BlockrateParams::new::<1>(),
 
-    pre_crescendo_target_time_per_block: 1000,
+    pre_raigad_target_time_per_block: 1000,
 
     // 18:30 UTC, March 6, 2025
-    crescendo_activation: ForkActivation::new(88_657_000),
+    raigad_activation: ForkActivation::new(88_657_000),
 };
 
 pub const SIMNET_PARAMS: Params = Params {
@@ -664,9 +664,9 @@ pub const SIMNET_PARAMS: Params = Params {
     // For simnet, we deviate from default 10BPS configuration and allow at least 64 parents in order to support mempool benchmarks out of the box
     blockrate: BlockrateParams::new::<1>().increase_max_block_parents(64),
 
-    pre_crescendo_target_time_per_block: 1000,
+    pre_raigad_target_time_per_block: 1000,
 
-    crescendo_activation: ForkActivation::always(),
+    raigad_activation: ForkActivation::always(),
 };
 
 pub const DEVNET_PARAMS: Params = Params {
@@ -702,7 +702,7 @@ pub const DEVNET_PARAMS: Params = Params {
 
     blockrate: BlockrateParams::new::<1>(),
 
-    pre_crescendo_target_time_per_block: 1000,
+    pre_raigad_target_time_per_block: 1000,
 
-    crescendo_activation: ForkActivation::always(),
+    raigad_activation: ForkActivation::always(),
 };
