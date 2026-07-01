@@ -28,6 +28,16 @@ fn pay_to_pub_key_ecdsa(address_payload: &[u8]) -> ScriptVec {
     SmallVec::from_iter(once(OpData33).chain(address_payload.iter().copied()).chain(once(OpCheckSigECDSA)))
 }
 
+/// Creates a new script to pay a transaction output to a 20-byte Dilithium pubkey hash.
+fn pay_to_pub_key_dilithium(address_payload: &[u8]) -> ScriptVec {
+    assert_eq!(address_payload.len(), 20);
+    let mut script = SmallVec::new();
+    script.push(0x14); // OP_PUSHBYTES_20
+    script.extend_from_slice(address_payload);
+    script.push(0xac); // OP_CHECKSIG
+    script
+}
+
 /// Creates a new script to pay a transaction output to a script hash.
 /// It is expected that the input is a valid hash.
 fn pay_to_script_hash(script_hash: &[u8]) -> ScriptVec {
@@ -42,6 +52,7 @@ pub fn pay_to_address_script(address: &Address) -> ScriptPublicKey {
         Version::PubKey => pay_to_pub_key(address.payload.as_slice()),
         Version::PubKeyECDSA => pay_to_pub_key_ecdsa(address.payload.as_slice()),
         Version::ScriptHash => pay_to_script_hash(address.payload.as_slice()),
+        Version::PubKeyDilithium => pay_to_pub_key_dilithium(address.payload.as_slice()),
     };
     ScriptPublicKey::new(ScriptClass::from(address.version).version(), script)
 }
@@ -80,6 +91,7 @@ pub fn extract_script_pub_key_address(script_public_key: &ScriptPublicKey, prefi
         ScriptClass::PubKey => Ok(Address::new(prefix, Version::PubKey, &script[1..33])),
         ScriptClass::PubKeyECDSA => Ok(Address::new(prefix, Version::PubKeyECDSA, &script[1..34])),
         ScriptClass::ScriptHash => Ok(Address::new(prefix, Version::ScriptHash, &script[2..34])),
+        ScriptClass::PubKeyDilithium => Ok(Address::new(prefix, Version::PubKeyDilithium, &script[1..21])),
     }
 }
 
