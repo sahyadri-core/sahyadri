@@ -30,7 +30,7 @@ pub enum TxScriptError {
     #[error("encountered invalid state while running script: {0}")]
     InvalidState(String),
     #[error("signature invalid: {0}")]
-    InvalidSignature(secp256k1::Error),
+    InvalidSignature(String),
     #[error("invalid signature in sig cache")]
     SigcacheSignatureInvalid,
     #[error("exceeded max operation limit of {0}")]
