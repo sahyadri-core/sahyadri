@@ -23,6 +23,8 @@ use sahyadri_utils::fd_budget;
 use sahyadrid_lib::args::Args;
 use parking_lot::Mutex;
 use rand::thread_rng;
+use rand::RngCore;
+use sha2::Digest;
 use rand_distr::{Distribution, Exp};
 use std::{
     cmp::max,
@@ -75,10 +77,10 @@ async fn bench_bbt_latency() {
     //
     // Setup
     //
-    let (prealloc_sk, prealloc_pk) = secp256k1::generate_keypair(&mut thread_rng());
-    let prealloc_address =
-        Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKey, &prealloc_pk.x_only_public_key().0.serialize());
-    let schnorr_key = secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &prealloc_sk);
+    let mut seed = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut seed);
+    let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
+    let prealloc_address = Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = Args {
@@ -95,7 +97,7 @@ async fn bench_bbt_latency() {
     let params: Params = network.into();
 
     let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
-    let txs = common::utils::generate_tx_dag(utxoset.clone(), schnorr_key, spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
+    let txs = common::utils::generate_tx_dag(utxoset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
     common::utils::verify_tx_dag(&utxoset, &txs);
     info!("Generated overall {} txs", txs.len());
 
@@ -109,10 +111,10 @@ async fn bench_bbt_latency() {
     let comm_delay = 1000;
 
     // Mining key and address
-    let (sk, pk) = &secp256k1::generate_keypair(&mut thread_rng());
+    let pay_kp = sahyadri_dilithium::generate_keypair().expect("generate pay keypair");
     let pay_address =
-        Address::new(network.network_type().into(), sahyadri_addresses::Version::PubKey, &pk.x_only_public_key().0.serialize());
-    debug!("Generated private key {} and address {}", sk.display_secret(), pay_address);
+        Address::new(network.network_type().into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(pay_kp.public_key())[..20]);
+    debug!("Generated address {}", pay_address);
 
     let current_template = Arc::new(Mutex::new(bbt_client.get_block_template(pay_address.clone(), vec![]).await.unwrap()));
     let current_template_consume = current_template.clone();
@@ -323,10 +325,10 @@ async fn bench_bbt_latency_2() {
     //
     // Setup
     //
-    let (prealloc_sk, prealloc_pk) = secp256k1::generate_keypair(&mut thread_rng());
-    let prealloc_address =
-        Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKey, &prealloc_pk.x_only_public_key().0.serialize());
-    let schnorr_key = secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &prealloc_sk);
+    let mut seed = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut seed);
+    let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
+    let prealloc_address = Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, 500)
@@ -338,7 +340,7 @@ async fn bench_bbt_latency_2() {
     let params: Params = network.into();
 
     let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
-    let txs = common::utils::generate_tx_dag(utxoset.clone(), schnorr_key, spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
+    let txs = common::utils::generate_tx_dag(utxoset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
     common::utils::verify_tx_dag(&utxoset, &txs);
     info!("Generated overall {} txs", txs.len());
 
