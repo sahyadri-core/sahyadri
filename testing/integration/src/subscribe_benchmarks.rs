@@ -26,7 +26,8 @@ use sahyadri_math::Uint256;
 use sahyadri_notify::scope::VirtualDaaScoreChangedScope;
 use sahyadri_rpc_core::api::rpc::RpcApi;
 use sahyadri_txscript::pay_to_address_script;
-use rand::thread_rng;
+use rand::RngCore;
+use sha2::Digest;
 use std::{sync::Arc, time::Duration};
 
 // Constants
@@ -66,7 +67,7 @@ fn create_client_addresses(index: usize, network_id: &NetworkId) -> Vec<Address>
         max_address.max(WALLET_ADDRESSES) - WALLET_ADDRESSES
     };
     (min_address..max_address)
-        .map(|x| Address::new((*network_id).into(), sahyadri_addresses::Version::PubKey, &Uint256::from_u64(x as u64).to_le_bytes()))
+        .map(|x| Address::new((*network_id).into(), sahyadri_addresses::Version::PubKeyDilithium, &Uint256::from_u64(x as u64).to_le_bytes()[..20])
         .collect_vec()
 }
 
@@ -81,7 +82,9 @@ async fn utxos_changed_subscriptions_sanity_check() {
     // As we log the panic, we want to set it up after the logger
     sahyadri_core::panic::configure_panic();
 
-    let (prealloc_sk, _) = secp256k1::generate_keypair(&mut thread_rng());
+    let mut seed = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut seed);
+    let prealloc_seed_hex: String = seed.iter().map(|b| format!("{:02x}", b)).collect();
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, PREALLOC_AMOUNT)
         .apply_args(Daemon::fill_args_with_random_ports)
         .build();
@@ -91,7 +94,7 @@ async fn utxos_changed_subscriptions_sanity_check() {
     let daemon_args = DaemonArgs::new(
         args.rpclisten.map(|x| x.normalize(0).port).unwrap(),
         args.listen.map(|x| x.normalize(0).port).unwrap(),
-        prealloc_sk.display_secret().to_string(),
+        seed_hex,
         Some("ucs-server".to_owned()),
         100,
         true,
@@ -173,10 +176,12 @@ async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_
     //
     // Setup
     //
-    let (prealloc_sk, prealloc_pk) = secp256k1::generate_keypair(&mut thread_rng());
+    let mut seed = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut seed);
+    let seed_hex: String = seed.iter().map(|b| format!("{:02x}", b)).collect();
+    let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
     let prealloc_address =
-        Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKey, &prealloc_pk.x_only_public_key().0.serialize());
-    let schnorr_key = secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &prealloc_sk);
+        Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, PREALLOC_AMOUNT)
@@ -191,7 +196,7 @@ async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_
     let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
     let txs = common::utils::generate_tx_dag(
         utxoset.clone(),
-        schnorr_key,
+        prealloc_kp.clone(),
         spk,
         (TX_COUNT + TX_LEVEL_WIDTH - 1) / TX_LEVEL_WIDTH,
         TX_LEVEL_WIDTH,
@@ -204,7 +209,7 @@ async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_
     let daemon_args = DaemonArgs::new(
         args.rpclisten.map(|x| x.normalize(0).port).unwrap(),
         args.listen.map(|x| x.normalize(0).port).unwrap(),
-        prealloc_sk.display_secret().to_string(),
+        prealloc_seed_hex.clone(),
         Some("ucs-server".to_owned()),
         MAX_ADDRESSES,
         true,
