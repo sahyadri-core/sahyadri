@@ -142,6 +142,8 @@ pub enum Version {
     PubKeyECDSA = 1,
     /// ScriptHash addresses always have the version byte set to 8
     ScriptHash = 8,
+    /// Dilithium3 post-quantum: version 2, payload is 20-byte SHA256 hash of the full Dilithium public key
+    PubKeyDilithium = 129,
 }
 
 impl TryFrom<&str> for Version {
@@ -152,6 +154,7 @@ impl TryFrom<&str> for Version {
             "PubKey" => Ok(Version::PubKey),
             "PubKeyECDSA" => Ok(Version::PubKeyECDSA),
             "ScriptHash" => Ok(Version::ScriptHash),
+            "PubKeyDilithium" => Ok(Version::PubKeyDilithium),
             _ => Err(AddressError::InvalidVersionString(value.to_owned())),
         }
     }
@@ -163,6 +166,7 @@ impl Version {
             Version::PubKey => 32,
             Version::PubKeyECDSA => 33,
             Version::ScriptHash => 32,
+            Version::PubKeyDilithium => 20,
         }
     }
 }
@@ -175,6 +179,7 @@ impl TryFrom<u8> for Version {
           128 => Ok(Version::PubKey),
             1 => Ok(Version::PubKeyECDSA),
             8 => Ok(Version::ScriptHash),
+          129 => Ok(Version::PubKeyDilithium),
             _ => Err(AddressError::InvalidVersion(value)),
         }
     }
@@ -186,6 +191,7 @@ impl Display for Version {
             Version::PubKey => write!(f, "PubKey"),
             Version::PubKeyECDSA => write!(f, "PubKeyECDSA"),
             Version::ScriptHash => write!(f, "ScriptHash"),
+            Version::PubKeyDilithium => write!(f, "PubKeyDilithium"),
         }
     }
 }
