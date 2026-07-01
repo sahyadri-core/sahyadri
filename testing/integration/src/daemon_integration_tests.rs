@@ -15,7 +15,7 @@ use sahyadri_notify::scope::{BlockAddedScope, UtxosChangedScope, VirtualDaaScore
 use sahyadri_rpc_core::{Notification, RpcTransactionId, api::rpc::RpcApi};
 use sahyadri_txscript::pay_to_address_script;
 use sahyadrid_lib::args::Args;
-use rand::thread_rng;
+use sha2::Digest;
 use std::{sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -170,19 +170,18 @@ async fn daemon_utxos_propagation_test() {
     .await;
 
     // Mining key and address
-    let (miner_sk, miner_pk) = secp256k1::generate_keypair(&mut thread_rng());
+    let miner_kp = sahyadri_dilithium::generate_keypair().expect("generate miner keypair");
     let miner_address =
-        Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKey, &miner_pk.x_only_public_key().0.serialize());
-    let miner_schnorr_key = secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &miner_sk);
+        Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(miner_kp.public_key())[0..20]);
     let miner_spk = pay_to_address_script(&miner_address);
 
     // User key and address
-    let (_user_sk, user_pk) = secp256k1::generate_keypair(&mut thread_rng());
+    let user_kp = sahyadri_dilithium::generate_keypair().expect("generate user keypair");
     let user_address =
-        Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKey, &user_pk.x_only_public_key().0.serialize());
+        Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(user_kp.public_key())[0..20]);
 
     // Some dummy non-monitored address
-    let blank_address = Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKey, &[0; 32]);
+    let blank_address = Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKeyDilithium, &[0; 20]);
 
     // Mine 1000 blocks to daemon #1
     let initial_blocks = coinbase_maturity;
@@ -280,7 +279,7 @@ async fn daemon_utxos_propagation_test() {
     const NUMBER_INPUTS: u64 = 2;
     const NUMBER_OUTPUTS: u64 = 2;
     const TX_AMOUNT: u64 = SIMNET_PARAMS.pre_deflationary_phase_base_subsidy * (NUMBER_INPUTS * 5 - 1) / 5;
-    let transaction = generate_tx(miner_schnorr_key, &utxos[0..NUMBER_INPUTS as usize], TX_AMOUNT, NUMBER_OUTPUTS, &user_address);
+    let transaction = generate_tx(miner_kp.clone(), &utxos[0..NUMBER_INPUTS as usize], TX_AMOUNT, NUMBER_OUTPUTS, &user_address);
     rpc_client1.submit_transaction((&transaction).into(), false).await.unwrap();
 
     let check_client = rpc_client1.clone();
