@@ -5,7 +5,7 @@ use sahyadri_addresses::{Address, Prefix as AddressPrefix, Version as AddressVer
 use sahyadri_bip32::types::{ChainCode, HmacSha512, KEY_SIZE, KeyFingerprint, PublicKeyBytes};
 use sahyadri_bip32::{
     AddressType, ChildNumber, DerivationPath, ExtendedKey, ExtendedKeyAttrs, ExtendedPrivateKey, ExtendedPublicKey, Prefix,
-    PrivateKey, PublicKey, SecretKey, SecretKeyExt,
+    DilithiumPkHash, PrivateKey, PublicKey, SecretKey,
 };
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
@@ -26,7 +26,7 @@ where
 // #[wasm_bindgen(inspectable)]
 pub struct PubkeyDerivationManager {
     /// Derived public key
-    public_key: secp256k1::PublicKey,
+    seed: SecretKey,
     /// Extended key attributes.
     attrs: ExtendedKeyAttrs,
     #[allow(dead_code)]
@@ -37,41 +37,40 @@ pub struct PubkeyDerivationManager {
 
 impl PubkeyDerivationManager {
     pub fn new(
-        public_key: secp256k1::PublicKey,
+        seed: SecretKey,
         attrs: ExtendedKeyAttrs,
         fingerprint: KeyFingerprint,
         hmac: HmacSha512,
         index: u32,
     ) -> Result<Self> {
-        let wallet = Self { public_key, attrs, fingerprint, hmac, index: Arc::new(Mutex::new(index)) };
-
+        let wallet = Self { seed, attrs, fingerprint, hmac, index: Arc::new(Mutex::new(index)) };
         Ok(wallet)
     }
 
-    pub fn derive_pubkey_range(&self, indexes: std::ops::Range<u32>) -> Result<Vec<secp256k1::PublicKey>> {
+    pub fn derive_pubkey_range(&self, indexes: std::ops::Range<u32>) -> Result<Vec<DilithiumPkHash>> {
         let list = indexes.map(|index| self.derive_pubkey(index)).collect::<Vec<_>>();
         let keys = list.into_iter().collect::<Result<Vec<_>>>()?;
         Ok(keys)
     }
 
-    pub fn derive_pubkey(&self, index: u32) -> Result<secp256k1::PublicKey> {
-        let (key, _chain_code) = WalletDerivationManager::derive_public_key_child(&self.public_key, index, self.hmac.clone())?;
+    pub fn derive_pubkey(&self, index: u32) -> Result<DilithiumPkHash> {
+        let mut hmac = self.hmac.clone();
+        hmac.update(&index.to_be_bytes());
+        let result = hmac.finalize().into_bytes();
+        let child_seed: [u8; 32] = result[..32].try_into().map_err(|_| "seed derivation failed".to_string())?;
+        let kp = sahyadri_dilithium::generate_keypair_from_seed(&child_seed);
+        let pk_hash = sha2::Sha256::digest(kp.public_key());
+        let key = DilithiumPkHash(pk_hash.into());
         Ok(key)
     }
 
-    pub fn create_address(key: &secp256k1::PublicKey, prefix: AddressPrefix, ecdsa: bool) -> Result<Address> {
-        let address = if ecdsa {
-            let payload = &key.serialize();
-            Address::new(prefix, AddressVersion::PubKeyECDSA, payload)
-        } else {
-            let payload = &key.x_only_public_key().0.serialize();
-            Address::new(prefix, AddressVersion::PubKey, payload)
-        };
-
+    pub fn create_address(key: &DilithiumPkHash, prefix: AddressPrefix, _ecdsa: bool) -> Result<Address> {
+        let payload = &key.0[..20];
+        let address = Address::new(prefix, AddressVersion::PubKeyDilithium, payload);
         Ok(address)
     }
 
-    pub fn public_key(&self) -> ExtendedPublicKey<secp256k1::PublicKey> {
+    pub fn public_key(&self) -> ExtendedPublicKey<DilithiumPkHash> {
         self.into()
     }
 
@@ -86,9 +85,7 @@ impl PubkeyDerivationManager {
 
     /// Serialize this key as an [`ExtendedKey`].
     pub fn to_extended_key(&self, prefix: Prefix) -> ExtendedKey {
-        let mut key_bytes = [0u8; KEY_SIZE + 1];
-        key_bytes[..].copy_from_slice(&self.to_bytes());
-        ExtendedKey { prefix, attrs: self.attrs.clone(), key_bytes }
+        ExtendedKey { prefix, attrs: self.attrs.clone(), key_bytes: self.to_bytes() }
     }
 
     pub fn to_string(&self) -> Zeroizing<String> {
@@ -104,15 +101,19 @@ impl PubkeyDerivationManager {
     }
 }
 
-impl From<&PubkeyDerivationManager> for ExtendedPublicKey<secp256k1::PublicKey> {
-    fn from(inner: &PubkeyDerivationManager) -> ExtendedPublicKey<secp256k1::PublicKey> {
-        ExtendedPublicKey { public_key: inner.public_key, attrs: inner.attrs().clone() }
+impl From<&PubkeyDerivationManager> for ExtendedPublicKey<DilithiumPkHash> {
+    fn from(inner: &PubkeyDerivationManager) -> ExtendedPublicKey<DilithiumPkHash> {
+        let kp = sahyadri_dilithium::generate_keypair_from_seed(&inner.seed.to_bytes());
+        let hash = Sha256::digest(kp.public_key());
+        let mut pk_bytes = [0u8; 32];
+        pk_bytes.copy_from_slice(&hash);
+        ExtendedPublicKey { public_key: DilithiumPkHash(pk_bytes), attrs: inner.attrs().clone() }
     }
 }
 
 #[async_trait]
 impl PubkeyDerivationManagerTrait for PubkeyDerivationManager {
-    fn new_pubkey(&self) -> Result<secp256k1::PublicKey> {
+    fn new_pubkey(&self) -> Result<DilithiumPkHash> {
         self.set_index(self.index()? + 1)?;
         self.current_pubkey()
     }
@@ -126,14 +127,14 @@ impl PubkeyDerivationManagerTrait for PubkeyDerivationManager {
         Ok(())
     }
 
-    fn current_pubkey(&self) -> Result<secp256k1::PublicKey> {
+    fn current_pubkey(&self) -> Result<DilithiumPkHash> {
         let index = self.index()?;
         let key = self.derive_pubkey(index)?;
 
         Ok(key)
     }
 
-    fn get_range(&self, range: std::ops::Range<u32>) -> Result<Vec<secp256k1::PublicKey>> {
+    fn get_range(&self, range: std::ops::Range<u32>) -> Result<Vec<DilithiumPkHash>> {
         self.derive_pubkey_range(range)
     }
 }
@@ -141,7 +142,7 @@ impl PubkeyDerivationManagerTrait for PubkeyDerivationManager {
 #[derive(Clone)]
 pub struct WalletDerivationManager {
     /// extended public key derived upto `m/<Purpose>'/111111'/<Account Index>'`
-    extended_public_key: ExtendedPublicKey<secp256k1::PublicKey>,
+    extended_public_key: ExtendedPublicKey<DilithiumPkHash>,
 
     /// receive address wallet
     receive_pubkey_manager: Arc<PubkeyDerivationManager>,
@@ -164,7 +165,7 @@ impl WalletDerivationManager {
         let attrs = xprv_key.attrs();
 
         let (extended_private_key, attrs) =
-            Self::create_extended_key(*xprv_key.private_key(), attrs.clone(), is_multisig, account_index)?;
+            Self::create_extended_key(xprv_key.private_key().clone(), attrs.clone(), is_multisig, account_index)?;
 
         Ok((extended_private_key, attrs))
     }
@@ -213,34 +214,34 @@ impl WalletDerivationManager {
         &self.change_pubkey_manager
     }
 
-    pub fn derive_child_pubkey_manager(
-        mut public_key: ExtendedPublicKey<secp256k1::PublicKey>,
+    pub fn derive_child_pubkey_manager_from_seed(
+        parent_seed: &SecretKey,
+        parent_attrs: &ExtendedKeyAttrs,
         address_type: AddressType,
-        cosigner_index: Option<u32>,
     ) -> Result<PubkeyDerivationManager> {
-        if let Some(cosigner_index) = cosigner_index {
-            public_key = public_key.derive_child(ChildNumber::new(cosigner_index, false)?)?;
-        }
-
-        public_key = public_key.derive_child(ChildNumber::new(address_type.index(), false)?)?;
-
-        let mut hmac = HmacSha512::new_from_slice(&public_key.attrs().chain_code).map_err(sahyadri_bip32::Error::Hmac)?;
-        hmac.update(&public_key.to_bytes());
-
-        PubkeyDerivationManager::new(*public_key.public_key(), public_key.attrs().clone(), public_key.fingerprint(), hmac, 0)
+        let (branch_seed, branch_attrs) = Self::derive_private_key(parent_seed, parent_attrs, ChildNumber::new(address_type.index(), false)?)?;
+        let mut hmac = HmacSha512::new_from_slice(&branch_attrs.chain_code).map_err(sahyadri_bip32::Error::Hmac)?;
+        hmac.update(&branch_seed.to_bytes());
+        let fingerprint = get_fingerprint(&branch_seed);
+        PubkeyDerivationManager::new(branch_seed, branch_attrs, fingerprint, hmac, 0)
     }
 
     pub fn derive_public_key(
-        public_key: &secp256k1::PublicKey,
+        public_key: &DilithiumPkHash,
         attrs: &ExtendedKeyAttrs,
         index: u32,
-    ) -> Result<(secp256k1::PublicKey, ExtendedKeyAttrs)> {
+    ) -> Result<(DilithiumPkHash, ExtendedKeyAttrs)> {
         let fingerprint = public_key.fingerprint();
 
         let mut hmac = HmacSha512::new_from_slice(&attrs.chain_code).map_err(sahyadri_bip32::Error::Hmac)?;
         hmac.update(&public_key.to_bytes());
 
-        let (key, chain_code) = Self::derive_public_key_child(public_key, index, hmac)?;
+        let result = hmac.finalize().into_bytes();
+        let child_seed: [u8; 32] = result[..32].try_into().map_err(|_| "seed conversion failed".to_string())?;
+        let chain_code: [u8; 32] = result[32..].try_into().map_err(|_| "chain code conversion failed".to_string())?;
+        let kp = sahyadri_dilithium::generate_keypair_from_seed(&child_seed);
+        let pk_hash = sha2::Sha256::digest(kp.public_key());
+        let key = DilithiumPkHash(pk_hash.into());
 
         let depth = attrs.depth.checked_add(1).ok_or(sahyadri_bip32::Error::Depth)?;
 
@@ -248,31 +249,6 @@ impl WalletDerivationManager {
             ExtendedKeyAttrs { parent_fingerprint: fingerprint, child_number: ChildNumber::new(index, false)?, chain_code, depth };
 
         Ok((key, attrs))
-    }
-
-    fn derive_public_key_child(
-        key: &secp256k1::PublicKey,
-        index: u32,
-        mut hmac: HmacSha512,
-    ) -> Result<(secp256k1::PublicKey, ChainCode)> {
-        let child_number = ChildNumber::new(index, false)?;
-        hmac.update(&child_number.to_bytes());
-
-        let result = hmac.finalize().into_bytes();
-        let (child_key, chain_code) = result.split_at(KEY_SIZE);
-
-        // We should technically loop here if a `secret_key` is zero or overflows
-        // the order of the underlying elliptic curve group, incrementing the
-        // index, however per "Child key derivation (CKD) functions":
-        // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#child-key-derivation-ckd-functions
-        //
-        // > "Note: this has probability lower than 1 in 2^127."
-        //
-        // ...so instead, we simply return an error if this were ever to happen,
-        // as the chances of it happening are vanishingly small.
-        let key = key.derive_child(child_key.try_into()?)?;
-
-        Ok((key, chain_code.try_into()?))
     }
 
     pub fn derive_private_key(
@@ -315,7 +291,7 @@ impl WalletDerivationManager {
 
     pub fn create_hmac<K>(private_key: &K, attrs: &ExtendedKeyAttrs, hardened: bool) -> Result<HmacSha512>
     where
-        K: PrivateKey<PublicKey = secp256k1::PublicKey>,
+        K: PrivateKey,
     {
         let mut hmac = HmacSha512::new_from_slice(&attrs.chain_code).map_err(sahyadri_bip32::Error::Hmac)?;
         if hardened {
@@ -359,41 +335,29 @@ impl Debug for WalletDerivationManager {
 #[async_trait]
 impl WalletDerivationManagerTrait for WalletDerivationManager {
     /// build wallet from root/master private key
-    fn from_master_xprv(xprv: &str, is_multisig: bool, account_index: u64, cosigner_index: Option<u32>) -> Result<Self> {
+    fn from_master_xprv(xprv: &str, is_multisig: bool, account_index: u64, _cosigner_index: Option<u32>) -> Result<Self> {
         let xprv_key = ExtendedPrivateKey::<SecretKey>::from_str(xprv)?;
         let attrs = xprv_key.attrs();
-
-        let (extended_private_key, attrs) =
-            Self::create_extended_key(*xprv_key.private_key(), attrs.clone(), is_multisig, account_index)?;
-
-        let extended_public_key = ExtendedPublicKey { public_key: extended_private_key.get_public_key(), attrs };
-
-        let wallet = Self::from_extended_public_key(extended_public_key, cosigner_index)?;
-
-        Ok(wallet)
+        let (account_seed, attrs) = Self::create_extended_key(xprv_key.private_key().clone(), attrs.clone(), is_multisig, account_index)?;
+        let kp = sahyadri_dilithium::generate_keypair_from_seed(&account_seed.to_bytes());
+        let hash = Sha256::digest(kp.public_key());
+        let mut pk_bytes = [0u8; 32];
+        pk_bytes.copy_from_slice(&hash);
+        let extended_public_key = ExtendedPublicKey { public_key: DilithiumPkHash(pk_bytes), attrs: attrs.clone() };
+        let receive_wallet = Self::derive_child_pubkey_manager_from_seed(&account_seed, &attrs, AddressType::Receive)?;
+        let change_wallet = Self::derive_child_pubkey_manager_from_seed(&account_seed, &attrs, AddressType::Change)?;
+        Ok(Self { extended_public_key, receive_pubkey_manager: Arc::new(receive_wallet), change_pubkey_manager: Arc::new(change_wallet) })
     }
 
-    fn from_extended_public_key_str(xpub: &str, cosigner_index: Option<u32>) -> Result<Self> {
-        let extended_public_key = ExtendedPublicKey::<secp256k1::PublicKey>::from_str(xpub)?;
-        let wallet = Self::from_extended_public_key(extended_public_key, cosigner_index)?;
-        Ok(wallet)
+    fn from_extended_public_key_str(_xpub: &str, _cosigner_index: Option<u32>) -> Result<Self> {
+        Err("Dilithium does not support extended public key derivation (requires private key)".into())
     }
 
     fn from_extended_public_key(
-        extended_public_key: ExtendedPublicKey<secp256k1::PublicKey>,
-        cosigner_index: Option<u32>,
+        _extended_public_key: ExtendedPublicKey<DilithiumPkHash>,
+        _cosigner_index: Option<u32>,
     ) -> Result<Self> {
-        let receive_wallet = Self::derive_child_pubkey_manager(extended_public_key.clone(), AddressType::Receive, cosigner_index)?;
-
-        let change_wallet = Self::derive_child_pubkey_manager(extended_public_key.clone(), AddressType::Change, cosigner_index)?;
-
-        let wallet = Self {
-            extended_public_key,
-            receive_pubkey_manager: Arc::new(receive_wallet),
-            change_pubkey_manager: Arc::new(change_wallet),
-        };
-
-        Ok(wallet)
+        Err("Dilithium does not support extended public key derivation (requires private key)".into())
     }
 
     fn receive_pubkey_manager(&self) -> Arc<dyn PubkeyDerivationManagerTrait> {
@@ -405,37 +369,37 @@ impl WalletDerivationManagerTrait for WalletDerivationManager {
     }
 
     #[inline(always)]
-    fn new_receive_pubkey(&self) -> Result<secp256k1::PublicKey> {
+    fn new_receive_pubkey(&self) -> Result<DilithiumPkHash> {
         let key = self.receive_pubkey_manager.new_pubkey()?;
         Ok(key)
     }
 
     #[inline(always)]
-    fn new_change_pubkey(&self) -> Result<secp256k1::PublicKey> {
+    fn new_change_pubkey(&self) -> Result<DilithiumPkHash> {
         let key = self.change_pubkey_manager.new_pubkey()?;
         Ok(key)
     }
 
     #[inline(always)]
-    fn receive_pubkey(&self) -> Result<secp256k1::PublicKey> {
+    fn receive_pubkey(&self) -> Result<DilithiumPkHash> {
         let key = self.receive_pubkey_manager.current_pubkey()?;
         Ok(key)
     }
 
     #[inline(always)]
-    fn change_pubkey(&self) -> Result<secp256k1::PublicKey> {
+    fn change_pubkey(&self) -> Result<DilithiumPkHash> {
         let key = self.change_pubkey_manager.current_pubkey()?;
         Ok(key)
     }
 
     #[inline(always)]
-    fn derive_receive_pubkey(&self, index: u32) -> Result<secp256k1::PublicKey> {
+    fn derive_receive_pubkey(&self, index: u32) -> Result<DilithiumPkHash> {
         let key = self.receive_pubkey_manager.derive_pubkey(index)?;
         Ok(key)
     }
 
     #[inline(always)]
-    fn derive_change_pubkey(&self, index: u32) -> Result<secp256k1::PublicKey> {
+    fn derive_change_pubkey(&self, index: u32) -> Result<DilithiumPkHash> {
         let key = self.change_pubkey_manager.derive_pubkey(index)?;
         Ok(key)
     }
