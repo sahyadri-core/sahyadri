@@ -39,7 +39,7 @@ pub struct Payload {
 }
 
 impl Payload {
-    pub fn new(xpub_keys: Arc<Vec<ExtendedPublicKeySecp256k1>>, minimum_signatures: u16, ecdsa: bool) -> Self {
+    pub fn new(xpub_keys: Arc<Vec<ExtendedPublicKeyDilithium>>, minimum_signatures: u16, ecdsa: bool) -> Self {
         Self { xpub_keys, minimum_signatures, ecdsa }
     }
 
