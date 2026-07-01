@@ -3,4 +3,4 @@ rustc --version
 cargo install cargo-fuzz
 fuzzer="$1"
 shift;
-cargo fuzz run "$fuzzer" --release -- -use_counters=1 -use_value_profile=1 "$@" ../../../rusty-sahyadri-corpus/math/"$fuzzer"
+cargo fuzz run "$fuzzer" --release -- -use_counters=1 -use_value_profile=1 "$@" ../../../sahyadri-corpus/math/"$fuzzer"
