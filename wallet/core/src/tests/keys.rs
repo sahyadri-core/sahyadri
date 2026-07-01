@@ -1,5 +1,5 @@
 use crate::imports::*;
-pub fn make_xpub() -> ExtendedPublicKeySecp256k1 {
+pub fn make_xpub() -> ExtendedPublicKeyDilithium {
     use sahyadri_bip32::ExtendedKey;
     let xpub_base58 =
         "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8";
