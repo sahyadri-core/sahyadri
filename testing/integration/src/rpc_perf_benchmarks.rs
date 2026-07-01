@@ -16,6 +16,8 @@ use sahyadri_rpc_core::api::rpc::RpcApi;
 use sahyadri_txscript::pay_to_address_script;
 use rand::Rng;
 use rand::thread_rng;
+use rand::RngCore;
+use sha2::Digest;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -44,10 +46,10 @@ async fn bench_rpc_high_load() {
     sahyadri_core::panic::configure_panic();
 
     // Setup for pre-allocated UTXOs and transaction generation
-    let (prealloc_sk, prealloc_pk) = secp256k1::generate_keypair(&mut thread_rng());
-    let prealloc_address =
-        Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKey, &prealloc_pk.x_only_public_key().0.serialize());
-    let schnorr_key = secp256k1::Keypair::from_secret_key(secp256k1::SECP256K1, &prealloc_sk);
+    let mut seed = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut seed);
+    let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
+    let prealloc_address = Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, PREALLOC_AMOUNT_KANA) // Use simnet with prealloc args
@@ -61,7 +63,7 @@ async fn bench_rpc_high_load() {
 
     // Generate UTXOs from args
     let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
-    let txs = generate_tx_dag(utxoset.clone(), schnorr_key, spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
+    let txs = generate_tx_dag(utxoset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
     verify_tx_dag(&utxoset, &txs);
     info!("Generated overall {} txs for mempool pressure.", txs.len());
 
