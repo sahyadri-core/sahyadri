@@ -167,6 +167,7 @@ impl<
         let mut highest_with_body = None;
         let mut forward_iterator = self.reachability_service.forward_chain_iterator(pp, high, true).tuple_windows();
         let mut backward_iterator = self.reachability_service.backward_chain_iterator(high, pp, true);
+        #[allow(clippy::while_let_loop)]
         loop {
             // We loop from both directions in parallel in order to use the shorter path
             let Some((parent, current)) = forward_iterator.next() else {
