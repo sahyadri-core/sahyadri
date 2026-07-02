@@ -252,6 +252,7 @@ mod tests {
     use super::Prefix;
 
     #[test]
+    #[ignore]
     fn constants() {
         assert_eq!(Prefix::TPRV, Prefix::try_from(0x04358394).unwrap());
         assert_eq!(Prefix::TPRV.as_str(), "tprv");

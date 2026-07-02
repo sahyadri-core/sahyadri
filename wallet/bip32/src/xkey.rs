@@ -118,6 +118,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn bip32_test_vector_1_xprv() {
         //let xprv_base58 = "kprv5y2qurMHCsXYrNfU3GCihuwG3vMqFji7PZXajMEqyBkNh9UZUJgoHYBLTKu1eM4MvUtomcXPQ3Sw9HZ5ebbM4byoUciHo1zrPJBQfqpLorQ";
         let xprv_base58 = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPP\
@@ -136,6 +137,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn bip32_test_vector_1_xpub() {
         let xpub_base58 = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhe\
              PY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8";

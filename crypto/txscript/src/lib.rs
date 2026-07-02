@@ -598,6 +598,7 @@ impl SpkEncoding for ScriptPublicKey {
 }
 
 #[cfg(test)]
+#[allow(unused_imports, dead_code, unused_variables)]
 mod tests {
     use std::iter::once;
 

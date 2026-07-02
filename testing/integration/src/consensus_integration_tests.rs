@@ -64,7 +64,7 @@ use sahyadri_muhash::MuHash;
 use sahyadri_notify::subscription::context::SubscriptionContext;
 use sahyadri_txscript::caches::TxScriptCacheCounters;
 use sahyadri_txscript::opcodes::codes::OpTrue;
-use sahyadri_txscript::script_builder::ScriptBuilderResult;
+// use sahyadri_txscript::script_builder::ScriptBuilderResult;
 use sahyadri_utxoindex::UtxoIndex;
 use sahyadri_utxoindex::api::{UtxoIndexApi, UtxoIndexProxy};
 use serde::{Deserialize, Serialize};

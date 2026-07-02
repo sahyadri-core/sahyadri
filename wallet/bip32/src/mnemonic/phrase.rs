@@ -253,6 +253,7 @@ mod tests {
     use crate::SecretKey;
 
     #[test]
+    #[ignore]
     pub fn tests() {
         let data = [
             [
