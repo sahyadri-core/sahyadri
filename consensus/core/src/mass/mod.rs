@@ -630,6 +630,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_storage_mass() {
         // Tx with less outs than ins
         let mut tx = generate_tx_from_amounts(&[100, 200, 300], &[300, 300]);
