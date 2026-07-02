@@ -1,12 +1,16 @@
 //! Fiat-Shamir equality STARK: proves c_tilde == c2 byte-by-byte.
-use p3_matrix::Matrix;
+use crate::config::F;
 use p3_air::{Air, BaseAir};
 use p3_field::PrimeCharacteristicRing;
-use crate::config::F;
+use p3_matrix::Matrix;
 
 pub const FS_COLS: usize = 2;
 pub struct FiatShamirAir;
-impl BaseAir<F> for FiatShamirAir { fn width(&self) -> usize { FS_COLS } }
+impl BaseAir<F> for FiatShamirAir {
+    fn width(&self) -> usize {
+        FS_COLS
+    }
+}
 
 impl<AB: p3_air::AirBuilder<F = F>> Air<AB> for FiatShamirAir {
     fn eval(&self, builder: &mut AB) {
@@ -29,11 +33,13 @@ pub fn build_fiat_shamir_trace(c_tilde: &[u8], c2: &[u8]) -> Vec<Vec<F>> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::params::CTILDEBYTES;
     use super::*;
     #[test]
     fn test_fs_trace_shape() {
-        let t = build_fiat_shamir_trace(&vec![1u8;32], &vec![1u8;32]);
-        assert_eq!(t.len(), 32); assert_eq!(t[0].len(), 2);
+        let t = build_fiat_shamir_trace(&vec![1u8; 32], &vec![1u8; 32]);
+        assert_eq!(t.len(), 32);
+        assert_eq!(t[0].len(), 2);
     }
     #[test]
     fn test_fs_prove_verify() {
@@ -42,9 +48,13 @@ mod tests {
         use p3_uni_stark::{prove, verify};
         let cfg = build_stark_config();
         let pv: Vec<F> = vec![];
-        let t = build_fiat_shamir_trace(&vec![42u8;CTILDEBYTES], &vec![42u8;CTILDEBYTES]);
-        let mut v = vec![F::ZERO; t.len()*2];
-        for (i,r) in t.iter().enumerate() { for (j,&val) in r.iter().enumerate() { v[i*2+j]=val; } }
+        let t = build_fiat_shamir_trace(&vec![42u8; CTILDEBYTES], &vec![42u8; CTILDEBYTES]);
+        let mut v = vec![F::ZERO; t.len() * 2];
+        for (i, r) in t.iter().enumerate() {
+            for (j, &val) in r.iter().enumerate() {
+                v[i * 2 + j] = val;
+            }
+        }
         let proof = prove(&cfg, &FiatShamirAir, RowMajorMatrix::new(v, 2), &pv);
         assert!(verify(&cfg, &FiatShamirAir, &proof, &pv).is_ok());
     }

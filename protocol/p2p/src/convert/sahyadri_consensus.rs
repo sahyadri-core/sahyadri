@@ -3,7 +3,7 @@ use crate::convert::header::Versioned;
 use crate::pb as protowire;
 use sahyadri_consensus_core::{
     BlockHashMap, BlueWorkType, HashMapCustomHasher, KType,
-    trusted::{ExternalSahyadriConsensusData, TrustedSahyadriConsensusData, TrustedHeader},
+    trusted::{ExternalSahyadriConsensusData, TrustedHeader, TrustedSahyadriConsensusData},
 };
 use sahyadri_hashes::Hash;
 use std::sync::Arc;

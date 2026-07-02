@@ -1,8 +1,8 @@
 use crate::{
     consensus::{
         services::{
-            ConsensusServices, DbBlockDepthManager, DbDagTraversalManager, DbSahyadriConsensusManager, DbParentsManager, DbPruningPointManager,
-            DbWindowManager,
+            ConsensusServices, DbBlockDepthManager, DbDagTraversalManager, DbParentsManager, DbPruningPointManager,
+            DbSahyadriConsensusManager, DbWindowManager,
         },
         storage::ConsensusStorage,
     },
@@ -16,11 +16,11 @@ use crate::{
         stores::{
             DB,
             acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
+            account_store::{AccountStore, DbAccountStore},
             block_transactions::{BlockTransactionsStoreReader, DbBlockTransactionsStore},
             block_window_cache::{BlockWindowCacheStore, BlockWindowCacheWriter},
             daa::DbDaaStore,
             depth::{DbDepthStore, DepthStoreReader},
-            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusData, SahyadriConsensusStoreReader},
             headers::{DbHeadersStore, HeaderStoreReader},
             past_pruning_points::DbPastPruningPointsStore,
             pruning::{DbPruningStore, PruningStoreReader},
@@ -28,13 +28,13 @@ use crate::{
             pruning_samples::DbPruningSamplesStore,
             reachability::DbReachabilityStore,
             relations::{DbRelationsStore, RelationsStoreReader},
+            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusData, SahyadriConsensusStoreReader},
             selected_chain::{DbSelectedChainStore, SelectedChainStore},
             statuses::{DbStatusesStore, StatusesStore, StatusesStoreBatchExtensions, StatusesStoreReader},
             tips::{DbTipsStore, TipsStoreReader},
             utxo_diffs::{DbUtxoDiffsStore, UtxoDiffsStoreReader},
             utxo_multisets::{DbUtxoMultisetsStore, UtxoMultisetsStoreReader},
             virtual_state::{LkgVirtualState, VirtualState, VirtualStateStoreReader, VirtualStores},
-            account_store::{AccountStore, DbAccountStore},
         },
     },
     params::Params,
@@ -49,6 +49,7 @@ use crate::{
         window::WindowManager,
     },
 };
+use once_cell::unsync::Lazy;
 use sahyadri_consensus_core::{
     BlockHashSet, ChainPath,
     acceptance_data::AcceptanceData,
@@ -62,10 +63,7 @@ use sahyadri_consensus_core::{
     mining_rules::MiningRules,
     pruning::PruningPointsList,
     tx::{MutableTransaction, Transaction},
-    utxo::{
-        utxo_diff::UtxoDiff,
-        utxo_view::UtxoView,
-    },
+    utxo::{utxo_diff::UtxoDiff, utxo_view::UtxoView},
 };
 use sahyadri_consensus_notify::{
     notification::{
@@ -80,12 +78,10 @@ use sahyadri_database::prelude::{StoreError, StoreResultExt, StoreResultUnitExt}
 use sahyadri_hashes::{Hash, ZERO_HASH};
 use sahyadri_muhash::MuHash;
 use sahyadri_notify::{events::EventType, notifier::Notify};
-use once_cell::unsync::Lazy;
 
 use super::errors::{PruningImportError, PruningImportResult};
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use itertools::Itertools;
-use sahyadri_utils::binary_heap::BinaryHeapExtensions;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rand::{Rng, seq::SliceRandom};
 use rayon::{
@@ -93,6 +89,7 @@ use rayon::{
     prelude::{IntoParallelRefMutIterator, ParallelIterator},
 };
 use rocksdb::WriteBatch;
+use sahyadri_utils::binary_heap::BinaryHeapExtensions;
 use std::{
     cmp::min,
     collections::{BinaryHeap, HashMap, VecDeque},
@@ -300,7 +297,8 @@ impl VirtualStateProcessor {
 
         let (new_sink, virtual_parent_candidates) =
             self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, prev_sink, tips, finality_point, pruning_point);
-        let (virtual_parents, virtual_sahyadri_consensus_data) = self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point);
+        let (virtual_parents, virtual_sahyadri_consensus_data) =
+            self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point);
         assert_eq!(virtual_sahyadri_consensus_data.selected_parent, new_sink);
 
         let sink_multiset = self.utxo_multisets_store.get(new_sink).unwrap();
@@ -320,7 +318,8 @@ impl VirtualStateProcessor {
             )
             .expect("all possible rule errors are unexpected here");
 
-        let compact_sink_sahyadri_consensus_data = if let Some(sink_sahyadri_consensus_data) = Lazy::get(&sink_sahyadri_consensus_data) {
+        let compact_sink_sahyadri_consensus_data = if let Some(sink_sahyadri_consensus_data) = Lazy::get(&sink_sahyadri_consensus_data)
+        {
             // If we had to retrieve the full data, we convert it to compact
             sink_sahyadri_consensus_data.to_compact()
         } else {
@@ -332,7 +331,9 @@ impl VirtualStateProcessor {
         // Empty the channel before sending the new message. If pruning processor is busy, this step makes sure
         // the internal channel does not grow with no need (since we only care about the most recent message)
         let _consume = self.pruning_receiver.try_iter().count();
-        self.pruning_sender.send(PruningProcessingMessage::Process { sink_sahyadri_consensus_data: compact_sink_sahyadri_consensus_data }).unwrap();
+        self.pruning_sender
+            .send(PruningProcessingMessage::Process { sink_sahyadri_consensus_data: compact_sink_sahyadri_consensus_data })
+            .unwrap();
 
         // Emit notifications
         let accumulated_diff = Arc::new(accumulated_diff);
@@ -344,7 +345,9 @@ impl VirtualStateProcessor {
             .notify(Notification::UtxosChanged(UtxosChangedNotification::new(accumulated_diff, virtual_parents)))
             .expect("expecting an open unbounded channel");
         self.notification_root
-            .notify(Notification::SinkBlueScoreChanged(SinkBlueScoreChangedNotification::new(compact_sink_sahyadri_consensus_data.blue_score)))
+            .notify(Notification::SinkBlueScoreChanged(SinkBlueScoreChangedNotification::new(
+                compact_sink_sahyadri_consensus_data.blue_score,
+            )))
             .expect("expecting an open unbounded channel");
         self.notification_root
             .notify(Notification::VirtualDaaScoreChanged(VirtualDaaScoreChangedNotification::new(new_virtual_state.daa_score)))
@@ -442,7 +445,7 @@ impl VirtualStateProcessor {
 
                     self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
                     let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
- 
+
                     if let Err(rule_error) = res {
                         info!("Block {} is disqualified from virtual chain: {}", current, rule_error);
                         self.statuses_store.write().set(current, StatusDisqualifiedFromChain).unwrap();
@@ -507,12 +510,8 @@ impl VirtualStateProcessor {
         accumulated_diff: &mut UtxoDiff,
         chain_path: &ChainPath,
     ) -> Result<Arc<VirtualState>, RuleError> {
-        let new_virtual_state = self.calculate_virtual_state(
-            &virtual_read,
-            virtual_parents,
-            virtual_sahyadri_consensus_data,
-            selected_parent_multiset,
-        )?;
+        let new_virtual_state =
+            self.calculate_virtual_state(&virtual_read, virtual_parents, virtual_sahyadri_consensus_data, selected_parent_multiset)?;
         self.commit_virtual_state(virtual_read, new_virtual_state.clone(), accumulated_diff, chain_path);
         Ok(new_virtual_state)
     }
@@ -530,21 +529,24 @@ impl VirtualStateProcessor {
         let virtual_past_median_time = self.window_manager.calc_past_median_time(&virtual_sahyadri_consensus_data)?.0;
 
         // Use Default to avoid Hash-Registry errors
-        let mergeset_rewards = sahyadri_consensus_core::BlockHashMap::default(); 
-        
+        let mergeset_rewards = sahyadri_consensus_core::BlockHashMap::default();
+
         let empty_miner_data = sahyadri_consensus_core::coinbase::MinerData {
             script_public_key: sahyadri_consensus_core::tx::ScriptPublicKey::new(0, sahyadri_consensus_core::tx::ScriptVec::new()),
             extra_data: vec![],
         };
 
         // Get the account balances
-        let account_diff = self.coinbase_manager.expected_coinbase_transaction(
-            virtual_daa_window.daa_score,
-            empty_miner_data,
-            &virtual_sahyadri_consensus_data,
-            &mergeset_rewards,
-            &virtual_daa_window.mergeset_non_daa,
-        ).unwrap_or_default();
+        let account_diff = self
+            .coinbase_manager
+            .expected_coinbase_transaction(
+                virtual_daa_window.daa_score,
+                empty_miner_data,
+                &virtual_sahyadri_consensus_data,
+                &mergeset_rewards,
+                &virtual_daa_window.mergeset_non_daa,
+            )
+            .unwrap_or_default();
 
         let accepted_tx_ids = Vec::new();
 
@@ -554,13 +556,13 @@ impl VirtualStateProcessor {
             virtual_bits,
             virtual_past_median_time,
             selected_parent_multiset,
-            account_diff,             
+            account_diff,
             accepted_tx_ids,
             mergeset_rewards,
             virtual_daa_window.mergeset_non_daa,
             virtual_sahyadri_consensus_data,
         )))
-    } 
+    }
 
     fn commit_virtual_state(
         &self,
@@ -586,7 +588,7 @@ impl VirtualStateProcessor {
                         let amount = -(output.value as i64); // Negative to deduct
                         let _ = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount);
                     }
-                    
+
                     if i > 0 {
                         // TODO: Reverse the Sender's deduction (Refund the sender)
                     }
@@ -598,36 +600,34 @@ impl VirtualStateProcessor {
         for &hash in chain_path.added.iter() {
             if let Ok(txs) = self.block_transactions_store.get(hash) {
                 for (i, tx) in txs.iter().enumerate() {
-                    
-        // ==========================================
-        // FIX 1: MINER REWARD
-        // ==========================================
-        if i == 0 {
-        if let Ok(coinbase_data) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
-        
-        // 1. Hardcoded hata! Payload se asli calculated reward utha
-        let total_reward = coinbase_data.subsidy; 
+                    // ==========================================
+                    // FIX 1: MINER REWARD
+                    // ==========================================
+                    if i == 0 {
+                        if let Ok(coinbase_data) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
+                            // 1. Hardcoded hata! Payload se asli calculated reward utha
+                            let total_reward = coinbase_data.subsidy;
 
-        if total_reward > 0 {
-            // 2. Dev Fee Split (2% for Treasury)
-            let dev_fee = total_reward / 50;
-            let miner_reward = total_reward - dev_fee;
+                            if total_reward > 0 {
+                                // 2. Dev Fee Split (2% for Treasury)
+                                let dev_fee = total_reward / 50;
+                                let miner_reward = total_reward - dev_fee;
 
-            // 3. Miner ka balance update kar
-            let _ = self.account_store.update_balance_batch(
-                &mut batch, 
-                &coinbase_data.miner_data.script_public_key, 
-                miner_reward as i64
-            );
+                                // 3. Miner ka balance update kar
+                                let _ = self.account_store.update_balance_batch(
+                                    &mut batch,
+                                    &coinbase_data.miner_data.script_public_key,
+                                    miner_reward as i64,
+                                );
 
-            // TODO: Treasury address ko string se ScriptPublicKey me convert karke dev_fee bhi add karni hai
+                                // TODO: Treasury address ko string se ScriptPublicKey me convert karke dev_fee bhi add karni hai
 
-            println!("SAHYADRI REWARD: Added {} Kana to Miner! (Dev Fee: {})", miner_reward, dev_fee);
-        }
-        } else {
-        println!("SAHYADRI REWARD ERROR: Failed to decode coinbase payload!");
-        }
- }
+                                println!("SAHYADRI REWARD: Added {} Kana to Miner! (Dev Fee: {})", miner_reward, dev_fee);
+                            }
+                        } else {
+                            println!("SAHYADRI REWARD ERROR: Failed to decode coinbase payload!");
+                        }
+                    }
                     // ==========================================
                     // FIX 2: USER TRANSACTIONS
                     // ==========================================
@@ -639,13 +639,13 @@ impl VirtualStateProcessor {
 
                         if tx.payload.len() >= 8 {
                             let nonce_bytes_start = tx.payload.len() - 8;
-                            
+
                             let mut nonce_bytes = [0u8; 8];
                             nonce_bytes.copy_from_slice(&tx.payload[nonce_bytes_start..]);
                             let _expected_nonce = u64::from_le_bytes(nonce_bytes);
 
                             let sender_script = tx.payload[..nonce_bytes_start].to_vec();
-                            
+
                             let sender_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, sender_script);
 
                             let mut total_spent: u64 = 0;
@@ -680,7 +680,12 @@ impl VirtualStateProcessor {
 
     /// Caches the DAA and Median time windows of the sink block (if needed). Following, virtual's window calculations will
     /// naturally hit the cache finding the sink's windows and building upon them.
-    fn cache_sink_windows(&self, new_sink: Hash, prev_sink: Hash, sink_sahyadri_consensus_data: &impl Deref<Target = Arc<SahyadriConsensusData>>) {
+    fn cache_sink_windows(
+        &self,
+        new_sink: Hash,
+        prev_sink: Hash,
+        sink_sahyadri_consensus_data: &impl Deref<Target = Arc<SahyadriConsensusData>>,
+    ) {
         // We expect that the `new_sink` is cached (or some close-enough ancestor thereof) if it is equal to the `prev_sink`,
         // Hence we short-circuit the check of the keys in such cases, thereby reducing the access of the read-lock
         if new_sink != prev_sink {
@@ -941,7 +946,7 @@ impl VirtualStateProcessor {
         let virtual_daa_score = virtual_state.daa_score;
         let virtual_past_median_time = virtual_state.past_median_time;
         let dummy_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default(); // SAHYADRI ACCOUNT BYPASS
-        
+
         self.thread_pool.install(|| {
             self.validate_mempool_transaction_impl(mutable_tx, &dummy_utxo_view, virtual_daa_score, virtual_past_median_time, args)
         })
@@ -999,8 +1004,7 @@ impl VirtualStateProcessor {
         let invalid_transactions = HashMap::new();
         let virtual_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
         let results = self.validate_block_template_transactions(&txs, &virtual_state, &virtual_utxo_view);
-        for (_tx, _res) in txs.iter().zip(results) {
-        }
+        for (_tx, _res) in txs.iter().zip(results) {}
 
         let mut has_rejections = !invalid_transactions.is_empty();
         if has_rejections {
@@ -1010,7 +1014,7 @@ impl VirtualStateProcessor {
         while has_rejections {
             has_rejections = false;
             let next_batch = tx_selector.select_transactions();
-            
+
             // SAHYADRI ACCOUNT MODEL BYPASS
             // We assume all selected txs in the batch are valid and have a fee of 0.
             for tx in next_batch.into_iter() {
@@ -1070,37 +1074,40 @@ impl VirtualStateProcessor {
 
         let blue_score = virtual_state.sahyadri_consensus_data.blue_score;
         let subsidy = self.coinbase_manager.calc_block_subsidy(blue_score);
-        let dynamic_payload = self.coinbase_manager.serialize_coinbase_payload(
-            &sahyadri_consensus_core::coinbase::CoinbaseData {
+        let dynamic_payload = self
+            .coinbase_manager
+            .serialize_coinbase_payload(&sahyadri_consensus_core::coinbase::CoinbaseData {
                 blue_score,
                 subsidy,
                 miner_data: miner_data.clone(),
-            }
-        ).unwrap_or_else(|_| {
-            let mut p = blue_score.to_le_bytes().to_vec();
-            p.resize(32, 0);
-            p
-        });
+            })
+            .unwrap_or_else(|_| {
+                let mut p = blue_score.to_le_bytes().to_vec();
+                p.resize(32, 0);
+                p
+            });
 
         let state_receipt = Transaction::new(
-            0, // version
-            vec![], // inputs
-            vec![], // outputs
-            0, // lock_time
+            0,                                                        // version
+            vec![],                                                   // inputs
+            vec![],                                                   // outputs
+            0,                                                        // lock_time
             sahyadri_consensus_core::subnets::SUBNETWORK_ID_COINBASE, // Network tag
-            0, // gas
+            0,                                                        // gas
             dynamic_payload,
         );
 
-        txs.insert(0, state_receipt); 
-        // --------------------------------------------------------   
+        txs.insert(0, state_receipt);
+        // --------------------------------------------------------
 
         let version = BLOCK_VERSION;
         let parents_by_level = self.parents_manager.calc_block_parents(pruning_point, &virtual_state.parents);
         let hash_merkle_root = calc_hash_merkle_root(txs.iter());
 
-        let accepted_id_merkle_root = self
-            .calc_accepted_id_merkle_root(virtual_state.accepted_tx_ids.iter().copied(), virtual_state.sahyadri_consensus_data.selected_parent);
+        let accepted_id_merkle_root = self.calc_accepted_id_merkle_root(
+            virtual_state.accepted_tx_ids.iter().copied(),
+            virtual_state.sahyadri_consensus_data.selected_parent,
+        );
         let utxo_commitment = virtual_state.multiset.clone().finalize();
         // Past median time is the exclusive lower bound for valid block time, so we increase by 1 to get the valid min
         let min_block_time = virtual_state.past_median_time + 1;
@@ -1166,7 +1173,10 @@ impl VirtualStateProcessor {
         // Init virtual state
         self.commit_virtual_state(
             self.virtual_stores.upgradable_read(),
-            Arc::new(VirtualState::from_genesis(&self.genesis, self.sahyadri_consensus_manager.sahyadri_consensus(&[self.genesis.hash]))),
+            Arc::new(VirtualState::from_genesis(
+                &self.genesis,
+                self.sahyadri_consensus_manager.sahyadri_consensus(&[self.genesis.hash]),
+            )),
             &Default::default(),
             &Default::default(),
         );
@@ -1215,7 +1225,7 @@ impl VirtualStateProcessor {
         let new_pruning_point_transactions = vec![]; // SAHYADRI ACCOUNT BYPASS: Dummy variable
         let validated_transactions = self.validate_transactions_in_parallel(
             &new_pruning_point_transactions,
-            &dummy_view, 
+            &dummy_view,
             new_pruning_point_header.daa_score,
             TxValidationFlags::Full,
         );

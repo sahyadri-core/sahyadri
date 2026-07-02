@@ -4,15 +4,15 @@ use crate::{
     model::{
         services::{reachability::MTReachabilityService, relations::MTRelationsService, statuses::MTStatusesService},
         stores::{
-            DB, block_window_cache::BlockWindowCacheStore, daa::DbDaaStore, depth::DbDepthStore, sahyadri_consensus::DbSahyadriConsensusStore,
-            headers::DbHeadersStore, headers_selected_tip::DbHeadersSelectedTipStore, past_pruning_points::DbPastPruningPointsStore,
-            pruning::DbPruningStore, pruning_samples::DbPruningSamplesStore, reachability::DbReachabilityStore,
-            relations::DbRelationsStore, selected_chain::DbSelectedChainStore, statuses::DbStatusesStore,
+            DB, block_window_cache::BlockWindowCacheStore, daa::DbDaaStore, depth::DbDepthStore, headers::DbHeadersStore,
+            headers_selected_tip::DbHeadersSelectedTipStore, past_pruning_points::DbPastPruningPointsStore, pruning::DbPruningStore,
+            pruning_samples::DbPruningSamplesStore, reachability::DbReachabilityStore, relations::DbRelationsStore,
+            sahyadri_consensus::DbSahyadriConsensusStore, selected_chain::DbSelectedChainStore, statuses::DbStatusesStore,
         },
     },
     processes::{
-        block_depth::BlockDepthManager, coinbase::CoinbaseManager, sahyadri_consensus::protocol::SahyadriConsensusManager,
-        parents_builder::ParentsManager, pruning::PruningPointManager, pruning_proof::PruningProofManager, sync::SyncManager,
+        block_depth::BlockDepthManager, coinbase::CoinbaseManager, parents_builder::ParentsManager, pruning::PruningPointManager,
+        pruning_proof::PruningProofManager, sahyadri_consensus::protocol::SahyadriConsensusManager, sync::SyncManager,
         transaction_validator::TransactionValidator, traversal_manager::DagTraversalManager, window::SampledWindowManager,
     },
 };
@@ -20,10 +20,15 @@ use sahyadri_consensus_core::mass::MassCalculator;
 use sahyadri_txscript::caches::TxScriptCacheCounters;
 use std::sync::{Arc, atomic::AtomicBool};
 
-pub type DbSahyadriConsensusManager =
-    SahyadriConsensusManager<DbSahyadriConsensusStore, MTRelationsService<DbRelationsStore>, MTReachabilityService<DbReachabilityStore>, DbHeadersStore>;
+pub type DbSahyadriConsensusManager = SahyadriConsensusManager<
+    DbSahyadriConsensusStore,
+    MTRelationsService<DbRelationsStore>,
+    MTReachabilityService<DbReachabilityStore>,
+    DbHeadersStore,
+>;
 
-pub type DbDagTraversalManager = DagTraversalManager<DbSahyadriConsensusStore, DbReachabilityStore, MTRelationsService<DbRelationsStore>>;
+pub type DbDagTraversalManager =
+    DagTraversalManager<DbSahyadriConsensusStore, DbReachabilityStore, MTRelationsService<DbRelationsStore>>;
 
 pub type DbWindowManager = SampledWindowManager<DbSahyadriConsensusStore, BlockWindowCacheStore, DbHeadersStore, DbDaaStore>;
 

@@ -5,12 +5,12 @@ use crate::result::Result;
 use crate::tx::{Fees, MassCalculator, PaymentDestination};
 use crate::utxo::UtxoEntryReference;
 use crate::{tx::PaymentOutputs, utils::sahyadri_to_kana};
+use rand::prelude::*;
 use sahyadri_addresses::Address;
 use sahyadri_consensus_core::config::params::Params;
 use sahyadri_consensus_core::mass::UtxoCell;
 use sahyadri_consensus_core::network::{NetworkId, NetworkType};
 use sahyadri_consensus_core::tx::Transaction;
-use rand::prelude::*;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -455,7 +455,9 @@ where
 pub(crate) fn change_address(network_type: NetworkType) -> Address {
     match network_type {
         NetworkType::Mainnet => Address::try_from("sahyadri:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j").unwrap(),
-        NetworkType::Testnet => Address::try_from("sahyadritest:qqz22l98sf8jun72rwh5rqe2tm8lhwtdxdmynrz4ypwak427qed5juktjt7ju").unwrap(),
+        NetworkType::Testnet => {
+            Address::try_from("sahyadritest:qqz22l98sf8jun72rwh5rqe2tm8lhwtdxdmynrz4ypwak427qed5juktjt7ju").unwrap()
+        }
         _ => unreachable!("network type not supported"),
     }
 }
@@ -463,7 +465,9 @@ pub(crate) fn change_address(network_type: NetworkType) -> Address {
 pub(crate) fn output_address(network_type: NetworkType) -> Address {
     match network_type {
         NetworkType::Mainnet => Address::try_from("sahyadri:qrd9efkvg3pg34sgp6ztwyv3r569qlc43wa5w8nfs302532dzj47knu04aftm").unwrap(),
-        NetworkType::Testnet => Address::try_from("sahyadritest:qqrewmx4gpuekvk8grenkvj2hp7xt0c35rxgq383f6gy223c4ud5s58ptm6er").unwrap(),
+        NetworkType::Testnet => {
+            Address::try_from("sahyadritest:qqrewmx4gpuekvk8grenkvj2hp7xt0c35rxgq383f6gy223c4ud5s58ptm6er").unwrap()
+        }
         _ => unreachable!("network type not supported"),
     }
 }
@@ -708,51 +712,65 @@ fn test_generator_inputs_100_outputs_1_fees_include_success() -> Result<()> {
 
 #[test]
 fn test_generator_inputs_100_outputs_1_fees_exclude_insufficient_funds() -> Result<()> {
-    generator(test_network_id(), &[10.0; 100], &[], None, Fees::sender(Sahyadri(5.0)), [(output_address, Sahyadri(1000.0))].as_slice())
-        .unwrap()
-        .harness()
-        .fetch(&Expected {
-            is_final: false,
-            input_count: 88,
-            aggregate_input_value: Sahyadri(880.0),
-            output_count: 1,
-            priority_fees: FeesExpected::None,
-        })
-        .insufficient_funds();
+    generator(
+        test_network_id(),
+        &[10.0; 100],
+        &[],
+        None,
+        Fees::sender(Sahyadri(5.0)),
+        [(output_address, Sahyadri(1000.0))].as_slice(),
+    )
+    .unwrap()
+    .harness()
+    .fetch(&Expected {
+        is_final: false,
+        input_count: 88,
+        aggregate_input_value: Sahyadri(880.0),
+        output_count: 1,
+        priority_fees: FeesExpected::None,
+    })
+    .insufficient_funds();
 
     Ok(())
 }
 
 #[test]
 fn test_generator_inputs_1k_outputs_2_fees_exclude() -> Result<()> {
-    generator(test_network_id(), &[10.0; 1_000], &[], None, Fees::sender(Sahyadri(5.0)), [(output_address, Sahyadri(9_000.0))].as_slice())
-        .unwrap()
-        .harness()
-        .drain(
-            10,
-            &Expected {
-                is_final: false,
-                input_count: 88,
-                aggregate_input_value: Sahyadri(880.0),
-                output_count: 1,
-                priority_fees: FeesExpected::None,
-            },
-        )
-        .fetch(&Expected {
+    generator(
+        test_network_id(),
+        &[10.0; 1_000],
+        &[],
+        None,
+        Fees::sender(Sahyadri(5.0)),
+        [(output_address, Sahyadri(9_000.0))].as_slice(),
+    )
+    .unwrap()
+    .harness()
+    .drain(
+        10,
+        &Expected {
             is_final: false,
-            input_count: 21,
-            aggregate_input_value: Sahyadri(210.0),
+            input_count: 88,
+            aggregate_input_value: Sahyadri(880.0),
             output_count: 1,
             priority_fees: FeesExpected::None,
-        })
-        .fetch(&Expected {
-            is_final: true,
-            input_count: 11,
-            aggregate_input_value: Kana(9009_98981896),
-            output_count: 2,
-            priority_fees: FeesExpected::receiver(Sahyadri(5.0)),
-        })
-        .finalize();
+        },
+    )
+    .fetch(&Expected {
+        is_final: false,
+        input_count: 21,
+        aggregate_input_value: Sahyadri(210.0),
+        output_count: 1,
+        priority_fees: FeesExpected::None,
+    })
+    .fetch(&Expected {
+        is_final: true,
+        input_count: 11,
+        aggregate_input_value: Kana(9009_98981896),
+        output_count: 2,
+        priority_fees: FeesExpected::receiver(Sahyadri(5.0)),
+    })
+    .finalize();
 
     Ok(())
 }

@@ -2,7 +2,7 @@
 //! Message signing and verification functions.
 //!
 
-use sahyadri_dilithium::{sign_bytes, verify_signature_bytes, generate_keypair_from_seed, DilithiumError, SIG_SIZE};
+use sahyadri_dilithium::{DilithiumError, SIG_SIZE, generate_keypair_from_seed, sign_bytes, verify_signature_bytes};
 
 /// A personal message (text) that can be signed.
 #[derive(Clone)]

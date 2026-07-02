@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{BlockHashSet, BlockHasher};
 use sahyadri_database::prelude::CachePolicy;
 use sahyadri_database::prelude::DB;
@@ -7,7 +8,6 @@ use sahyadri_database::prelude::StoreError;
 use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
-use rocksdb::WriteBatch;
 
 pub trait DaaStoreReader {
     fn get_mergeset_non_daa(&self, hash: Hash) -> Result<Arc<BlockHashSet>, StoreError>;

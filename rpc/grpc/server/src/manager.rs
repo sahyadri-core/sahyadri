@@ -1,7 +1,7 @@
 use crate::connection::{Connection, ConnectionId};
+use parking_lot::RwLock;
 use sahyadri_core::{debug, info, warn};
 use sahyadri_notify::connection::Connection as ConnectionT;
-use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet, hash_map::Entry::Occupied},
     sync::Arc,

@@ -1,10 +1,10 @@
 pub mod errors;
+pub mod tx_validation_in_account_context;
 pub mod tx_validation_in_header_context;
-pub mod tx_validation_in_isolation;
-pub mod tx_validation_in_account_context; // <--- RENAMED FROM UTXO!
+pub mod tx_validation_in_isolation; // <--- RENAMED FROM UTXO!
 
-use std::sync::Arc;
-use crate::model::stores::account_store::DbAccountStore; // <--- IMPORT BANK
+use crate::model::stores::account_store::DbAccountStore;
+use std::sync::Arc; // <--- IMPORT BANK
 
 use sahyadri_txscript::{
     SigCacheKey,

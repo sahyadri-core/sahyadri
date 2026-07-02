@@ -1,7 +1,7 @@
 use crate::model::stores::{
     block_window_cache::BlockWindowHeap,
-    sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
     headers::HeaderStoreReader,
+    sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
 };
 use sahyadri_consensus_core::{
     BlockHashSet, BlueWorkType, MAX_WORK_LEVEL,
@@ -208,8 +208,10 @@ impl<T: HeaderStoreReader, U: SahyadriConsensusStoreReader> SampledDifficultyMan
         store: &(impl SahyadriConsensusStoreReader + ?Sized),
     ) -> (u64, BlockHashSet) {
         let lowest_daa_blue_score = self.lowest_daa_blue_score(sahyadri_consensus_data);
-        let mergeset_non_daa: BlockHashSet =
-            sahyadri_consensus_data.unordered_mergeset().filter(|hash| store.get_blue_score(*hash).unwrap() < lowest_daa_blue_score).collect();
+        let mergeset_non_daa: BlockHashSet = sahyadri_consensus_data
+            .unordered_mergeset()
+            .filter(|hash| store.get_blue_score(*hash).unwrap() < lowest_daa_blue_score)
+            .collect();
         (self.internal_calc_daa_score(sahyadri_consensus_data, &mergeset_non_daa), mergeset_non_daa)
     }
 

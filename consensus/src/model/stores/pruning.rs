@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use itertools::Itertools;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::pruning::PruningPointProof;
 use sahyadri_database::prelude::DB;
 use sahyadri_database::prelude::StoreResult;
@@ -8,7 +9,6 @@ use sahyadri_database::prelude::{BatchDbWriter, CachedDbItem, DirectDbWriter};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 use sahyadri_hashes::ZERO_HASH;
-use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Serialize, Deserialize)]

@@ -1,17 +1,17 @@
 use crate::log_colors::LogColors;
 use crate::share_handler::SahyadriApiTrait;
 use anyhow::{Context, Result};
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use sahyadri_addresses::Address;
 use sahyadri_consensus_core::block::Block;
 use sahyadri_grpc_client::GrpcClient;
 use sahyadri_notify::{listener::ListenerId, scope::NewBlockTemplateScope};
 use sahyadri_rpc_core::notify::mode::NotificationMode;
 use sahyadri_rpc_core::{
-    GetSahyadriDagInfoRequest, GetBlockTemplateRequest, GetConnectedPeerInfoRequest, GetCurrentBlockColorRequest, GetInfoRequest,
+    GetBlockTemplateRequest, GetConnectedPeerInfoRequest, GetCurrentBlockColorRequest, GetInfoRequest, GetSahyadriDagInfoRequest,
     GetServerInfoRequest, Notification, RpcHash, RpcRawBlock, SubmitBlockRequest, SubmitBlockResponse, api::rpc::RpcApi,
 };
-use once_cell::sync::Lazy;
-use parking_lot::Mutex;
 use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 use std::sync::Arc;

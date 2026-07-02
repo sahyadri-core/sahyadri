@@ -176,10 +176,10 @@ impl TryFrom<u8> for Version {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-          128 => Ok(Version::PubKey),
+            128 => Ok(Version::PubKey),
             1 => Ok(Version::PubKeyECDSA),
             8 => Ok(Version::ScriptHash),
-          129 => Ok(Version::PubKeyDilithium),
+            129 => Ok(Version::PubKeyDilithium),
             _ => Err(AddressError::InvalidVersion(value)),
         }
     }

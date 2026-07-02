@@ -1,4 +1,7 @@
 use crate::model::{CirculatingSupply, CirculatingSupplyDiff};
+#[cfg(test)]
+use rand::Rng;
+use rand::{SeedableRng, rngs::SmallRng};
 use sahyadri_consensus::test_helpers::*;
 use sahyadri_consensus_core::{
     BlockHashSet, HashMapCustomHasher,
@@ -6,9 +9,6 @@ use sahyadri_consensus_core::{
     utxo::{utxo_collection::UtxoCollection, utxo_diff::UtxoDiff},
 };
 use sahyadri_hashes::Hash;
-#[cfg(test)]
-use rand::Rng;
-use rand::{SeedableRng, rngs::SmallRng};
 use std::sync::Arc;
 
 pub struct VirtualChangeEmulator {

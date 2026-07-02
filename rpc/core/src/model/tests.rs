@@ -2,6 +2,7 @@
 mod mockery {
 
     use crate::model::*;
+    use rand::Rng;
     use sahyadri_addresses::{Prefix, Version};
     use sahyadri_consensus_core::api::BlockCount;
     use sahyadri_consensus_core::network::NetworkType;
@@ -13,7 +14,6 @@ mod mockery {
     use sahyadri_rpc_macros::test_wrpc_serializer as test;
     use sahyadri_txscript::script_class::ScriptClass;
     use sahyadri_utils::networking::{ContextualNetAddress, IpAddress, NetAddress};
-    use rand::Rng;
     use std::net::{IpAddr, Ipv4Addr};
     use std::sync::Arc;
     use uuid::Uuid;

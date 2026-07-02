@@ -1,10 +1,10 @@
 use crate::{
     errors::*,
     jsonrpc_event::{JsonRpcEvent, JsonRpcResponse},
-    sahyadriapi::NODE_STATUS,
     log_colors::LogColors,
     mining_state::GetMiningState,
     prom::*,
+    sahyadriapi::NODE_STATUS,
     stratum_context::StratumContext,
 };
 use sahyadri_consensus_core::block::Block;

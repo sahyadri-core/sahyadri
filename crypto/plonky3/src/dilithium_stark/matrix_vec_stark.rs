@@ -17,17 +17,14 @@ use p3_air::{Air, BaseAir};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::Matrix;
 
-use crate::config::F;
 use super::params::{K, L, N, Q};
+use crate::config::F;
 
 /// Total trace rows: K × N × L.
 pub const MATRIX_VEC_TRACE_ROWS: usize = 8192;
 
 /// Build trace for matrix-vector multiplication in Z_q.
-pub fn build_matrix_vec_trace(
-    a_matrix: &[[[u32; N]; L]; K],
-    s_vec: &[[u32; N]; L],
-) -> Vec<Vec<F>> {
+pub fn build_matrix_vec_trace(a_matrix: &[[[u32; N]; L]; K], s_vec: &[[u32; N]; L]) -> Vec<Vec<F>> {
     let mut rows = Vec::with_capacity(MATRIX_VEC_TRACE_ROWS);
     for i in 0..K {
         for k in 0..N {
@@ -40,11 +37,7 @@ pub fn build_matrix_vec_trace(
                 let quotient = (prod_u64 / (Q as u64)) as u32;
                 let product = (prod_u64 % (Q as u64)) as u32;
                 let sum = (prev_acc as u64) + (product as u64);
-                let new_acc = if sum >= Q as u64 {
-                    (sum - Q as u64) as u32
-                } else {
-                    sum as u32
-                };
+                let new_acc = if sum >= Q as u64 { (sum - Q as u64) as u32 } else { sum as u32 };
                 rows.push(vec![
                     F::from_u64(i as u64),
                     F::from_u64(k as u64),
@@ -63,7 +56,17 @@ pub fn build_matrix_vec_trace(
     let padded_h = rows.len().next_power_of_two();
     if padded_h > rows.len() {
         let fa = rows.last().unwrap()[8];
-        let pad = vec![F::from_u64((K-1) as u64), F::from_u64((N-1) as u64), F::from_u64((L-1) as u64), F::ZERO, F::ZERO, F::ZERO, F::ZERO, fa, fa];
+        let pad = vec![
+            F::from_u64((K - 1) as u64),
+            F::from_u64((N - 1) as u64),
+            F::from_u64((L - 1) as u64),
+            F::ZERO,
+            F::ZERO,
+            F::ZERO,
+            F::ZERO,
+            fa,
+            fa,
+        ];
         rows.resize(padded_h, pad);
     }
 
@@ -137,8 +140,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::field_zq::{add_q, mul_q};
+    use super::*;
 
     #[test]
     fn test_matrix_vec_trace_shape() {

@@ -7,12 +7,13 @@ use async_trait::async_trait;
 pub use client_pool::ClientPool;
 use connection_event::ConnectionEvent;
 use futures::{future::FutureExt, pin_mut, select};
+use regex::Regex;
 use sahyadri_core::{debug, error, trace};
 use sahyadri_grpc_core::{
     RPC_MAX_MESSAGE_SIZE,
     channel::NotificationChannel,
     ops::SahyadridPayloadOps,
-    protowire::{GetInfoRequestMessage, SahyadridRequest, SahyadridResponse, sahyadrid_request, rpc_client::RpcClient},
+    protowire::{GetInfoRequestMessage, SahyadridRequest, SahyadridResponse, rpc_client::RpcClient, sahyadrid_request},
 };
 use sahyadri_notify::{
     collector::{Collector, CollectorFrom},
@@ -40,7 +41,6 @@ use sahyadri_utils_tower::{
     counters::TowerConnectionCounters,
     middleware::{BodyExt, CountBytesBody, MapRequestBodyLayer, MapResponseBodyLayer, ServiceBuilder},
 };
-use regex::Regex;
 use std::{
     sync::{
         Arc,
@@ -307,8 +307,11 @@ impl RpcApi for GrpcClient {
         }
         Ok(())
     }
-    
-    async fn submit_account_transaction(&self, _request: SubmitAccountTransactionRequest) -> RpcResult<SubmitAccountTransactionResponse> {
+
+    async fn submit_account_transaction(
+        &self,
+        _request: SubmitAccountTransactionRequest,
+    ) -> RpcResult<SubmitAccountTransactionResponse> {
         Err(sahyadri_rpc_core::RpcError::NotImplemented)
     }
 

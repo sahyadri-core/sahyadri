@@ -1,9 +1,9 @@
 use crate::hasher::SahyadriDiff;
-use sahyadri_consensus_core::block::Block;
-use sahyadri_hashes::Hash;
 use num_bigint::BigUint;
 use num_traits::Zero;
 use parking_lot::Mutex;
+use sahyadri_consensus_core::block::Block;
+use sahyadri_hashes::Hash;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;

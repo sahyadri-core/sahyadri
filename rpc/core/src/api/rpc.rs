@@ -23,7 +23,10 @@ pub const MAX_SAFE_WINDOW_SIZE: u32 = 10_000;
 #[async_trait]
 pub trait RpcApi: Sync + Send + AnySync {
     ///
-    async fn submit_account_transaction(&self, request: SubmitAccountTransactionRequest) -> RpcResult<SubmitAccountTransactionResponse>;
+    async fn submit_account_transaction(
+        &self,
+        request: SubmitAccountTransactionRequest,
+    ) -> RpcResult<SubmitAccountTransactionResponse>;
 
     async fn ping(&self) -> RpcResult<()> {
         self.ping_call(None, PingRequest {}).await?;
@@ -227,7 +230,7 @@ pub trait RpcApi: Sync + Send + AnySync {
         connection: Option<&DynRpcConnection>,
         request: SubmitTransactionReplacementRequest,
     ) -> RpcResult<SubmitTransactionReplacementResponse>;
-    
+
     async fn submit_account_transaction_call(
         &self,
         connection: Option<&DynRpcConnection>,

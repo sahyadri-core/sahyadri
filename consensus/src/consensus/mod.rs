@@ -19,12 +19,12 @@ use crate::{
             DB,
             acceptance_data::AcceptanceDataStoreReader,
             block_transactions::BlockTransactionsStoreReader,
-            sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
             headers::{CompactHeaderData, HeaderStoreReader},
             headers_selected_tip::HeadersSelectedTipStoreReader,
             past_pruning_points::PastPruningPointsStoreReader,
             pruning::PruningStoreReader,
             relations::RelationsStoreReader,
+            sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
             selected_chain::SelectedChainStore,
             statuses::StatusesStoreReader,
             tips::{TipsStore, TipsStoreReader},
@@ -86,14 +86,14 @@ use crossbeam_channel::{
 use itertools::Itertools;
 use sahyadri_consensusmanager::{SessionLock, SessionReadGuard};
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rocksdb::WriteBatch;
 use sahyadri_core::info;
 use sahyadri_database::prelude::StoreResultExt;
 use sahyadri_hashes::Hash;
 use sahyadri_muhash::MuHash;
 use sahyadri_txscript::caches::TxScriptCacheCounters;
 use sahyadri_utils::arc::ArcExtensions;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rocksdb::WriteBatch;
 
 use std::{
     cmp,
@@ -439,7 +439,11 @@ impl Consensus {
         }
     }
 
-    fn estimate_network_hashes_per_second_impl(&self, sahyadri_consensus_data: &SahyadriConsensusData, window_size: usize) -> ConsensusResult<u64> {
+    fn estimate_network_hashes_per_second_impl(
+        &self,
+        sahyadri_consensus_data: &SahyadriConsensusData,
+        window_size: usize,
+    ) -> ConsensusResult<u64> {
         let window = match self.services.window_manager.block_window(sahyadri_consensus_data, WindowType::VaryingWindow(window_size)) {
             Ok(w) => w,
             Err(RuleError::InsufficientDaaWindowSize(s)) => return Err(DifficultyError::InsufficientWindowData(s).into()),
@@ -521,7 +525,9 @@ impl Consensus {
                 "Catchup cannot be continued since the syncer pruning point could not be confirmed to be a valid pruning point",
             ));
         };
-        let Ok(selected_parent_sahyadri_consensus_data) = self.get_sahyadri_consensus_data(candidate_sahyadri_consensus_data.selected_parent) else {
+        let Ok(selected_parent_sahyadri_consensus_data) =
+            self.get_sahyadri_consensus_data(candidate_sahyadri_consensus_data.selected_parent)
+        else {
             return Err(ConsensusError::General(
                 "Catchup cannot be continued since the syncer pruning point could not be confirmed to be a valid pruning point",
             ));
@@ -632,10 +638,7 @@ impl ConsensusApi for Consensus {
     }
 
     // Sahyadri Account Model: Bypass parallel mempool population
-    fn populate_mempool_transactions_in_parallel(
-        &self,
-        transactions: &mut [MutableTransaction],
-    ) -> Vec<TxResult<()>> {
+    fn populate_mempool_transactions_in_parallel(&self, transactions: &mut [MutableTransaction]) -> Vec<TxResult<()>> {
         // Return Ok for all transactions without doing UTXO population
         transactions.iter().map(|_| Ok(())).collect()
     }
@@ -683,7 +686,8 @@ impl ConsensusApi for Consensus {
 
     fn get_virtual_merge_depth_blue_work_threshold(&self) -> BlueWorkType {
         // PRUNE SAFETY: merge depth root is never close to being pruned (in terms of block depth)
-        self.get_virtual_merge_depth_root().map_or(BlueWorkType::ZERO, |root| self.sahyadri_consensus_store.get_blue_work(root).unwrap())
+        self.get_virtual_merge_depth_root()
+            .map_or(BlueWorkType::ZERO, |root| self.sahyadri_consensus_store.get_blue_work(root).unwrap())
     }
 
     fn get_sink(&self) -> Hash {
@@ -1259,7 +1263,8 @@ impl ConsensusApi for Consensus {
             Some(BlockStatus::StatusInvalid) => return Err(ConsensusError::InvalidBlock(hash)),
             _ => {}
         };
-        let sahyadri_consensus = self.sahyadri_consensus_store.get_data(hash).optional().unwrap().ok_or(ConsensusError::MissingData(hash))?;
+        let sahyadri_consensus =
+            self.sahyadri_consensus_store.get_data(hash).optional().unwrap().ok_or(ConsensusError::MissingData(hash))?;
         Ok((&*sahyadri_consensus).into())
     }
 

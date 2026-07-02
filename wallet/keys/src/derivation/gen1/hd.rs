@@ -1,13 +1,13 @@
 use crate::derivation::traits::*;
 use crate::imports::*;
 use hmac::Mac;
+use ripemd::Ripemd160;
 use sahyadri_addresses::{Address, Prefix as AddressPrefix, Version as AddressVersion};
 use sahyadri_bip32::types::{ChainCode, HmacSha512, KEY_SIZE, KeyFingerprint, PublicKeyBytes};
 use sahyadri_bip32::{
-    AddressType, ChildNumber, DerivationPath, ExtendedKey, ExtendedKeyAttrs, ExtendedPrivateKey, ExtendedPublicKey, Prefix,
-    DilithiumPkHash, PrivateKey, PublicKey, SecretKey,
+    AddressType, ChildNumber, DerivationPath, DilithiumPkHash, ExtendedKey, ExtendedKeyAttrs, ExtendedPrivateKey, ExtendedPublicKey,
+    Prefix, PrivateKey, PublicKey, SecretKey,
 };
-use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use std::fmt::Debug;
 // use wasm_bindgen::prelude::*;
@@ -36,13 +36,7 @@ pub struct PubkeyDerivationManager {
 }
 
 impl PubkeyDerivationManager {
-    pub fn new(
-        seed: SecretKey,
-        attrs: ExtendedKeyAttrs,
-        fingerprint: KeyFingerprint,
-        hmac: HmacSha512,
-        index: u32,
-    ) -> Result<Self> {
+    pub fn new(seed: SecretKey, attrs: ExtendedKeyAttrs, fingerprint: KeyFingerprint, hmac: HmacSha512, index: u32) -> Result<Self> {
         let wallet = Self { seed, attrs, fingerprint, hmac, index: Arc::new(Mutex::new(index)) };
         Ok(wallet)
     }
@@ -219,7 +213,8 @@ impl WalletDerivationManager {
         parent_attrs: &ExtendedKeyAttrs,
         address_type: AddressType,
     ) -> Result<PubkeyDerivationManager> {
-        let (branch_seed, branch_attrs) = Self::derive_private_key(parent_seed, parent_attrs, ChildNumber::new(address_type.index(), false)?)?;
+        let (branch_seed, branch_attrs) =
+            Self::derive_private_key(parent_seed, parent_attrs, ChildNumber::new(address_type.index(), false)?)?;
         let mut hmac = HmacSha512::new_from_slice(&branch_attrs.chain_code).map_err(sahyadri_bip32::Error::Hmac)?;
         hmac.update(&branch_seed.to_bytes());
         let fingerprint = get_fingerprint(&branch_seed);
@@ -338,7 +333,8 @@ impl WalletDerivationManagerTrait for WalletDerivationManager {
     fn from_master_xprv(xprv: &str, is_multisig: bool, account_index: u64, _cosigner_index: Option<u32>) -> Result<Self> {
         let xprv_key = ExtendedPrivateKey::<SecretKey>::from_str(xprv)?;
         let attrs = xprv_key.attrs();
-        let (account_seed, attrs) = Self::create_extended_key(xprv_key.private_key().clone(), attrs.clone(), is_multisig, account_index)?;
+        let (account_seed, attrs) =
+            Self::create_extended_key(xprv_key.private_key().clone(), attrs.clone(), is_multisig, account_index)?;
         let kp = sahyadri_dilithium::generate_keypair_from_seed(&account_seed.to_bytes());
         let hash = Sha256::digest(kp.public_key());
         let mut pk_bytes = [0u8; 32];
@@ -346,7 +342,11 @@ impl WalletDerivationManagerTrait for WalletDerivationManager {
         let extended_public_key = ExtendedPublicKey { public_key: DilithiumPkHash(pk_bytes), attrs: attrs.clone() };
         let receive_wallet = Self::derive_child_pubkey_manager_from_seed(&account_seed, &attrs, AddressType::Receive)?;
         let change_wallet = Self::derive_child_pubkey_manager_from_seed(&account_seed, &attrs, AddressType::Change)?;
-        Ok(Self { extended_public_key, receive_pubkey_manager: Arc::new(receive_wallet), change_pubkey_manager: Arc::new(change_wallet) })
+        Ok(Self {
+            extended_public_key,
+            receive_pubkey_manager: Arc::new(receive_wallet),
+            change_pubkey_manager: Arc::new(change_wallet),
+        })
     }
 
     fn from_extended_public_key_str(_xpub: &str, _cosigner_index: Option<u32>) -> Result<Self> {

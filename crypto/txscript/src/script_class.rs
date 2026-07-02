@@ -99,7 +99,6 @@ impl ScriptClass {
             ScriptClass::PubKeyECDSA => PUB_KEY_ECDSA,
             ScriptClass::ScriptHash => SCRIPT_HASH,
             ScriptClass::PubKeyDilithium => PUB_KEY_DILITHIUM,
-
         }
     }
 
@@ -110,7 +109,6 @@ impl ScriptClass {
             ScriptClass::PubKeyECDSA => MAX_SCRIPT_PUBLIC_KEY_VERSION,
             ScriptClass::ScriptHash => MAX_SCRIPT_PUBLIC_KEY_VERSION,
             ScriptClass::PubKeyDilithium => MAX_SCRIPT_PUBLIC_KEY_VERSION,
-
         }
     }
 }

@@ -11,8 +11,8 @@ use crate::tx::{DataKind, Generator, MAXIMUM_STANDARD_TRANSACTION_MASS};
 use crate::utxo::{UtxoContext, UtxoEntryId, UtxoEntryReference, UtxoIterator};
 use sahyadri_consensus_core::hashing::sighash_type::SigHashType;
 use sahyadri_consensus_core::sign::{Signed, sign_input, sign_with_multiple_v2};
-use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair_from_seed};
 use sahyadri_consensus_core::tx::{SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput};
+use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair_from_seed};
 use sahyadri_rpc_core::{RpcTransaction, RpcTransactionId};
 
 pub(crate) struct PendingTransactionInner {
@@ -282,8 +282,8 @@ impl PendingTransaction {
     pub fn try_sign_with_keys(&self, privkeys: &[[u8; 32]], check_fully_signed: Option<bool>) -> Result<()> {
         let mutable_tx = self.inner.signable_tx.lock()?.clone();
         let keypairs: Vec<DilithiumKeyPair> = privkeys.iter().map(|k| generate_keypair_from_seed(k)).collect();
-               let kp_refs: Vec<&DilithiumKeyPair> = keypairs.iter().collect();
-               let signed = sign_with_multiple_v2(mutable_tx, &kp_refs);
+        let kp_refs: Vec<&DilithiumKeyPair> = keypairs.iter().collect();
+        let signed = sign_with_multiple_v2(mutable_tx, &kp_refs);
 
         let signed_tx = match signed {
             Signed::Fully(tx) => tx,

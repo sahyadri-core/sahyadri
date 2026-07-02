@@ -20,9 +20,7 @@
 
 // ── Re-exports from dilithium-rs ────────────────────────────────────
 pub use dilithium::{
-    DilithiumMode, DilithiumError, DilithiumKeyPair, DilithiumSignature,
-    MlDsaKeyPair, MlDsaSignature,
-    ML_DSA_44, ML_DSA_65, ML_DSA_87,
+    DilithiumError, DilithiumKeyPair, DilithiumMode, DilithiumSignature, ML_DSA_44, ML_DSA_65, ML_DSA_87, MlDsaKeyPair, MlDsaSignature,
 };
 
 /// Sahyadri default: ML-DSA-65 (Dilithium3, NIST Level 3 ≈ AES-192)
@@ -90,20 +88,12 @@ pub fn sign_bytes(message: &[u8], keypair: &DilithiumKeyPair) -> Result<Dilithiu
 ///
 /// # Returns
 /// * `true` if valid, `false` if invalid
-pub fn verify_signature(
-    message: &str,
-    signature: &DilithiumSignature,
-    public_key: &[u8],
-) -> bool {
+pub fn verify_signature(message: &str, signature: &DilithiumSignature, public_key: &[u8]) -> bool {
     DilithiumKeyPair::verify(public_key, signature, message.as_bytes(), b"", SAHYADRI_MODE)
 }
 
 /// Verify a Dilithium3 signature from raw bytes.
-pub fn verify_signature_bytes(
-    message: &str,
-    sig_bytes: &[u8],
-    pubkey_bytes: &[u8],
-) -> bool {
+pub fn verify_signature_bytes(message: &str, sig_bytes: &[u8], pubkey_bytes: &[u8]) -> bool {
     let sig = DilithiumSignature::from_slice(sig_bytes);
     DilithiumKeyPair::verify(pubkey_bytes, &sig, message.as_bytes(), b"", SAHYADRI_MODE)
 }
@@ -131,11 +121,7 @@ pub fn is_dilithium_signature(sig_bytes: &[u8]) -> Option<DilithiumMode> {
 }
 
 /// Verify a Dilithium signature with auto-detected mode.
-pub fn verify_with_auto_mode(
-    message: &str,
-    sig_bytes: &[u8],
-    pubkey_bytes: &[u8],
-) -> Option<bool> {
+pub fn verify_with_auto_mode(message: &str, sig_bytes: &[u8], pubkey_bytes: &[u8]) -> Option<bool> {
     let mode = is_dilithium_signature(sig_bytes)?;
     let sig = DilithiumSignature::from_slice(sig_bytes);
     Some(DilithiumKeyPair::verify(pubkey_bytes, &sig, message.as_bytes(), b"", mode))
@@ -163,11 +149,7 @@ pub fn sig_to_hex(sig: &DilithiumSignature) -> String {
 /// Decode signature from hex string.
 pub fn sig_from_hex(hex_str: &str) -> Option<DilithiumSignature> {
     let bytes = hex::decode(hex_str).ok()?;
-    if is_dilithium_signature(&bytes).is_some() {
-        Some(DilithiumSignature::from_slice(&bytes))
-    } else {
-        None
-    }
+    if is_dilithium_signature(&bytes).is_some() { Some(DilithiumSignature::from_slice(&bytes)) } else { None }
 }
 
 // ── DID Message Builders ─────────────────────────────────────────────

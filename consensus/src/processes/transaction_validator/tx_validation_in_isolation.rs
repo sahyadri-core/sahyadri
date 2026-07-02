@@ -53,7 +53,7 @@ impl TransactionValidator {
             return Err(TxRuleError::CoinbaseNonZeroMassCommitment);
         }
 
-        let outputs_limit = 100; 
+        let outputs_limit = 100;
         if tx.outputs.len() as u64 > outputs_limit {
             return Err(TxRuleError::CoinbaseTooManyOutputs(tx.outputs.len(), outputs_limit));
         }

@@ -83,7 +83,9 @@ impl From<&SahyadridMessagePayload> for SahyadridMessagePayloadType {
             }
             SahyadridMessagePayload::BlockWithTrustedData(_) => SahyadridMessagePayloadType::BlockWithTrustedData,
             SahyadridMessagePayload::DoneBlocksWithTrustedData(_) => SahyadridMessagePayloadType::DoneBlocksWithTrustedData,
-            SahyadridMessagePayload::RequestPruningPointAndItsAnticone(_) => SahyadridMessagePayloadType::RequestPruningPointAndItsAnticone,
+            SahyadridMessagePayload::RequestPruningPointAndItsAnticone(_) => {
+                SahyadridMessagePayloadType::RequestPruningPointAndItsAnticone
+            }
             SahyadridMessagePayload::BlockHeaders(_) => SahyadridMessagePayloadType::BlockHeaders,
             SahyadridMessagePayload::RequestNextHeaders(_) => SahyadridMessagePayloadType::RequestNextHeaders,
             SahyadridMessagePayload::DoneHeaders(_) => SahyadridMessagePayloadType::DoneHeaders,

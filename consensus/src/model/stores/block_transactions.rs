@@ -1,3 +1,4 @@
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::tx::{TransactionInput, TransactionOutput};
 use sahyadri_consensus_core::{BlockHasher, tx::Transaction};
 use sahyadri_database::prelude::CachePolicy;
@@ -7,7 +8,6 @@ use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 use sahyadri_utils::mem_size::MemSizeEstimator;
-use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

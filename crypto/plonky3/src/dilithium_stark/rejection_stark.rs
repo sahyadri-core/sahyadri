@@ -14,8 +14,8 @@ use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::Matrix;
 
-use crate::config::F;
 use super::params::{N, Q};
+use crate::config::F;
 
 pub const REJECTION_TRACE_ROWS: usize = N;
 
@@ -25,12 +25,7 @@ pub fn build_rejection_trace(coeffs: &[u32; N]) -> Vec<Vec<F>> {
         let c = coeffs[i];
         let is_neg = if c > (Q / 2) { 1u32 } else { 0u32 };
         let abs_val = if is_neg == 1 { Q - c } else { c };
-        rows.push(vec![
-            F::from_u64(i as u64),
-            F::from_u64(c as u64),
-            F::from_u64(is_neg as u64),
-            F::from_u64(abs_val as u64),
-        ]);
+        rows.push(vec![F::from_u64(i as u64), F::from_u64(c as u64), F::from_u64(is_neg as u64), F::from_u64(abs_val as u64)]);
     }
     rows
 }
@@ -67,9 +62,7 @@ where
         // 2. abs_val = coeff + is_neg * (Q - 2*coeff)
         let q_expr = ce(Q as u64);
         let two_coeff = coeff.clone() + coeff.clone();
-        builder.assert_zero(
-            abs_val.clone() - coeff.clone() - is_neg.clone() * (q_expr - two_coeff)
-        );
+        builder.assert_zero(abs_val.clone() - coeff.clone() - is_neg.clone() * (q_expr - two_coeff));
 
         // 3. Index increment: next_index - current_index - 1 = 0
         {
@@ -110,11 +103,7 @@ mod tests {
     fn test_rejection_correctness() {
         let mut coeffs = [0u32; N];
         for i in 0..N {
-            coeffs[i] = if i < N / 2 {
-                (i * 1000) as u32 % (Q / 2)
-            } else {
-                Q - (i * 1000) as u32 % (Q / 2)
-            };
+            coeffs[i] = if i < N / 2 { (i * 1000) as u32 % (Q / 2) } else { Q - (i * 1000) as u32 % (Q / 2) };
         }
         let trace = build_rejection_trace(&coeffs);
         for i in 0..N {

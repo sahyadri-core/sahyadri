@@ -8,13 +8,13 @@ use crate::{
     model::{
         services::reachability::{MTReachabilityService, ReachabilityService},
         stores::{
-            sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusStoreReader},
             headers::HeaderStoreReader,
             past_pruning_points::PastPruningPointsStoreReader,
             pruning::PruningStoreReader,
             pruning_samples::PruningSamplesStoreReader,
             reachability::{DbReachabilityStore, ReachabilityStoreReader, StagingReachabilityStore},
             relations::StagingRelationsStore,
+            sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusStoreReader},
             selected_chain::{SelectedChainStore, SelectedChainStoreReader},
             statuses::StatusesStoreReader,
             tips::{TipsStore, TipsStoreReader},
@@ -26,6 +26,8 @@ use crate::{
 };
 use crossbeam_channel::Receiver as CrossbeamReceiver;
 use itertools::Itertools;
+use parking_lot::RwLockUpgradableReadGuard;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{
     BlockHashMap, BlockHashSet, BlockLevel,
     blockhash::ORIGIN,
@@ -41,8 +43,6 @@ use sahyadri_database::prelude::{BatchDbWriter, DB, MemoryWriter, StoreResultExt
 use sahyadri_hashes::Hash;
 use sahyadri_muhash::MuHash;
 use sahyadri_utils::iter::IterExtensions;
-use parking_lot::RwLockUpgradableReadGuard;
-use rocksdb::WriteBatch;
 use std::{
     collections::{VecDeque, hash_map::Entry::Vacant},
     ops::Deref,
@@ -347,7 +347,9 @@ impl PruningProcessor {
                         mutable_sahyadri_consensus.selected_parent = ORIGIN;
                     }
                     counter += 1;
-                    self.sahyadri_consensus_store.update_batch(&mut batch, kept, &Arc::new(mutable_sahyadri_consensus.into())).unwrap();
+                    self.sahyadri_consensus_store
+                        .update_batch(&mut batch, kept, &Arc::new(mutable_sahyadri_consensus.into()))
+                        .unwrap();
                 }
             }
             self.db.write(batch).unwrap();

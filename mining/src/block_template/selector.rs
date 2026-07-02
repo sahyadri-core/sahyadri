@@ -1,5 +1,5 @@
-use sahyadri_core::{time::Stopwatch, trace};
 use rand::Rng;
+use sahyadri_core::{time::Stopwatch, trace};
 use std::collections::HashMap;
 
 use crate::model::candidate_tx::CandidateTransaction;
@@ -261,7 +261,7 @@ mod tests {
     use super::*;
     use itertools::Itertools;
     use sahyadri_consensus_core::{
-        constants::{MAX_TX_IN_SEQUENCE_NUM, KANA_PER_SAHYADRI, TX_VERSION},
+        constants::{KANA_PER_SAHYADRI, MAX_TX_IN_SEQUENCE_NUM, TX_VERSION},
         mass::transaction_estimated_serialized_size,
         subnets::SUBNETWORK_ID_NATIVE,
         tx::{Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput},

@@ -6,6 +6,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::{
     BlockHashMap, BlockHashSet, BlockLevel, HashMapCustomHasher, KType,
     blockhash::{BlockHashes, ORIGIN},
@@ -16,24 +17,23 @@ use sahyadri_core::{debug, trace};
 use sahyadri_database::prelude::*;
 use sahyadri_hashes::Hash;
 use sahyadri_utils::binary_heap::TopK;
-use parking_lot::RwLock;
 
 use crate::{
     model::{
         services::reachability::ReachabilityService,
         stores::{
-            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusStore, SahyadriConsensusStoreReader},
             headers::{HeaderStoreReader, HeaderWithBlockLevel},
             pruning::{PruningProofDescriptor, PruningStoreReader},
             reachability::{DbReachabilityStore, ReachabilityStoreReader},
             relations::{DbRelationsStore, RelationsStoreReader},
+            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusStore, SahyadriConsensusStoreReader},
         },
     },
     processes::{
-        sahyadri_consensus::{ordering::SortableBlock, protocol::SahyadriConsensusManager},
-        pruning_proof::{SahyadriConsensusReaderExt, ProofInternalError},
+        pruning_proof::{ProofInternalError, SahyadriConsensusReaderExt},
         reachability::inquirer as reachability,
         relations::RelationsStoreExtensions,
+        sahyadri_consensus::{ordering::SortableBlock, protocol::SahyadriConsensusManager},
     },
 };
 
@@ -112,7 +112,13 @@ impl SahyadriConsensusStoreFactory {
     /// Creates a fresh temporary sahyadri_consensus store for the next retry attempt
     fn new_store(&mut self) -> Arc<DbSahyadriConsensusStore> {
         self.retries += 1;
-        Arc::new(DbSahyadriConsensusStore::new_temp(self.db.clone(), self.level, self.cache_policy, self.cache_policy, self.retries - 1))
+        Arc::new(DbSahyadriConsensusStore::new_temp(
+            self.db.clone(),
+            self.level,
+            self.cache_policy,
+            self.cache_policy,
+            self.retries - 1,
+        ))
     }
 }
 

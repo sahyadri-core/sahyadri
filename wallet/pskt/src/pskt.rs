@@ -3,7 +3,7 @@
 //!
 
 use sahyadri_bip32::{DerivationPath, DilithiumPkHash, KeyFingerprint};
-use sahyadri_consensus_core::{Hash, };
+use sahyadri_consensus_core::Hash;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{collections::BTreeMap, fmt::Display, fmt::Formatter, future::Future, marker::PhantomData, ops::Deref};
@@ -462,8 +462,7 @@ impl PSKT<Extractor> {
         // TODO: Re-enable script validation after Dilithium sig hash infrastructure
         self.extract_tx_unchecked(params).map_err(ExtractError::from)
     }
-
-    }
+}
 /// Error combining pskt.
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum CombineError {

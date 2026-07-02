@@ -234,10 +234,8 @@ pub fn unlock_utxo(
         .redeem_script(script_sig.to_vec())
         .build()?;
 
-    let output = OutputBuilder::default()
-        .amount(utxo_entry.amount - priority_fee_kana)
-        .script_public_key(script_public_key.clone())
-        .build()?;
+    let output =
+        OutputBuilder::default().amount(utxo_entry.amount - priority_fee_kana).script_public_key(script_public_key.clone()).build()?;
 
     let pskt: PSKT<Constructor> = PSKT::<Creator>::default().constructor().input(input).output(output);
     Ok(pskt.into())

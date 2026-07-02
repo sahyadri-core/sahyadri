@@ -1,8 +1,8 @@
 use sahyadri_consensus_core::tx::ScriptPublicKey;
 // Changed cache::CachePolicy to prelude::CachePolicy
-use sahyadri_database::prelude::{CachedDbAccess, StoreError, StoreResult, CachePolicy, BatchDbWriter};
-use sahyadri_utils::mem_size::MemSizeEstimator;
 use rocksdb::WriteBatch;
+use sahyadri_database::prelude::{BatchDbWriter, CachePolicy, CachedDbAccess, StoreError, StoreResult};
+use sahyadri_utils::mem_size::MemSizeEstimator;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -62,7 +62,12 @@ pub trait AccountStoreReader {
 
 pub trait AccountStore: AccountStoreReader {
     fn set_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey, state: AccountState) -> StoreResult<()>;
-    fn update_balance_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey, balance_change: i64) -> StoreResult<()>;
+    fn update_balance_batch(
+        &self,
+        batch: &mut WriteBatch,
+        script_public_key: &ScriptPublicKey,
+        balance_change: i64,
+    ) -> StoreResult<()>;
     fn increment_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()>;
 }
 
@@ -75,9 +80,7 @@ pub struct DbAccountStore {
 
 impl DbAccountStore {
     pub fn new(db: Arc<sahyadri_database::prelude::DB>, cache_size: u64) -> Self {
-        Self {
-            access: CachedDbAccess::new(db, CachePolicy::Count(cache_size as usize), STORE_PREFIX.to_vec()),
-        }
+        Self { access: CachedDbAccess::new(db, CachePolicy::Count(cache_size as usize), STORE_PREFIX.to_vec()) }
     }
 }
 
@@ -104,12 +107,16 @@ impl AccountStore for DbAccountStore {
         self.access.write(BatchDbWriter::new(batch), AccountKey::new(script_public_key), state)
     }
 
-fn update_balance_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey, balance_change: i64) -> StoreResult<()> {
-        
+    fn update_balance_batch(
+        &self,
+        batch: &mut WriteBatch,
+        script_public_key: &ScriptPublicKey,
+        balance_change: i64,
+    ) -> StoreResult<()> {
         println!("SAHYADRI REWARD: Adding {} to account {:?}", balance_change, script_public_key);
 
         let mut state = self.get(script_public_key).unwrap_or(AccountState { balance: 0, nonce: 0 });
-        
+
         if balance_change >= 0 {
             state.balance = state.balance.saturating_add(balance_change as u64);
         } else {

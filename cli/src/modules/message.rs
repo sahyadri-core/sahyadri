@@ -64,8 +64,14 @@ impl Message {
     async fn display_help(self: Arc<Self>, ctx: Arc<SahyadriCli>, _argv: Vec<String>) -> Result<()> {
         ctx.term().help(
             &[
-                ("sign <sahyadri_address>", "Sign a message with the private key that matches the given address. Prompts for message."),
-                ("verify <sahyadri_address> <signature>", "Verify the signature against the message and sahyadri_address. Prompts for message."),
+                (
+                    "sign <sahyadri_address>",
+                    "Sign a message with the private key that matches the given address. Prompts for message.",
+                ),
+                (
+                    "verify <sahyadri_address> <signature>",
+                    "Verify the signature against the message and sahyadri_address. Prompts for message.",
+                ),
             ],
             None,
         )?;

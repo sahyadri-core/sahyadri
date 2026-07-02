@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use log::debug;
 use sahyadri_p2p_lib::{
     IncomingRoute, Router,
     common::ProtocolError,
@@ -7,7 +8,6 @@ use sahyadri_p2p_lib::{
     dequeue_with_request_id, make_response,
     pb::{PruningPointProofMessage, sahyadrid_message::Payload},
 };
-use log::debug;
 
 use crate::{flow_context::FlowContext, flow_trait::Flow};
 

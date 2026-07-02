@@ -7,14 +7,14 @@ use crate::notifier::{Notification, Notifier};
 use crate::result::Result;
 use sahyadri_daemon::{DaemonEvent, DaemonKind, Daemons};
 use sahyadri_wallet_core::account::Account;
+use sahyadri_wallet_core::rpc::ConnectOptions;
 use sahyadri_wallet_core::rpc::DynRpcApi;
 use sahyadri_wallet_core::storage::{IdT, PrvKeyDataInfo};
-use sahyadri_wrpc_client::{SahyadriRpcClient, Resolver};
+use sahyadri_wrpc_client::{Resolver, SahyadriRpcClient};
 use workflow_core::channel::*;
 use workflow_core::time::Instant;
 use workflow_log::*;
 pub use workflow_terminal::Event as TerminalEvent;
-use sahyadri_wallet_core::rpc::ConnectOptions;
 use workflow_terminal::*;
 pub use workflow_terminal::{Options as TerminalOptions, TargetElement as TerminalTarget};
 
@@ -995,20 +995,20 @@ pub async fn sahyadri_cli(terminal_options: TerminalOptions, banner: Option<Stri
 
     // --- Sahyadri Global Auto-Connect Start ---
     let url = "ws://127.0.0.1:27110".to_string(); // 'ws://' joda hai connection pakka karne ke liye
-    
+
     if let Some(client) = cli.wallet().try_wrpc_client().as_ref() {
         tprintln!(cli, "Sahyadri Auto-Pilot: Handshaking with node...");
-        
+
         let mut connect_options = ConnectOptions::default();
         connect_options.url = Some(url.clone());
-        
+
         // Connection dial karo aur uska result check karo
         match client.connect(Some(connect_options)).await {
             Ok(_) => {
                 // Jab connect ho jaye, tabhi setting mein save karo
                 let _ = cli.wallet().settings().set(sahyadri_wallet_core::settings::WalletSettings::Server, url);
                 tprintln!(cli, "Sahyadri Auto-Pilot: Connection Successful!");
-            },
+            }
             Err(e) => {
                 tprintln!(cli, "Sahyadri Auto-Pilot Error: Node busy or offline. Details: {}", e);
             }

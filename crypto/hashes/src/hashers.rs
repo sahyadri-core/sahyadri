@@ -19,7 +19,7 @@ pub trait Hasher: HasherBase + Clone + Default {
 // Implemented manually in pow_hashers:
 //  struct PowHash => `cSHAKE256("ProofOfWorkHash")
 //  struct SahyadriX => `cSHAKE256("HeavyHash")
-pub use crate::pow_hashers::{SahyadriX, PowHash};
+pub use crate::pow_hashers::{PowHash, SahyadriX};
 blake2b_hasher! {
     struct TransactionHash => b"TransactionHash",
     struct TransactionID => b"TransactionID",

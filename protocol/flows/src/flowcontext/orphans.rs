@@ -1,4 +1,5 @@
 use indexmap::{IndexMap, map::Entry::Occupied};
+use rand::Rng;
 use sahyadri_consensus_core::{
     api::{BlockValidationFuture, BlockValidationFutures},
     block::Block,
@@ -6,7 +7,6 @@ use sahyadri_consensus_core::{
 use sahyadri_consensusmanager::{BlockProcessingBatch, ConsensusProxy};
 use sahyadri_core::debug;
 use sahyadri_hashes::Hash;
-use rand::Rng;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     iter::once,
@@ -274,6 +274,7 @@ impl OrphanBlocksPool {
 mod tests {
     use super::*;
     use futures::future::try_join_all;
+    use parking_lot::RwLock;
     use sahyadri_consensus_core::{
         api::{BlockValidationFutures, ConsensusApi},
         blockstatus::BlockStatus,
@@ -281,7 +282,6 @@ mod tests {
     };
     use sahyadri_consensusmanager::{ConsensusInstance, SessionLock};
     use sahyadri_core::assert_match;
-    use parking_lot::RwLock;
     use std::sync::Arc;
 
     #[derive(Default)]
@@ -300,8 +300,8 @@ mod tests {
         }
 
         fn get_account_balance(&self, _address: &sahyadri_addresses::Address) -> Option<u64> {
-        None
-    }
+            None
+        }
 
         fn get_block_status(&self, hash: Hash) -> Option<BlockStatus> {
             self.processed.read().get(&hash).map(|_| BlockStatus::StatusUTXOPendingVerification)

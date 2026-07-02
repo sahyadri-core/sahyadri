@@ -1,8 +1,8 @@
 //! PSKT input structure.
-use sahyadri_bip32::DilithiumPkHash;
 use crate::pskt::{KeySource, PartialSigs};
 use crate::utils::{Error as CombineMapErr, combine_if_no_conflicts};
 use derive_builder::Builder;
+use sahyadri_bip32::DilithiumPkHash;
 use sahyadri_consensus_core::{
     hashing::sighash_type::{SIG_HASH_ALL, SigHashType},
     tx::{TransactionId, TransactionOutpoint, UtxoEntry},

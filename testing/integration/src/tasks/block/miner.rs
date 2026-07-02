@@ -1,14 +1,14 @@
 use crate::tasks::{Stopper, Task};
 use async_channel::Sender;
 use async_trait::async_trait;
+use parking_lot::Mutex;
+use rand::thread_rng;
+use rand_distr::{Distribution, Exp};
 use sahyadri_addresses::Address;
 use sahyadri_core::warn;
 use sahyadri_grpc_client::GrpcClient;
 use sahyadri_rpc_core::{GetBlockTemplateResponse, RpcRawBlock, api::rpc::RpcApi};
 use sahyadri_utils::triggers::SingleTrigger;
-use parking_lot::Mutex;
-use rand::thread_rng;
-use rand_distr::{Distribution, Exp};
 use std::{
     cmp::max,
     sync::{

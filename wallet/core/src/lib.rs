@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_if, clippy::if_same_then_else, clippy::redundant_closure, clippy::needless_borrow, clippy::useless_vec)]
 //!
 //! # Sahyadri Wallet Core
 //!

@@ -21,7 +21,7 @@
 
 use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues, BaseAir};
 use p3_field::PrimeCharacteristicRing;
-use p3_matrix::{Matrix, dense::RowMajorMatrix};
+use p3_matrix::{dense::RowMajorMatrix, Matrix};
 
 use crate::config::F;
 
@@ -37,7 +37,9 @@ pub const NUM_PUBLIC_VALUES: usize = 4;
 pub struct DilithiumBatchVerifyAir;
 
 impl BaseAir<F> for DilithiumBatchVerifyAir {
-    fn width(&self) -> usize { NUM_TRACE_COLS }
+    fn width(&self) -> usize {
+        NUM_TRACE_COLS
+    }
 }
 
 impl<AB> Air<AB> for DilithiumBatchVerifyAir
@@ -66,22 +68,16 @@ where
         let pv_beta: AB::Expr = pv[3].into();
 
         // Constraint 1: verify_bit is boolean
-        builder.when_transition().assert_zero(
-            local_verify.clone() * (local_verify.clone() - AB::Expr::ONE),
-        );
+        builder.when_transition().assert_zero(local_verify.clone() * (local_verify.clone() - AB::Expr::ONE));
 
         // Constraint 2: index is sequential
-        builder.when_transition().assert_zero(
-            next_index.clone() - local_index.clone() - AB::Expr::ONE,
-        );
+        builder.when_transition().assert_zero(next_index.clone() - local_index.clone() - AB::Expr::ONE);
 
         // Constraint 3: accumulator chain
         let weighted_fp = pv_alpha * local_fp0.clone() + pv_beta * local_fp1.clone();
-        builder.when_transition().assert_zero(
-            next_acc.clone()
-                - pv_challenge.clone() * local_acc.clone()
-                - local_verify.clone() * weighted_fp,
-        );
+        builder
+            .when_transition()
+            .assert_zero(next_acc.clone() - pv_challenge.clone() * local_acc.clone() - local_verify.clone() * weighted_fp);
 
         // Boundary 4: first index = 0
         builder.when_first_row().assert_zero(local_index.clone());
@@ -108,16 +104,14 @@ pub fn pack_fp1(hash: &[u8; 32]) -> F {
 
 /// Next power of 2 >= n (minimum 2).
 fn next_pow2(n: usize) -> usize {
-    if n <= 1 { return 2; }
-    1 << (32 - (n as u32).leading_zeros() as usize
-        - (if n.is_power_of_two() { 1 } else { 0 }))
+    if n <= 1 {
+        return 2;
+    }
+    1 << (32 - (n as u32).leading_zeros() as usize - (if n.is_power_of_two() { 1 } else { 0 }))
 }
 
 /// Build STARK execution trace from verified attestation hashes.
-pub fn build_execution_trace(
-    attestation_hashes: &[[u8; 32]],
-    commitment_root: &[u8; 32],
-) -> RowMajorMatrix<F> {
+pub fn build_execution_trace(attestation_hashes: &[[u8; 32]], commitment_root: &[u8; 32]) -> RowMajorMatrix<F> {
     let batch_size = attestation_hashes.len();
     let trace_height = next_pow2(batch_size);
     let (challenge, alpha, beta) = crate::config::derive_public_challenges(commitment_root);

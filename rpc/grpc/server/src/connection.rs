@@ -10,6 +10,7 @@ use crate::{
 };
 use async_channel::{Receiver as MpmcReceiver, Sender as MpmcSender, TrySendError as MpmcTrySendError, bounded};
 use itertools::Itertools;
+use parking_lot::Mutex;
 use sahyadri_core::{debug, info, trace, warn};
 use sahyadri_grpc_core::{
     ops::SahyadridPayloadOps,
@@ -22,7 +23,6 @@ use sahyadri_notify::{
     notifier::Notifier,
 };
 use sahyadri_rpc_core::Notification;
-use parking_lot::Mutex;
 use std::{
     collections::{HashMap, hash_map::Entry},
     fmt::Display,

@@ -232,7 +232,12 @@ impl RelayTransactionsFlow {
                 Err(MiningManagerError::MempoolError(RuleError::RejectNonStandard(..))) => {
                     self.spam_counter += 1;
                     if self.spam_counter.is_multiple_of(100) {
-                        sahyadri_core::warn!("Peer {} has shared {} spam/non-standard txs ({:?})", self.router, self.spam_counter, res);
+                        sahyadri_core::warn!(
+                            "Peer {} has shared {} spam/non-standard txs ({:?})",
+                            self.router,
+                            self.spam_counter,
+                            res
+                        );
                     }
                 }
                 Err(_) => {}

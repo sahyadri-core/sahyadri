@@ -20,7 +20,7 @@ mod tests {
         api::ConsensusApi,
         block::TemplateBuildMode,
         coinbase::MinerData,
-        constants::{MAX_TX_IN_SEQUENCE_NUM, KANA_PER_SAHYADRI, TX_VERSION},
+        constants::{KANA_PER_SAHYADRI, MAX_TX_IN_SEQUENCE_NUM, TX_VERSION},
         errors::tx::TxRuleError,
         mass::{NonContextualMasses, transaction_estimated_serialized_size},
         subnets::SUBNETWORK_ID_NATIVE,
@@ -1382,7 +1382,8 @@ mod tests {
         // Make the funding amounts always different so that funding txs have different ids
         (0..count)
             .map(|i| {
-                let funding_tx = create_transaction_without_input(vec![1_000 * KANA_PER_SAHYADRI, 2_500 * KANA_PER_SAHYADRI + i as u64]);
+                let funding_tx =
+                    create_transaction_without_input(vec![1_000 * KANA_PER_SAHYADRI, 2_500 * KANA_PER_SAHYADRI + i as u64]);
                 consensus.add_transaction(funding_tx.clone(), 1);
                 funding_tx
             })

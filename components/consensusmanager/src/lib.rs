@@ -1,7 +1,7 @@
 use itertools::Itertools;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::api::{ConsensusApi, DynConsensus};
 use sahyadri_core::{core::Core, debug, service::Service};
-use parking_lot::RwLock;
 use std::{collections::VecDeque, ops::Deref, sync::Arc, thread::JoinHandle};
 
 mod batch;

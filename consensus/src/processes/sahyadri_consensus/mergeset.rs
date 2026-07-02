@@ -1,6 +1,6 @@
 use super::protocol::SahyadriConsensusManager;
-use crate::model::stores::sahyadri_consensus::SahyadriConsensusStoreReader;
 use crate::model::stores::relations::RelationsStoreReader;
+use crate::model::stores::sahyadri_consensus::SahyadriConsensusStoreReader;
 use crate::model::{services::reachability::ReachabilityService, stores::headers::HeaderStoreReader};
 use sahyadri_consensus_core::{BlockHashSet, HashMapCustomHasher};
 use sahyadri_hashes::Hash;
@@ -39,7 +39,9 @@ pub fn unordered_mergeset_without_selected_parent<S: RelationsStoreReader + ?Siz
     mergeset
 }
 
-impl<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilityService, V: HeaderStoreReader> SahyadriConsensusManager<T, S, U, V> {
+impl<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilityService, V: HeaderStoreReader>
+    SahyadriConsensusManager<T, S, U, V>
+{
     pub fn ordered_mergeset_without_selected_parent(&self, selected_parent: Hash, parents: &[Hash]) -> Vec<Hash> {
         self.sort_blocks(self.unordered_mergeset_without_selected_parent(selected_parent, parents))
     }

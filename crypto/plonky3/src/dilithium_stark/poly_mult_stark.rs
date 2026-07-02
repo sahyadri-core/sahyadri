@@ -15,8 +15,8 @@ use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::Matrix;
 
-use crate::config::F;
 use super::params::{N, Q};
+use crate::config::F;
 
 /// Number of rows for polynomial multiplication trace.
 pub const POLY_MULT_TRACE_ROWS: usize = N;
@@ -87,8 +87,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::field_zq::mul_q;
+    use super::*;
 
     #[test]
     fn test_poly_mult_trace_shape() {
@@ -115,10 +115,7 @@ mod tests {
             let expected = mul_q(a[i], b[i]);
             assert_eq!(trace[i][4], F::from_u64(expected as u64));
             // decomposition: a * b = q * Q + result
-            assert_eq!(
-                trace[i][1] * trace[i][2],
-                trace[i][3] * F::from_u64(Q as u64) + trace[i][4]
-            );
+            assert_eq!(trace[i][1] * trace[i][2], trace[i][3] * F::from_u64(Q as u64) + trace[i][4]);
         }
     }
 }

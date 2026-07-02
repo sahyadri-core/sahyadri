@@ -1,5 +1,6 @@
 use crate::{flow_context::FlowContext, flow_trait::Flow};
 use itertools::Itertools;
+use rand::seq::SliceRandom;
 use sahyadri_addressmanager::NetAddress;
 use sahyadri_p2p_lib::{
     IncomingRoute, Router,
@@ -8,7 +9,6 @@ use sahyadri_p2p_lib::{
     pb::{AddressesMessage, RequestAddressesMessage, sahyadrid_message::Payload},
 };
 use sahyadri_utils::networking::IpAddress;
-use rand::seq::SliceRandom;
 use std::sync::Arc;
 
 /// The maximum number of addresses that are sent in a single sahyadri Addresses message.

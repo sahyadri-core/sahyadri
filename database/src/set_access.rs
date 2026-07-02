@@ -200,8 +200,8 @@ mod tests {
         create_temp_db,
         prelude::{BatchDbWriter, ConnBuilder, DirectDbWriter},
     };
-    use sahyadri_hashes::Hash;
     use rocksdb::WriteBatch;
+    use sahyadri_hashes::Hash;
 
     #[test]
     fn test_delete_bucket() {

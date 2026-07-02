@@ -1,9 +1,9 @@
 use sahyadri_notify::{scope::Scope, subscription::Command};
 
 use crate::protowire::{
-    SahyadridRequest, SahyadridResponse, NotifyBlockAddedRequestMessage, NotifyFinalityConflictRequestMessage,
-    NotifyNewBlockTemplateRequestMessage, NotifyPruningPointUtxoSetOverrideRequestMessage, NotifySinkBlueScoreChangedRequestMessage,
-    NotifyUtxosChangedRequestMessage, NotifyVirtualChainChangedRequestMessage, NotifyVirtualDaaScoreChangedRequestMessage,
+    NotifyBlockAddedRequestMessage, NotifyFinalityConflictRequestMessage, NotifyNewBlockTemplateRequestMessage,
+    NotifyPruningPointUtxoSetOverrideRequestMessage, NotifySinkBlueScoreChangedRequestMessage, NotifyUtxosChangedRequestMessage,
+    NotifyVirtualChainChangedRequestMessage, NotifyVirtualDaaScoreChangedRequestMessage, SahyadridRequest, SahyadridResponse,
     sahyadrid_request, sahyadrid_response,
 };
 

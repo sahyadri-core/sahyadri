@@ -1,7 +1,7 @@
 #[test]
 fn test_stark_dilithium3_proof() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
-    use sahyadri_plonky3::{generate_stark_proof, verify_stark_proof, batch::DilithiumBatch};
+    use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
 
     // 1. Generate Dilithium3 keypair
     let keypair = generate_keypair().expect("keypair gen failed");
@@ -15,8 +15,7 @@ fn test_stark_dilithium3_proof() {
     for i in 0..num_sigs {
         let msg = format!("sahyadri-stark-test-{}", i);
         let sig = sign_message(&msg, &keypair).expect("sign failed");
-        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes)
-            .unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
+        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes).unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
     }
 
     assert_eq!(batch.attestations.len(), num_sigs);
@@ -25,18 +24,10 @@ fn test_stark_dilithium3_proof() {
     let proof = generate_stark_proof(&mut batch).expect("prove failed");
 
     // 4. Calculate real metrics
-    let raw_att_bytes: usize = batch
-        .attestations
-        .iter()
-        .map(|a| a.message.len() + a.signature.len() + a.public_key.len())
-        .sum();
+    let raw_att_bytes: usize = batch.attestations.iter().map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
     let raw_sig_only: usize = batch.attestations.iter().map(|a| a.signature.len()).sum();
     let proof_size = proof.proof_bytes.len();
-    let ratio = if proof_size > 0 {
-        raw_att_bytes as f64 / proof_size as f64
-    } else {
-        0.0
-    };
+    let ratio = if proof_size > 0 { raw_att_bytes as f64 / proof_size as f64 } else { 0.0 };
 
     println!("\n========== STARK Proof Results ==========");
     println!("  Batch size:       {} sigs", proof.batch_size);
@@ -60,11 +51,10 @@ fn test_stark_dilithium3_proof() {
     assert!(valid, "STARK verification FAILED");
 }
 
-
 #[test]
 fn test_stark_batch_scaling() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
-    use sahyadri_plonky3::{generate_stark_proof, verify_stark_proof, batch::DilithiumBatch};
+    use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
 
     let keypair = generate_keypair().expect("keypair gen failed");
     let pk_hex = sahyadri_dilithium::pubkey_to_hex(&keypair);
@@ -75,13 +65,11 @@ fn test_stark_batch_scaling() {
         for i in 0..num_sigs {
             let msg = format!("sahyadri-batch-{}-{}", num_sigs, i);
             let sig = sign_message(&msg, &keypair).expect("sign failed");
-            batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes)
-                .unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
+            batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes).unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
         }
 
         let proof = generate_stark_proof(&mut batch).expect("prove failed");
-        let raw_att: usize = batch.attestations.iter()
-            .map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
+        let raw_att: usize = batch.attestations.iter().map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
         let ratio = raw_att as f64 / proof.proof_bytes.len() as f64;
 
         println!("\n--- Batch {} sigs ---", num_sigs);
@@ -97,11 +85,10 @@ fn test_stark_batch_scaling() {
     }
 }
 
-
 #[test]
 fn test_stark_256_sigs() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
-    use sahyadri_plonky3::{generate_stark_proof, verify_stark_proof, batch::DilithiumBatch};
+    use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
 
     let keypair = generate_keypair().expect("keypair gen failed");
     let pk_hex = sahyadri_dilithium::pubkey_to_hex(&keypair);
@@ -114,22 +101,24 @@ fn test_stark_256_sigs() {
     for i in 0..num_sigs {
         let msg = format!("sahyadri-mainnet-tx-{}-{}", num_sigs, i);
         let sig = sign_message(&msg, &keypair).expect("sign failed");
-        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes)
-            .unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
+        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes).unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
     }
     let sign_ms = t_sign.elapsed().as_millis();
 
     let proof = generate_stark_proof(&mut batch).expect("prove failed");
 
-    let raw_att: usize = batch.attestations.iter()
-        .map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
+    let raw_att: usize = batch.attestations.iter().map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
     let proof_size = proof.proof_bytes.len();
     let ratio = raw_att as f64 / proof_size as f64;
 
     println!("\n========== MAINNET BENCHMARK: 256 sigs ==========");
     println!("  Sign+Verify:      {} sigs in {} ms ({:.1} sigs/sec)", num_sigs, sign_ms, num_sigs as f64 / sign_ms as f64 * 1000.0);
     println!("  Raw attestations: {} bytes ({:.2} KB)", raw_att, raw_att as f64 / 1024.0);
-    println!("  Raw sigs only:    {} bytes ({:.2} KB)", batch.attestations.iter().map(|a| a.signature.len()).sum::<usize>(), batch.attestations.iter().map(|a| a.signature.len()).sum::<usize>() as f64 / 1024.0);
+    println!(
+        "  Raw sigs only:    {} bytes ({:.2} KB)",
+        batch.attestations.iter().map(|a| a.signature.len()).sum::<usize>(),
+        batch.attestations.iter().map(|a| a.signature.len()).sum::<usize>() as f64 / 1024.0
+    );
     println!("  STARK proof:      {} bytes ({:.2} KB)", proof_size, proof_size as f64 / 1024.0);
     println!("  Compression:      {:.2}x", ratio);
     println!("  Prove time:       {} ms", proof.generation_time_ms);
@@ -148,11 +137,10 @@ fn test_stark_256_sigs() {
     assert!(verify_ms < 100, "Verify should be < 100ms, got {}ms", verify_ms);
 }
 
-
 #[test]
 fn test_stark_1024_sigs() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
-    use sahyadri_plonky3::{generate_stark_proof, verify_stark_proof, batch::DilithiumBatch};
+    use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
 
     let keypair = generate_keypair().expect("keypair gen failed");
     let pk_hex = sahyadri_dilithium::pubkey_to_hex(&keypair);
@@ -165,15 +153,13 @@ fn test_stark_1024_sigs() {
     for i in 0..num_sigs {
         let msg = format!("sahyadri-mainnet-tx-{}-{}", num_sigs, i);
         let sig = sign_message(&msg, &keypair).expect("sign failed");
-        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes)
-            .unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
+        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes).unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
     }
     let sign_ms = t_sign.elapsed().as_millis();
 
     let proof = generate_stark_proof(&mut batch).expect("prove failed");
 
-    let raw_att: usize = batch.attestations.iter()
-        .map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
+    let raw_att: usize = batch.attestations.iter().map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
     let proof_size = proof.proof_bytes.len();
     let ratio = raw_att as f64 / proof_size as f64;
 
@@ -196,12 +182,11 @@ fn test_stark_1024_sigs() {
     assert!(verify_ms < 50, "Verify should be < 50ms, got {}ms", verify_ms);
 }
 
-
 #[test]
 #[ignore] // Run with: cargo test -p sahyadri-plonky3 test_stark_10k --release -- --ignored --nocapture
 fn test_stark_10k() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
-    use sahyadri_plonky3::{generate_stark_proof, verify_stark_proof, batch::DilithiumBatch};
+    use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
 
     let keypair = generate_keypair().expect("keypair gen failed");
     let pk_hex = sahyadri_dilithium::pubkey_to_hex(&keypair);
@@ -214,15 +199,13 @@ fn test_stark_10k() {
     for i in 0..num_sigs {
         let msg = format!("sahyadri-mainnet-tx-10k-{}", i);
         let sig = sign_message(&msg, &keypair).expect("sign failed");
-        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes)
-            .unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
+        batch.add_and_verify(msg.as_bytes(), sig.as_bytes(), &pk_bytes).unwrap_or_else(|e| panic!("add {} failed: {:?}", i, e));
     }
     let sign_ms = t_sign.elapsed().as_millis();
 
     let proof = generate_stark_proof(&mut batch).expect("prove failed");
 
-    let raw_att: usize = batch.attestations.iter()
-        .map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
+    let raw_att: usize = batch.attestations.iter().map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
     let raw_sig_only: usize = batch.attestations.iter().map(|a| a.signature.len()).sum();
     let proof_size = proof.proof_bytes.len();
     let ratio = raw_att as f64 / proof_size as f64;

@@ -1,8 +1,8 @@
 //! Extended public keys
 //!
 use crate::{
-    ChildNumber, DerivationPath, DilithiumPkHash, Error, ExtendedKey, ExtendedKeyAttrs, ExtendedPrivateKey, KEY_SIZE, KeyFingerprint, Prefix,
-    PrivateKey, PublicKey, PublicKeyBytes, Result, types::*,
+    ChildNumber, DerivationPath, DilithiumPkHash, Error, ExtendedKey, ExtendedKeyAttrs, ExtendedPrivateKey, KEY_SIZE, KeyFingerprint,
+    Prefix, PrivateKey, PublicKey, PublicKeyBytes, Result, types::*,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use core::str::FromStr;

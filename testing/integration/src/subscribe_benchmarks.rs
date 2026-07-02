@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rand::RngCore;
 use sahyadri_addresses::Address;
 use sahyadri_alloc::init_allocator_with_default_settings;
 use sahyadri_consensus::params::Params;
@@ -26,7 +27,6 @@ use sahyadri_math::Uint256;
 use sahyadri_notify::scope::VirtualDaaScoreChangedScope;
 use sahyadri_rpc_core::api::rpc::RpcApi;
 use sahyadri_txscript::pay_to_address_script;
-use rand::RngCore;
 use sha2::Digest;
 use std::{sync::Arc, time::Duration};
 
@@ -67,7 +67,13 @@ fn create_client_addresses(index: usize, network_id: &NetworkId) -> Vec<Address>
         max_address.max(WALLET_ADDRESSES) - WALLET_ADDRESSES
     };
     (min_address..max_address)
-        .map(|x| Address::new((*network_id).into(), sahyadri_addresses::Version::PubKeyDilithium, &Uint256::from_u64(x as u64).to_le_bytes()[..20])
+        .map(|x| {
+            Address::new(
+                (*network_id).into(),
+                sahyadri_addresses::Version::PubKeyDilithium,
+                &Uint256::from_u64(x as u64).to_le_bytes()[..20],
+            )
+        })
         .collect_vec()
 }
 
@@ -180,8 +186,11 @@ async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_
     rand::thread_rng().fill_bytes(&mut seed);
     let seed_hex: String = seed.iter().map(|b| format!("{:02x}", b)).collect();
     let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
-    let prealloc_address =
-        Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
+    let prealloc_address = Address::new(
+        NetworkType::Simnet.into(),
+        sahyadri_addresses::Version::PubKeyDilithium,
+        &sha2::Sha256::digest(prealloc_kp.public_key())[..20],
+    );
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, PREALLOC_AMOUNT)

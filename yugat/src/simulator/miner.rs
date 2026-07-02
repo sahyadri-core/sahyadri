@@ -1,5 +1,8 @@
 use indexmap::IndexSet;
 use itertools::Itertools;
+use rand::Rng;
+use rand::rngs::ThreadRng;
+use rand_distr::{Distribution, Exp};
 use sahyadri_consensus::consensus::Consensus;
 use sahyadri_consensus::model::stores::virtual_state::VirtualStateStoreReader;
 use sahyadri_consensus::params::Params;
@@ -14,11 +17,8 @@ use sahyadri_consensus_core::tx::{
 use sahyadri_consensus_core::utxo::utxo_view::UtxoView;
 use sahyadri_core::trace;
 use sahyadri_utils::sim::{Environment, Process, Resumption, Suspension};
-use rand::Rng;
-use rand::rngs::ThreadRng;
-use rand_distr::{Distribution, Exp};
-use std::cmp::max;
 use sha2::Digest;
+use std::cmp::max;
 use std::sync::Arc;
 
 struct OnetimeTxSelector {
@@ -91,7 +91,8 @@ impl Miner {
         long_payload: bool,
     ) -> Self {
         let pk_hash = sha2::Sha256::digest(keypair.public_key());
-        let script_pub_key_script = std::iter::once(0x14u8).chain(pk_hash[0..20].iter().copied()).chain(std::iter::once(0xac)).collect_vec();
+        let script_pub_key_script =
+            std::iter::once(0x14u8).chain(pk_hash[0..20].iter().copied()).chain(std::iter::once(0xac)).collect_vec();
         let script_pub_key_script_vec = ScriptVec::from_slice(&script_pub_key_script);
         Self {
             id,
@@ -134,7 +135,7 @@ impl Miner {
 
     fn build_txs(&mut self) -> Vec<Transaction> {
         let virtual_read = self.consensus.virtual_stores.read();
-        let _virtual_state = virtual_read.state.get().unwrap(); 
+        let _virtual_state = virtual_read.state.get().unwrap();
 
         // ---------------------------------------------------------
         // SAHYADRI ACCOUNT MODEL FIX
@@ -142,14 +143,13 @@ impl Miner {
         // In the Account model, transactions use Balances and Nonces.
         // ---------------------------------------------------------
 
-        let txs = Vec::new();
 
-        // TODO for Simulator: 
+        // TODO for Simulator:
         // 1. Fetch simulator account balances from `self.consensus.account_store()`
         // 2. Build `tx.payload` as `[sender_script_bytes][nonce_bytes]`
         // 3. Push to `txs` vector.
 
-        txs
+        Vec::new()
     }
 
     fn _get_spendable_entry(

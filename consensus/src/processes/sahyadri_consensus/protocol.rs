@@ -11,9 +11,9 @@ use crate::{
     model::{
         services::reachability::ReachabilityService,
         stores::{
-            sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader, HashKTypeMap, KType},
             headers::HeaderStoreReader,
             relations::RelationsStoreReader,
+            sahyadri_consensus::{HashKTypeMap, KType, SahyadriConsensusData, SahyadriConsensusStoreReader},
         },
     },
     processes::difficulty::{calc_work, level_work},
@@ -22,7 +22,12 @@ use crate::{
 use super::ordering::*;
 
 #[derive(Clone)]
-pub struct SahyadriConsensusManager<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilityService, V: HeaderStoreReader> {
+pub struct SahyadriConsensusManager<
+    T: SahyadriConsensusStoreReader,
+    S: RelationsStoreReader,
+    U: ReachabilityService,
+    V: HeaderStoreReader,
+> {
     genesis_hash: Hash,
     pub(super) k: KType,
     pub(super) sahyadri_consensus_store: Arc<T>,
@@ -40,7 +45,9 @@ pub struct SahyadriConsensusManager<T: SahyadriConsensusStoreReader, S: Relation
     level_work: BlueWorkType,
 }
 
-impl<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilityService, V: HeaderStoreReader> SahyadriConsensusManager<T, S, U, V> {
+impl<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilityService, V: HeaderStoreReader>
+    SahyadriConsensusManager<T, S, U, V>
+{
     pub fn new(
         genesis_hash: Hash,
         k: KType,
@@ -150,7 +157,8 @@ impl<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilitySe
             }
         }
 
-        let blue_score = self.sahyadri_consensus_store.get_blue_score(selected_parent).unwrap() + new_block_data.mergeset_blues.len() as u64;
+        let blue_score =
+            self.sahyadri_consensus_store.get_blue_score(selected_parent).unwrap() + new_block_data.mergeset_blues.len() as u64;
 
         let added_blue_work: BlueWorkType = new_block_data
             .mergeset_blues

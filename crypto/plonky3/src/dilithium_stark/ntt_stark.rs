@@ -73,9 +73,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::field_zq::build_ntt_trace;
     use super::super::params::N;
+    use super::*;
 
     #[test]
     fn test_ntt_trace_shape() {

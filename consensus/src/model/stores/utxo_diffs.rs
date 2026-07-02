@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{BlockHasher, utxo::utxo_diff::UtxoDiff};
 use sahyadri_database::prelude::CachePolicy;
 use sahyadri_database::prelude::DB;
@@ -7,7 +8,6 @@ use sahyadri_database::prelude::StoreError;
 use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
-use rocksdb::WriteBatch;
 
 /// Store for holding the UTXO difference (delta) of a block relative to its selected parent.
 /// Note that this data is lazy-computed only for blocks which are candidates to being chain

@@ -4,6 +4,8 @@ use std::{
 };
 
 use itertools::Itertools;
+use parking_lot::RwLock;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{
     BlockLevel, BlueWorkType,
     blockhash::{BlockHashExtensions, BlockHashes, ORIGIN},
@@ -19,23 +21,21 @@ use sahyadri_database::{
 use sahyadri_hashes::Hash;
 use sahyadri_pow::{calc_block_level, calc_block_level_check_pow};
 use sahyadri_utils::vec::VecExtensions;
-use parking_lot::RwLock;
-use rocksdb::WriteBatch;
 
 use crate::{
     model::{
         services::reachability::MTReachabilityService,
         stores::{
-            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusStore, SahyadriConsensusStoreReader},
             headers::{DbHeadersStore, HeaderStore, HeaderStoreReader},
             headers_selected_tip::HeadersSelectedTipStoreReader,
             reachability::{DbReachabilityStore, ReachabilityStoreReader},
             relations::{DbRelationsStore, RelationsStoreReader},
+            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusStore, SahyadriConsensusStoreReader},
         },
     },
     processes::{
-        sahyadri_consensus::protocol::SahyadriConsensusManager, pruning_proof::SahyadriConsensusReaderExt, reachability::inquirer as reachability,
-        relations::RelationsStoreExtensions,
+        pruning_proof::SahyadriConsensusReaderExt, reachability::inquirer as reachability, relations::RelationsStoreExtensions,
+        sahyadri_consensus::protocol::SahyadriConsensusManager,
     },
 };
 
@@ -46,8 +46,14 @@ struct ProofContext {
     sahyadri_consensus_stores: Vec<Arc<DbSahyadriConsensusStore>>,
     _relations_stores: Vec<DbRelationsStore>,
     _reachability_stores: Vec<Arc<RwLock<DbReachabilityStore>>>,
-    _sahyadri_consensus_managers:
-        Vec<SahyadriConsensusManager<DbSahyadriConsensusStore, DbRelationsStore, MTReachabilityService<DbReachabilityStore>, DbHeadersStore>>,
+    _sahyadri_consensus_managers: Vec<
+        SahyadriConsensusManager<
+            DbSahyadriConsensusStore,
+            DbRelationsStore,
+            MTReachabilityService<DbReachabilityStore>,
+            DbHeadersStore,
+        >,
+    >,
     selected_tip_by_level: Vec<Hash>,
 
     pp_header: Arc<Header>,
@@ -158,7 +164,9 @@ impl ProofContext {
                 let level = level as usize;
                 reachability::init(reachability_stores[level].write().deref_mut()).unwrap();
                 relations_stores[level].insert_batch(&mut batch, ORIGIN, BlockHashes::new(vec![])).unwrap();
-                sahyadri_consensus_stores[level].insert(ORIGIN, sahyadri_consensus_managers[level].origin_sahyadri_consensus_data()).unwrap();
+                sahyadri_consensus_stores[level]
+                    .insert(ORIGIN, sahyadri_consensus_managers[level].origin_sahyadri_consensus_data())
+                    .unwrap();
             }
 
             db.write(batch).unwrap();

@@ -5,6 +5,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{
     BlockHashMap, BlockHashSet, HashMapCustomHasher,
     blockhash::{BlockHashes, ORIGIN},
@@ -17,25 +18,24 @@ use sahyadri_core::{debug, trace};
 use sahyadri_hashes::Hash;
 use sahyadri_pow::calc_block_level;
 use sahyadri_utils::{binary_heap::BinaryHeapExtensions, vec::VecExtensions};
-use rocksdb::WriteBatch;
 
 use crate::{
     model::{
         services::reachability::ReachabilityService,
         stores::{
-            sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStore},
             headers::HeaderStore,
             pruning::PruningProofDescriptor,
             reachability::StagingReachabilityStore,
             relations::StagingRelationsStore,
+            sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStore},
             selected_chain::SelectedChainStore,
             virtual_state::{VirtualState, VirtualStateStore},
         },
     },
     processes::{
-        sahyadri_consensus::{mergeset::unordered_mergeset_without_selected_parent, ordering::SortableBlock},
         reachability::inquirer as reachability,
         relations::RelationsStoreExtensions,
+        sahyadri_consensus::{mergeset::unordered_mergeset_without_selected_parent, ordering::SortableBlock},
     },
 };
 

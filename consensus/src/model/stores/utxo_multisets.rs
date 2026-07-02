@@ -1,3 +1,4 @@
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::BlockHasher;
 use sahyadri_database::prelude::CachePolicy;
 use sahyadri_database::prelude::DB;
@@ -7,7 +8,6 @@ use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 use sahyadri_math::Uint3072;
 use sahyadri_muhash::MuHash;
-use rocksdb::WriteBatch;
 use std::sync::Arc;
 
 pub trait UtxoMultisetsStoreReader {

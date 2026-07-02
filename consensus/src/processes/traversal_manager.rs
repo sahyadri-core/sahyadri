@@ -2,7 +2,9 @@ use std::{collections::VecDeque, sync::Arc};
 
 use crate::model::{
     services::reachability::{MTReachabilityService, ReachabilityService},
-    stores::{sahyadri_consensus::SahyadriConsensusStoreReader, reachability::ReachabilityStoreReader, relations::RelationsStoreReader},
+    stores::{
+        reachability::ReachabilityStoreReader, relations::RelationsStoreReader, sahyadri_consensus::SahyadriConsensusStoreReader,
+    },
 };
 use itertools::Itertools;
 use sahyadri_consensus_core::{

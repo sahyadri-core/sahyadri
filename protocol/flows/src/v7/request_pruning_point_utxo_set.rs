@@ -8,7 +8,8 @@ use sahyadri_p2p_lib::{
     common::ProtocolError,
     dequeue, make_message,
     pb::{
-        DonePruningPointUtxoSetChunksMessage, PruningPointUtxoSetChunkMessage, UnexpectedPruningPointMessage, sahyadrid_message::Payload,
+        DonePruningPointUtxoSetChunksMessage, PruningPointUtxoSetChunkMessage, UnexpectedPruningPointMessage,
+        sahyadrid_message::Payload,
     },
 };
 use std::sync::Arc;

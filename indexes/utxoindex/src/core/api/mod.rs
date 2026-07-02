@@ -1,3 +1,4 @@
+use parking_lot::RwLock;
 use sahyadri_consensus_core::{
     BlockHashSet,
     tx::{ScriptPublicKeys, TransactionOutpoint},
@@ -7,7 +8,6 @@ use sahyadri_consensusmanager::spawn_blocking;
 use sahyadri_database::prelude::StoreResult;
 use sahyadri_hashes::Hash;
 use sahyadri_index_core::indexed_utxos::BalanceByScriptPublicKey;
-use parking_lot::RwLock;
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
 
 use crate::{

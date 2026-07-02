@@ -16,9 +16,9 @@ pub(crate) mod request_block_bodies;
 use crate::{flow_context::FlowContext, flow_trait::Flow};
 
 use crate::ibd::IbdFlow;
-use sahyadri_p2p_lib::{SahyadridMessagePayloadType, Router, SharedIncomingRoute, convert::header::HeaderFormat};
-use sahyadri_utils::channel;
 use request_block_bodies::HandleBlockBodyRequests;
+use sahyadri_p2p_lib::{Router, SahyadridMessagePayloadType, SharedIncomingRoute, convert::header::HeaderFormat};
+use sahyadri_utils::channel;
 use std::sync::Arc;
 
 pub fn register(ctx: FlowContext, router: Arc<Router>, protocol_version: u32) -> Vec<Box<dyn Flow>> {
@@ -114,8 +114,10 @@ pub fn register(ctx: FlowContext, router: Arc<Router>, protocol_version: u32) ->
         Box::new(RelayTransactionsFlow::new(
             ctx.clone(),
             router.clone(),
-            router
-                .subscribe_with_capacity(vec![SahyadridMessagePayloadType::InvTransactions], RelayTransactionsFlow::invs_channel_size()),
+            router.subscribe_with_capacity(
+                vec![SahyadridMessagePayloadType::InvTransactions],
+                RelayTransactionsFlow::invs_channel_size(),
+            ),
             router.subscribe_with_capacity(
                 vec![SahyadridMessagePayloadType::Transaction, SahyadridMessagePayloadType::TransactionNotFound],
                 RelayTransactionsFlow::txs_channel_size(),
@@ -126,7 +128,11 @@ pub fn register(ctx: FlowContext, router: Arc<Router>, protocol_version: u32) ->
             router.clone(),
             router.subscribe(vec![SahyadridMessagePayloadType::RequestTransactions]),
         )),
-        Box::new(ReceiveAddressesFlow::new(ctx.clone(), router.clone(), router.subscribe(vec![SahyadridMessagePayloadType::Addresses]))),
+        Box::new(ReceiveAddressesFlow::new(
+            ctx.clone(),
+            router.clone(),
+            router.subscribe(vec![SahyadridMessagePayloadType::Addresses]),
+        )),
         Box::new(SendAddressesFlow::new(
             ctx.clone(),
             router.clone(),

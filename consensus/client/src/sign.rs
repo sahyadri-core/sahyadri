@@ -10,8 +10,8 @@ use sahyadri_consensus_core::{
     },
     tx::PopulatedTransaction,
 };
-use sahyadri_dilithium::{generate_keypair_from_seed, sign_bytes, DilithiumKeyPair};
-use sha2::{Sha256, Digest};
+use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair_from_seed, sign_bytes};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 /// A wrapper enum that represents the transaction signed state. A transaction
@@ -39,7 +39,8 @@ pub fn sign_with_multiple_v3<'a>(tx: &'a Transaction, seeds: &[[u8; 32]]) -> cra
         let keypair = generate_keypair_from_seed(seed);
         let pk_bytes = keypair.public_key();
         let pk_hash = Sha256::digest(pk_bytes);
-        let script_pub_key_script: Vec<u8> = std::iter::once(0x14u8).chain(pk_hash[0..20].iter().copied()).chain(std::iter::once(0xac)).collect();
+        let script_pub_key_script: Vec<u8> =
+            std::iter::once(0x14u8).chain(pk_hash[0..20].iter().copied()).chain(std::iter::once(0xac)).collect();
         map.insert(script_pub_key_script, keypair);
     }
 
@@ -68,7 +69,7 @@ pub fn sign_with_multiple_v3<'a>(tx: &'a Transaction, seeds: &[[u8; 32]]) -> cra
                 sig_script.push(0x4d); // OP_PUSHDATA2
                 sig_script.extend_from_slice(&payload_len.to_le_bytes());
                 sig_script.extend_from_slice(pk_bytes);
-                sig_script.extend_from_slice(&sig.as_bytes());
+                sig_script.extend_from_slice(sig.as_bytes());
                 sig_script.push(SIG_HASH_ALL.to_u8());
                 tx.set_signature_script(i, sig_script)?;
             } else {

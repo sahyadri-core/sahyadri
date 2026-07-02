@@ -2,7 +2,7 @@
 
 use sahyadri_rpc_core::{GetSahyadriDagInfoResponse, GetServerInfoResponse, api::rpc::RpcApi};
 use sahyadri_wrpc_client::{
-    SahyadriRpcClient, Resolver, WrpcEncoding,
+    Resolver, SahyadriRpcClient, WrpcEncoding,
     client::{ConnectOptions, ConnectStrategy},
     prelude::{NetworkId, NetworkType},
     result::Result,

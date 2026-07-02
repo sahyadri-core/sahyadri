@@ -1,4 +1,4 @@
-use sahyadri_consensus_core::trusted::{TrustedSahyadriConsensusData, TrustedHeader};
+use sahyadri_consensus_core::trusted::{TrustedHeader, TrustedSahyadriConsensusData};
 
 use crate::convert::header::HeaderFormat;
 use crate::pb as protowire;

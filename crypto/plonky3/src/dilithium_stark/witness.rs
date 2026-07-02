@@ -4,38 +4,34 @@
 use dilithium::packing;
 use dilithium::poly::Poly;
 use dilithium::polyvec::{
-    PolyVecK, PolyVecL,
-    matrix_pointwise_montgomery,
-    polyveck_pointwise_poly_montgomery,
-    polyveck_sub,
-    polyveck_invntt_tomont,
-    polyveck_ntt,
-    polyvecl_ntt,
-    polyveck_reduce,
-    polyveck_shiftl,
-    polyveck_caddq,
-    polyveck_use_hint,
-    polyveck_pack_w1,
-    polyvecl_chknorm,
+    matrix_pointwise_montgomery, polyveck_caddq, polyveck_invntt_tomont, polyveck_ntt, polyveck_pack_w1,
+    polyveck_pointwise_poly_montgomery, polyveck_reduce, polyveck_shiftl, polyveck_sub, polyveck_use_hint, polyvecl_chknorm,
+    polyvecl_ntt, PolyVecK, PolyVecL,
 };
 
 use super::params::*;
 
 fn poly_to_u32(p: &Poly) -> [u32; N] {
     let mut arr = [0u32; N];
-    for i in 0..N { arr[i] = (p.coeffs[i] as i64).rem_euclid(Q as i64) as u32; }
+    for i in 0..N {
+        arr[i] = (p.coeffs[i] as i64).rem_euclid(Q as i64) as u32;
+    }
     arr
 }
 
 fn polyvecl_to_u32(pv: &PolyVecL) -> [[u32; N]; L] {
     let mut arr = [[0u32; N]; L];
-    for i in 0..L { arr[i] = poly_to_u32(&pv.vec[i]); }
+    for i in 0..L {
+        arr[i] = poly_to_u32(&pv.vec[i]);
+    }
     arr
 }
 
 fn polyveck_to_u32(pv: &PolyVecK) -> [[u32; N]; K] {
     let mut arr = [[0u32; N]; K];
-    for i in 0..K { arr[i] = poly_to_u32(&pv.vec[i]); }
+    for i in 0..K {
+        arr[i] = poly_to_u32(&pv.vec[i]);
+    }
     arr
 }
 
@@ -53,18 +49,18 @@ pub struct DilithiumVerifyWitness {
     pub valid: bool,
 }
 
-pub fn verify_with_witness(
-    sig_bytes: &[u8],
-    pk_bytes: &[u8],
-    msg: &[u8],
-) -> Result<DilithiumVerifyWitness, String> {
+pub fn verify_with_witness(sig_bytes: &[u8], pk_bytes: &[u8], msg: &[u8]) -> Result<DilithiumVerifyWitness, String> {
     let mode = dilithium::ML_DSA_65;
     let k = mode.k();
     let beta = mode.beta();
     let gamma1 = mode.gamma1();
 
-    if sig_bytes.len() != SIG_SIZE { return Err("wrong sig size".into()); }
-    if pk_bytes.len() != PK_SIZE { return Err("wrong pk size".into()); }
+    if sig_bytes.len() != SIG_SIZE {
+        return Err("wrong sig size".into());
+    }
+    if pk_bytes.len() != PK_SIZE {
+        return Err("wrong pk size".into());
+    }
 
     let mut rho = [0u8; 32];
     let mut t1 = PolyVecK::default();
@@ -134,9 +130,16 @@ pub fn verify_with_witness(
     let valid = c_tilde == c2;
 
     Ok(DilithiumVerifyWitness {
-        rho, t1_shifted_coeffs, c_tilde_bytes: c_tilde,
-        z_coeffs, h_coeffs, cp_coeffs, a_matrix,
-        w1_packed, c2_bytes: c2, valid,
+        rho,
+        t1_shifted_coeffs,
+        c_tilde_bytes: c_tilde,
+        z_coeffs,
+        h_coeffs,
+        cp_coeffs,
+        a_matrix,
+        w1_packed,
+        c2_bytes: c2,
+        valid,
     })
 }
 
@@ -172,9 +175,7 @@ mod tests {
         let kp = generate_keypair().unwrap();
         let sig = sign_message("match", &kp).unwrap();
         let w = verify_with_witness(sig.as_bytes(), kp.public_key(), b"match").unwrap();
-        assert!(crate::dilithium_stark::zk_verify::verify_dilithium_native(
-            sig.as_bytes(), kp.public_key(), b"match"
-        ).is_ok());
+        assert!(crate::dilithium_stark::zk_verify::verify_dilithium_native(sig.as_bytes(), kp.public_key(), b"match").is_ok());
         assert!(w.valid);
     }
 }

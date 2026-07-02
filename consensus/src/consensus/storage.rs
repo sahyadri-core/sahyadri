@@ -3,11 +3,11 @@ use crate::{
     model::stores::{
         DB,
         acceptance_data::DbAcceptanceDataStore,
+        account_store::DbAccountStore, // <--- 1. IMPORT SAHYADRI BANK
         block_transactions::DbBlockTransactionsStore,
         block_window_cache::BlockWindowCacheStore,
         daa::DbDaaStore,
         depth::DbDepthStore,
-        sahyadri_consensus::{CompactSahyadriConsensusData, DbSahyadriConsensusStore},
         headers::{CompactHeaderData, DbHeadersStore},
         headers_selected_tip::DbHeadersSelectedTipStore,
         past_pruning_points::DbPastPruningPointsStore,
@@ -16,22 +16,22 @@ use crate::{
         pruning_samples::DbPruningSamplesStore,
         reachability::{DbReachabilityStore, ReachabilityData},
         relations::DbRelationsStore,
+        sahyadri_consensus::{CompactSahyadriConsensusData, DbSahyadriConsensusStore},
         selected_chain::DbSelectedChainStore,
         statuses::DbStatusesStore,
         tips::DbTipsStore,
         utxo_diffs::DbUtxoDiffsStore,
         utxo_multisets::DbUtxoMultisetsStore,
         virtual_state::{LkgVirtualState, VirtualStores},
-        account_store::DbAccountStore, // <--- 1. IMPORT SAHYADRI BANK
     },
-    processes::{sahyadri_consensus::ordering::SortableBlock, reachability::inquirer as reachability, relations},
+    processes::{reachability::inquirer as reachability, relations, sahyadri_consensus::ordering::SortableBlock},
 };
 
 use super::cache_policy_builder::CachePolicyBuilder as PolicyBuilder;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::{BlockHashSet, blockstatus::BlockStatus};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
-use parking_lot::RwLock;
 use std::{ops::DerefMut, sync::Arc};
 
 pub struct ConsensusStorage {
@@ -85,27 +85,27 @@ impl ConsensusStorage {
 
         // Lower and upper bounds
         let pruning_depth = params.pruning_depth() as usize;
-        let pruning_size_for_caches = pruning_depth + params.finality_depth() as usize; 
-        let level_lower_bound = 2 * params.pruning_proof_m as usize; 
+        let pruning_size_for_caches = pruning_depth + params.finality_depth() as usize;
+        let level_lower_bound = 2 * params.pruning_proof_m as usize;
 
         // Budgets in bytes
         let daa_excluded_budget = scaled(30_000_000);
         let statuses_budget = scaled(30_000_000);
         let reachability_data_budget = scaled(100_000_000);
-        let reachability_sets_budget = scaled(100_000_000); 
+        let reachability_sets_budget = scaled(100_000_000);
         let sahyadri_consensus_compact_budget = scaled(15_000_000);
         let headers_compact_budget = scaled(5_000_000);
-        let parents_budget = scaled(80_000_000); 
-        let children_budget = scaled(20_000_000); 
-        let sahyadri_consensus_budget = scaled(80_000_000); 
+        let parents_budget = scaled(80_000_000);
+        let children_budget = scaled(20_000_000);
+        let sahyadri_consensus_budget = scaled(80_000_000);
         let headers_budget = scaled(80_000_000);
         let transactions_budget = scaled(40_000_000);
         let utxo_diffs_budget = scaled(40_000_000);
-        let block_window_budget = scaled(200_000_000); 
+        let block_window_budget = scaled(200_000_000);
         let acceptance_data_budget = scaled(40_000_000);
 
         // Unit sizes in bytes
-        let daa_excluded_bytes = size_of::<Hash>() + size_of::<BlockHashSet>(); 
+        let daa_excluded_bytes = size_of::<Hash>() + size_of::<BlockHashSet>();
         let status_bytes = size_of::<Hash>() + size_of::<BlockStatus>();
         let reachability_data_bytes = size_of::<Hash>() + size_of::<ReachabilityData>();
         let sahyadri_consensus_compact_bytes = size_of::<Hash>() + size_of::<CompactSahyadriConsensusData>();
@@ -115,17 +115,50 @@ impl ConsensusStorage {
         let median_window_bytes = params.past_median_time_window_size * size_of::<SortableBlock>();
 
         // Cache policy builders
-        let daa_excluded_builder = PolicyBuilder::new().max_items(pruning_depth).bytes_budget(daa_excluded_budget).unit_bytes(daa_excluded_bytes).untracked(); 
-        let statuses_builder = PolicyBuilder::new().max_items(pruning_size_for_caches).bytes_budget(statuses_budget).unit_bytes(status_bytes).untracked();
-        let reachability_data_builder = PolicyBuilder::new().max_items(pruning_size_for_caches).bytes_budget(reachability_data_budget).unit_bytes(reachability_data_bytes).untracked();
-        let sahyadri_consensus_compact_builder = PolicyBuilder::new().max_items(pruning_size_for_caches).bytes_budget(sahyadri_consensus_compact_budget).unit_bytes(sahyadri_consensus_compact_bytes).min_items(level_lower_bound).untracked();
-        let headers_compact_builder = PolicyBuilder::new().max_items(pruning_size_for_caches).bytes_budget(headers_compact_budget).unit_bytes(headers_compact_bytes).untracked();
-        let parents_builder = PolicyBuilder::new().bytes_budget(parents_budget).unit_bytes(size_of::<Hash>()).min_items(level_lower_bound).tracked_units();
-        let children_builder = PolicyBuilder::new().bytes_budget(children_budget).unit_bytes(size_of::<Hash>()).min_items(level_lower_bound).tracked_units();
-        let reachability_sets_builder = PolicyBuilder::new().bytes_budget(reachability_sets_budget).unit_bytes(size_of::<Hash>()).tracked_units();
-        let difficulty_window_builder = PolicyBuilder::new().max_items(perf_params.block_window_cache_size).bytes_budget(block_window_budget).unit_bytes(difficulty_window_bytes).untracked();
-        let median_window_builder = PolicyBuilder::new().max_items(perf_params.block_window_cache_size).bytes_budget(block_window_budget).unit_bytes(median_window_bytes).untracked();
-        let sahyadri_consensus_builder = PolicyBuilder::new().bytes_budget(sahyadri_consensus_budget).min_items(level_lower_bound).tracked_bytes();
+        let daa_excluded_builder =
+            PolicyBuilder::new().max_items(pruning_depth).bytes_budget(daa_excluded_budget).unit_bytes(daa_excluded_bytes).untracked();
+        let statuses_builder =
+            PolicyBuilder::new().max_items(pruning_size_for_caches).bytes_budget(statuses_budget).unit_bytes(status_bytes).untracked();
+        let reachability_data_builder = PolicyBuilder::new()
+            .max_items(pruning_size_for_caches)
+            .bytes_budget(reachability_data_budget)
+            .unit_bytes(reachability_data_bytes)
+            .untracked();
+        let sahyadri_consensus_compact_builder = PolicyBuilder::new()
+            .max_items(pruning_size_for_caches)
+            .bytes_budget(sahyadri_consensus_compact_budget)
+            .unit_bytes(sahyadri_consensus_compact_bytes)
+            .min_items(level_lower_bound)
+            .untracked();
+        let headers_compact_builder = PolicyBuilder::new()
+            .max_items(pruning_size_for_caches)
+            .bytes_budget(headers_compact_budget)
+            .unit_bytes(headers_compact_bytes)
+            .untracked();
+        let parents_builder = PolicyBuilder::new()
+            .bytes_budget(parents_budget)
+            .unit_bytes(size_of::<Hash>())
+            .min_items(level_lower_bound)
+            .tracked_units();
+        let children_builder = PolicyBuilder::new()
+            .bytes_budget(children_budget)
+            .unit_bytes(size_of::<Hash>())
+            .min_items(level_lower_bound)
+            .tracked_units();
+        let reachability_sets_builder =
+            PolicyBuilder::new().bytes_budget(reachability_sets_budget).unit_bytes(size_of::<Hash>()).tracked_units();
+        let difficulty_window_builder = PolicyBuilder::new()
+            .max_items(perf_params.block_window_cache_size)
+            .bytes_budget(block_window_budget)
+            .unit_bytes(difficulty_window_bytes)
+            .untracked();
+        let median_window_builder = PolicyBuilder::new()
+            .max_items(perf_params.block_window_cache_size)
+            .bytes_budget(block_window_budget)
+            .unit_bytes(median_window_bytes)
+            .untracked();
+        let sahyadri_consensus_builder =
+            PolicyBuilder::new().bytes_budget(sahyadri_consensus_budget).min_items(level_lower_bound).tracked_bytes();
         let headers_builder = PolicyBuilder::new().bytes_budget(headers_budget).tracked_bytes();
         let utxo_diffs_builder = PolicyBuilder::new().bytes_budget(utxo_diffs_budget).tracked_bytes();
         let block_data_builder = PolicyBuilder::new().max_items(perf_params.block_data_cache_size).untracked();
@@ -172,7 +205,7 @@ impl ConsensusStorage {
         let past_pruning_points_store = Arc::new(DbPastPruningPointsStore::new(db.clone(), past_pruning_points_builder.build()));
         let pruning_meta_stores = Arc::new(RwLock::new(PruningMetaStores::new(db.clone(), utxo_set_builder.build())));
         let pruning_samples_store = Arc::new(DbPruningSamplesStore::new(db.clone(), header_data_builder.build()));
-        
+
         // Txs
         let block_transactions_store = Arc::new(DbBlockTransactionsStore::new(db.clone(), transactions_builder.build()));
         let utxo_diffs_store = Arc::new(DbUtxoDiffsStore::new(db.clone(), utxo_diffs_builder.build()));

@@ -23,7 +23,7 @@ use sahyadri_consensus_core::{
     },
     header::Header,
     pruning::{PruningPointProof, PruningPointTrustedData},
-    trusted::{TrustedSahyadriConsensusData, TrustedHeader},
+    trusted::{TrustedHeader, TrustedSahyadriConsensusData},
 };
 use sahyadri_core::info;
 use sahyadri_database::prelude::StoreResultExt;
@@ -33,7 +33,7 @@ use thiserror::Error;
 
 use crate::{
     consensus::{
-        services::{DbDagTraversalManager, DbSahyadriConsensusManager, DbParentsManager, DbWindowManager},
+        services::{DbDagTraversalManager, DbParentsManager, DbSahyadriConsensusManager, DbWindowManager},
         storage::ConsensusStorage,
     },
     model::{
@@ -41,7 +41,6 @@ use crate::{
         stores::{
             DB,
             depth::DbDepthStore,
-            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusStoreReader},
             headers::{DbHeadersStore, HeaderStore, HeaderStoreReader},
             headers_selected_tip::DbHeadersSelectedTipStore,
             past_pruning_points::{DbPastPruningPointsStore, PastPruningPointsStore},
@@ -50,6 +49,7 @@ use crate::{
             pruning_samples::{DbPruningSamplesStore, PruningSamplesStore},
             reachability::DbReachabilityStore,
             relations::{DbRelationsStore, RelationsStoreReader},
+            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusStoreReader},
             selected_chain::DbSelectedChainStore,
             tips::DbTipsStore,
             virtual_state::{VirtualStateStoreReader, VirtualStores},
@@ -331,7 +331,10 @@ impl PruningProofManager {
         PruningPointTrustedData {
             anticone,
             daa_window_blocks: daa_window_blocks.into_values().collect_vec(),
-            sahyadri_consensus_blocks: sahyadri_consensus_blocks.into_iter().map(|(hash, sahyadri_consensus)| TrustedSahyadriConsensusData { hash, sahyadri_consensus }).collect_vec(),
+            sahyadri_consensus_blocks: sahyadri_consensus_blocks
+                .into_iter()
+                .map(|(hash, sahyadri_consensus)| TrustedSahyadriConsensusData { hash, sahyadri_consensus })
+                .collect_vec(),
         }
     }
 

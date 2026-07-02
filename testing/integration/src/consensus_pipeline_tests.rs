@@ -1,4 +1,5 @@
 use futures_util::future::try_join_all;
+use rand_distr::{Distribution, Poisson};
 use sahyadri_alloc::init_allocator_with_default_settings;
 use sahyadri_consensus::{
     config::ConfigBuilder, consensus::test_consensus::TestConsensus, params::MAINNET_PARAMS,
@@ -7,7 +8,6 @@ use sahyadri_consensus::{
 use sahyadri_consensus_core::{api::ConsensusApi, blockhash};
 use sahyadri_database::prelude::CachePolicy;
 use sahyadri_hashes::Hash;
-use rand_distr::{Distribution, Poisson};
 use std::cmp::min;
 use tokio::join;
 

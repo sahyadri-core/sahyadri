@@ -13,6 +13,7 @@ use sahyadri_consensus_client::UtxoEntry as ClientUTXO;
 use sahyadri_consensus_core::hashing::sighash::{SigHashReusedValuesUnsync, calc_signature_hash};
 use sahyadri_consensus_core::tx::VerifiableTransaction;
 use sahyadri_consensus_core::tx::{TransactionInput, UtxoEntry};
+use sahyadri_dilithium::{generate_keypair_from_seed, sign_bytes};
 use sahyadri_txscript::extract_script_pub_key_address;
 use sahyadri_txscript::opcodes::codes::OpData65;
 use sahyadri_txscript::script_builder::ScriptBuilder;
@@ -23,7 +24,6 @@ use sahyadri_wallet_pskt::prelude::KeySource;
 use sahyadri_wallet_pskt::prelude::lock_script_sig_templating_bytes;
 use sahyadri_wallet_pskt::prelude::{Finalizer, Inner, SignInputOk, Signature, Signer};
 pub use sahyadri_wallet_pskt::pskt::{Creator, PSKT};
-use sahyadri_dilithium::{generate_keypair_from_seed, sign_bytes};
 use std::iter;
 
 struct PSKBSignerInner {
@@ -229,13 +229,14 @@ pub async fn pskb_signer_for_address(
                                 current_addresses.get(input_idx).ok_or_else(|| format!("No address found for input {}", input_idx))?
                             };
 
-                            let pub_key_vec = signer.public_key_bytes(address).map_err(|e| format!("Failed to get public key: {}", e))?;
+                            let pub_key_vec =
+                                signer.public_key_bytes(address).map_err(|e| format!("Failed to get public key: {}", e))?;
                             let mut pk_arr = [0u8; 32];
                             pk_arr.copy_from_slice(&pub_key_vec[..32]);
                             let pub_key = sahyadri_bip32::DilithiumPkHash(pk_arr);
 
                             let signature = signer.sign_dilithium(address, &msg).map_err(|e| format!("Failed to sign: {}", e))?;
-                            
+
                             Ok(SignInputOk { signature: Signature::Dilithium(signature), pub_key, key_source: key_source.clone() })
                         })
                         .collect()

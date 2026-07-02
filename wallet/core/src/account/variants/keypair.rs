@@ -57,26 +57,26 @@ impl AccountStorable for Payload {}
 
 impl BorshSerialize for Payload {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-            StorageHeader::new(Self::STORAGE_MAGIC, Self::STORAGE_VERSION).serialize(writer)?;
- 
-            BorshSerialize::serialize(&self.public_key.bytes, writer)?;
-            BorshSerialize::serialize(&self.ecdsa, writer)?;
- 
-            Ok(())
-        }
+        StorageHeader::new(Self::STORAGE_MAGIC, Self::STORAGE_VERSION).serialize(writer)?;
+
+        BorshSerialize::serialize(&self.public_key.bytes, writer)?;
+        BorshSerialize::serialize(&self.ecdsa, writer)?;
+
+        Ok(())
+    }
 }
 
 impl BorshDeserialize for Payload {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> IoResult<Self> {
-            let StorageHeader { version: _, .. } =
-                StorageHeader::deserialize_reader(reader)?.try_magic(Self::STORAGE_MAGIC)?.try_version(Self::STORAGE_VERSION)?;
- 
-            let public_key_bytes: Vec<u8> = BorshDeserialize::deserialize_reader(reader)?;
-            let public_key = sahyadri_wallet_keys::prelude::PublicKey::from(public_key_bytes);
-            let ecdsa = BorshDeserialize::deserialize_reader(reader)?;
- 
-            Ok(Self { public_key, ecdsa })
-        }
+        let StorageHeader { version: _, .. } =
+            StorageHeader::deserialize_reader(reader)?.try_magic(Self::STORAGE_MAGIC)?.try_version(Self::STORAGE_VERSION)?;
+
+        let public_key_bytes: Vec<u8> = BorshDeserialize::deserialize_reader(reader)?;
+        let public_key = sahyadri_wallet_keys::prelude::PublicKey::from(public_key_bytes);
+        let ecdsa = BorshDeserialize::deserialize_reader(reader)?;
+
+        Ok(Self { public_key, ecdsa })
+    }
 }
 
 pub struct Keypair {
@@ -140,13 +140,13 @@ impl Account for Keypair {
     }
 
     fn receive_address(&self) -> Result<Address> {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let hash = Sha256::digest(&self.public_key.bytes);
         Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }
 
     fn change_address(&self) -> Result<Address> {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let hash = Sha256::digest(&self.public_key.bytes);
         Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }

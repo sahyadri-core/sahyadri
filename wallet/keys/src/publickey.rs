@@ -4,7 +4,7 @@
 
 use crate::imports::*;
 use sahyadri_consensus_core::network::NetworkType;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /// Data structure that envelopes a Dilithium PublicKey (1952 bytes).
 /// @category Wallet SDK
@@ -21,8 +21,7 @@ impl PublicKey {
     #[wasm_bindgen(constructor)]
     pub fn try_new(key: &str) -> Result<PublicKey> {
         let mut buf = vec![0u8; key.len() / 2];
-        faster_hex::hex_decode(key.as_bytes(), &mut buf)
-            .map_err(|_| Error::custom("Invalid hex for PublicKey"))?;
+        faster_hex::hex_decode(key.as_bytes(), &mut buf).map_err(|_| Error::custom("Invalid hex for PublicKey"))?;
         Ok(Self { bytes: buf })
     }
 
@@ -111,8 +110,7 @@ impl XOnlyPublicKey {
     #[wasm_bindgen(constructor)]
     pub fn try_new(key: &str) -> Result<XOnlyPublicKey> {
         let mut buf = vec![0u8; key.len() / 2];
-        faster_hex::hex_decode(key.as_bytes(), &mut buf)
-            .map_err(|_| Error::custom("Invalid hex for XOnlyPublicKey"))?;
+        faster_hex::hex_decode(key.as_bytes(), &mut buf).map_err(|_| Error::custom("Invalid hex for XOnlyPublicKey"))?;
         let mut hash = [0u8; 20];
         hash.copy_from_slice(&buf[..20]);
         Ok(Self { hash })

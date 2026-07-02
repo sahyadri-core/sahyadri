@@ -1,8 +1,8 @@
 use crate::{
     consensus::{
         services::{
-            ConsensusServices, DbBlockDepthManager, DbDagTraversalManager, DbSahyadriConsensusManager, DbParentsManager, DbPruningPointManager,
-            DbWindowManager,
+            ConsensusServices, DbBlockDepthManager, DbDagTraversalManager, DbParentsManager, DbPruningPointManager,
+            DbSahyadriConsensusManager, DbWindowManager,
         },
         storage::ConsensusStorage,
     },
@@ -14,21 +14,26 @@ use crate::{
             block_window_cache::{BlockWindowCacheStore, BlockWindowCacheWriter, BlockWindowHeap},
             daa::DbDaaStore,
             depth::DbDepthStore,
-            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusData, SahyadriConsensusStoreReader},
             headers::DbHeadersStore,
             headers_selected_tip::{DbHeadersSelectedTipStore, HeadersSelectedTipStoreReader},
             pruning::{DbPruningStore, PruningStoreReader},
             reachability::{DbReachabilityStore, StagingReachabilityStore},
             relations::{DbRelationsStore, RelationsStoreReader},
+            sahyadri_consensus::{DbSahyadriConsensusStore, SahyadriConsensusData, SahyadriConsensusStoreReader},
             statuses::{DbStatusesStore, StatusesStore, StatusesStoreBatchExtensions, StatusesStoreReader},
         },
     },
     params::Params,
     pipeline::deps_manager::{BlockProcessingMessage, BlockTask, BlockTaskDependencyManager, TaskId},
-    processes::{sahyadri_consensus::ordering::SortableBlock, reachability::inquirer as reachability, relations::RelationsStoreExtensions},
+    processes::{
+        reachability::inquirer as reachability, relations::RelationsStoreExtensions, sahyadri_consensus::ordering::SortableBlock,
+    },
 };
 use crossbeam_channel::{Receiver, Sender};
 use itertools::Itertools;
+use parking_lot::RwLock;
+use rayon::ThreadPool;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{
     BlockHashSet, BlockLevel,
     blockhash::{BlockHashes, ORIGIN},
@@ -40,9 +45,6 @@ use sahyadri_consensusmanager::SessionLock;
 use sahyadri_database::prelude::{StoreResultExt, StoreResultUnitExt};
 use sahyadri_hashes::Hash;
 use sahyadri_utils::vec::VecExtensions;
-use parking_lot::RwLock;
-use rayon::ThreadPool;
-use rocksdb::WriteBatch;
 use std::sync::{Arc, atomic::Ordering};
 
 use super::super::ProcessingCounters;
@@ -476,7 +478,9 @@ impl HeaderProcessor {
         let mut batch = WriteBatch::default();
         let mut relations_write = self.relations_store.write();
         relations_write.insert_batch(&mut batch, ORIGIN, BlockHashes::new(vec![])).unwrap();
-        self.sahyadri_consensus_store.insert_batch(&mut batch, ORIGIN, &self.sahyadri_consensus_manager.origin_sahyadri_consensus_data()).unwrap();
+        self.sahyadri_consensus_store
+            .insert_batch(&mut batch, ORIGIN, &self.sahyadri_consensus_manager.origin_sahyadri_consensus_data())
+            .unwrap();
         let mut hst_write = self.headers_selected_tip_store.write();
         hst_write.set_batch(&mut batch, SortableBlock::new(ORIGIN, 0.into())).unwrap();
         self.db.write(batch).unwrap();

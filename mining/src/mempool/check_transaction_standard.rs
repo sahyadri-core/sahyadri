@@ -3,7 +3,7 @@ use crate::mempool::{
     errors::{NonStandardError, NonStandardResult},
 };
 use sahyadri_consensus_core::{
-    constants::{MAX_SCRIPT_PUBLIC_KEY_VERSION},
+    constants::MAX_SCRIPT_PUBLIC_KEY_VERSION,
     mass,
     tx::{MutableTransaction, PopulatedTransaction, TransactionOutput},
 };
@@ -222,16 +222,16 @@ impl Mempool {
 
 #[cfg(test)]
 mod tests {
-    use sahyadri_consensus_core::constants::MAX_KANA;
     use super::*;
     use crate::{
         MiningCounters,
         mempool::config::{Config, DEFAULT_MINIMUM_RELAY_TRANSACTION_FEE},
     };
     use sahyadri_addresses::{Address, Prefix, Version};
+    use sahyadri_consensus_core::constants::MAX_KANA;
     use sahyadri_consensus_core::{
         config::params::Params,
-        constants::{MAX_TX_IN_SEQUENCE_NUM, KANA_PER_SAHYADRI, TX_VERSION},
+        constants::{KANA_PER_SAHYADRI, MAX_TX_IN_SEQUENCE_NUM, TX_VERSION},
         mass::NonContextualMasses,
         network::NetworkType,
         subnets::SUBNETWORK_ID_NATIVE,

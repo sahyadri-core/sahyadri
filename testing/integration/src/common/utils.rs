@@ -1,5 +1,6 @@
 use super::client::ListeningClient;
 use itertools::Itertools;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use sahyadri_addresses::Address;
 use sahyadri_consensus_core::{
     constants::TX_VERSION,
@@ -16,11 +17,10 @@ use sahyadri_consensus_core::{
     },
 };
 use sahyadri_core::info;
+use sahyadri_dilithium::DilithiumKeyPair;
 use sahyadri_grpc_client::GrpcClient;
 use sahyadri_rpc_core::{BlockAddedNotification, Notification, RpcUtxoEntry, VirtualDaaScoreChangedNotification, api::rpc::RpcApi};
 use sahyadri_txscript::pay_to_address_script;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use sahyadri_dilithium::DilithiumKeyPair;
 use std::{
     collections::{HashMap, HashSet, hash_map::Entry::Occupied},
     future::Future,

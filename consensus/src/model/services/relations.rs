@@ -1,8 +1,8 @@
 use crate::model::stores::relations::RelationsStoreReader;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::BlockHashSet;
 use sahyadri_database::prelude::{ReadLock, StoreError, StoreResult};
 use sahyadri_hashes::Hash;
-use parking_lot::RwLock;
 use std::sync::Arc;
 
 /// Multi-threaded block-relations service imp

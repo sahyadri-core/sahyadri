@@ -769,20 +769,20 @@ async fn sanity_test() {
                         .unwrap();
                 })
             }
-       SahyadridPayloadOps::StopNotifyingPruningPointUtxoSetOverride => {
+            SahyadridPayloadOps::StopNotifyingPruningPointUtxoSetOverride => {
                 let rpc_client = client.clone();
                 let id = listener_id;
                 tst!(op, {
                     rpc_client.stop_notify(id, PruningPointUtxoSetOverrideScope {}.into()).await.unwrap();
                 })
-            },
+            }
             SahyadridPayloadOps::StopNotifyingUtxosChanged => {
                 let rpc_client = client.clone();
                 let id = listener_id;
                 tst!(op, {
                     rpc_client.stop_notify(id, UtxosChangedScope::new(vec![]).into()).await.unwrap();
                 })
-            },
+            }
             SahyadridPayloadOps::SubmitAccountTransaction => {
                 tokio::spawn(async move {
                     // Dummy implementation for the test to satisfy the compiler

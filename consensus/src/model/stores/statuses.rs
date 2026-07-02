@@ -1,7 +1,7 @@
-use sahyadri_consensus_core::{BlockHasher, blockstatus::BlockStatus};
-use sahyadri_database::registry::DatabaseStorePrefixes;
 use parking_lot::{RwLock, RwLockWriteGuard};
 use rocksdb::WriteBatch;
+use sahyadri_consensus_core::{BlockHasher, blockstatus::BlockStatus};
+use sahyadri_database::registry::DatabaseStorePrefixes;
 use std::sync::Arc;
 
 use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};

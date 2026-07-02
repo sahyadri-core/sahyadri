@@ -71,7 +71,10 @@ impl Account {
                     tprintln!(ctx, "");
                     ctx.term().help(
                         &[
-                            ("account import legacy-data", "Import KDX keydata file or sahyadrinet web wallet data on the same domain"),
+                            (
+                                "account import legacy-data",
+                                "Import KDX keydata file or sahyadrinet web wallet data on the same domain",
+                            ),
                             (
                                 "account import mnemonic bip32",
                                 "Import Bip32 (12 or 24 word mnemonics used by sahyadriwallet, kaspium, onekey, tangem etc.)",

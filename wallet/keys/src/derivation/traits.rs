@@ -20,10 +20,7 @@ pub trait WalletDerivationManagerTrait: Send + Sync {
     where
         Self: Sized;
 
-    fn from_extended_public_key(
-        extended_public_key: ExtendedPublicKey<DilithiumPkHash>,
-        cosigner_index: Option<u32>,
-    ) -> Result<Self>
+    fn from_extended_public_key(extended_public_key: ExtendedPublicKey<DilithiumPkHash>, cosigner_index: Option<u32>) -> Result<Self>
     where
         Self: Sized;
 

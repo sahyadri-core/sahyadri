@@ -1,11 +1,11 @@
 use crate::core::hub::HubEvent;
 use crate::pb::RejectMessage;
 use crate::pb::{SahyadridMessage, sahyadrid_message::Payload as SahyadridMessagePayload};
-use crate::{SahyadridMessagePayloadType, common::ProtocolError};
 use crate::{Peer, make_message};
+use crate::{SahyadridMessagePayloadType, common::ProtocolError};
+use parking_lot::{Mutex, RwLock};
 use sahyadri_core::{debug, error, info, trace, warn};
 use sahyadri_utils::networking::PeerId;
-use parking_lot::{Mutex, RwLock};
 use seqlock::SeqLock;
 use std::fmt::{Debug, Display};
 use std::net::SocketAddr;
@@ -83,7 +83,9 @@ impl From<SahyadridMessagePayloadType> for IncomingRouteOverflowPolicy {
     fn from(msg_type: SahyadridMessagePayloadType) -> Self {
         match msg_type {
             // Inv messages are unique in the sense that no harm is done if some of them are dropped
-            SahyadridMessagePayloadType::InvTransactions | SahyadridMessagePayloadType::InvRelayBlock => IncomingRouteOverflowPolicy::Drop,
+            SahyadridMessagePayloadType::InvTransactions | SahyadridMessagePayloadType::InvRelayBlock => {
+                IncomingRouteOverflowPolicy::Drop
+            }
             _ => IncomingRouteOverflowPolicy::Disconnect,
         }
     }
@@ -414,7 +416,8 @@ impl Router {
         if err.can_send_outgoing_message() {
             // Send an explicit reject message for easier tracing of logical bugs causing protocol errors.
             // No need to handle errors since we are closing anyway
-            let _ = self.enqueue(make_message!(SahyadridMessagePayload::Reject, RejectMessage { reason: err.to_reject_message() })).await;
+            let _ =
+                self.enqueue(make_message!(SahyadridMessagePayload::Reject, RejectMessage { reason: err.to_reject_message() })).await;
         }
     }
 

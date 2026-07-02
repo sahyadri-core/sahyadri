@@ -1,7 +1,7 @@
 use crate::errors::BlockProcessResult;
+use parking_lot::{Condvar, Mutex};
 use sahyadri_consensus_core::{block::Block, blockstatus::BlockStatus};
 use sahyadri_hashes::Hash;
-use parking_lot::{Condvar, Mutex};
 use std::collections::{
     HashMap, VecDeque,
     hash_map::Entry::{Occupied, Vacant},

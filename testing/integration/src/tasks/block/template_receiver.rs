@@ -3,13 +3,13 @@ use crate::{
     tasks::{Stopper, Task},
 };
 use async_trait::async_trait;
+use parking_lot::Mutex;
 use sahyadri_addresses::Address;
 use sahyadri_core::warn;
 use sahyadri_grpc_client::GrpcClient;
 use sahyadri_notify::{listener::ListenerId, scope::NewBlockTemplateScope};
 use sahyadri_rpc_core::{GetBlockTemplateResponse, Notification, api::rpc::RpcApi};
 use sahyadri_utils::{channel::Channel, triggers::SingleTrigger};
-use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 

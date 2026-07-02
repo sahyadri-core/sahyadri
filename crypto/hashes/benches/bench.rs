@@ -1,6 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use sahyadri_hashes::*;
 use rand::{Rng, RngCore, thread_rng};
+use sahyadri_hashes::*;
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{CShake256, CShake256Core};
 use std::any::type_name;

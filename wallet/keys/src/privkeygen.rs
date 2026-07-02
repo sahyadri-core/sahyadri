@@ -46,12 +46,12 @@ impl PrivateKeyGenerator {
     #[wasm_bindgen(js_name=receiveKey)]
     pub fn receive_key(&self, index: u32) -> Result<PrivateKey> {
         let xkey = self.receive.derive_child(ChildNumber::new(index, false)?)?;
-       Ok(PrivateKey { inner: xkey.private_key().0 })
+        Ok(PrivateKey { inner: xkey.private_key().0 })
     }
 
     #[wasm_bindgen(js_name=changeKey)]
     pub fn change_key(&self, index: u32) -> Result<PrivateKey> {
         let xkey = self.change.derive_child(ChildNumber::new(index, false)?)?;
-       Ok(PrivateKey { inner: xkey.private_key().0 })
+        Ok(PrivateKey { inner: xkey.private_key().0 })
     }
 }

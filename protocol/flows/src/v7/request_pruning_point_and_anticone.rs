@@ -4,6 +4,7 @@
 //!
 
 use itertools::Itertools;
+use log::debug;
 use sahyadri_p2p_lib::{
     IncomingRoute, Router,
     common::ProtocolError,
@@ -14,7 +15,6 @@ use sahyadri_p2p_lib::{
         sahyadrid_message::Payload,
     },
 };
-use log::debug;
 use std::sync::Arc;
 
 use crate::{flow_context::FlowContext, flow_trait::Flow, ibd::IBD_BATCH_SIZE};

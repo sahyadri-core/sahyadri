@@ -46,7 +46,7 @@ pub(crate) trait Pool {
                 full_script.push(script.len() as u8);
                 full_script.extend_from_slice(script);
                 let address = faster_hex::hex_string(&full_script);
-                
+
                 if address == target_address {
                     count += 1;
                 }

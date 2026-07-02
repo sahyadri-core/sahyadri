@@ -212,6 +212,7 @@ mod tests {
 
     use super::ParentsManager;
     use itertools::Itertools;
+    use parking_lot::RwLock;
     use sahyadri_consensus_core::{
         BlockHashSet, HashMapCustomHasher,
         blockhash::{BlockHashes, ORIGIN},
@@ -219,7 +220,6 @@ mod tests {
     };
     use sahyadri_database::prelude::{ReadLock, StoreError, StoreResult};
     use sahyadri_hashes::Hash;
-    use parking_lot::RwLock;
 
     struct HeaderStoreMock {
         map: RwLock<BlockHashMap<HeaderWithBlockLevel>>,

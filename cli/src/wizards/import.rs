@@ -34,7 +34,11 @@ pub async fn prompt_for_mnemonic(term: &Arc<Terminal>) -> Result<Vec<String>> {
     if words.len() > 24 { Err("Mnemonic must be 12 or 24 words".into()) } else { Ok(words) }
 }
 
-pub(crate) async fn import_with_mnemonic(ctx: &Arc<SahyadriCli>, account_kind: AccountKind, additional_xpubs: &[String]) -> Result<()> {
+pub(crate) async fn import_with_mnemonic(
+    ctx: &Arc<SahyadriCli>,
+    account_kind: AccountKind,
+    additional_xpubs: &[String],
+) -> Result<()> {
     let wallet = ctx.wallet();
 
     if !wallet.is_open() {

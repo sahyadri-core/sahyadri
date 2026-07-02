@@ -5,7 +5,7 @@
 use crate::account::Inner;
 use crate::imports::*;
 use sahyadri_addresses::Version;
-use sahyadri_wallet_keys::prelude::{PublicKey, PrivateKey};
+use sahyadri_wallet_keys::prelude::{PrivateKey, PublicKey};
 
 pub const RESIDENT_ACCOUNT_KIND: &str = "sahyadri-resident-standard";
 
@@ -55,13 +55,13 @@ impl Account for Resident {
     }
 
     fn receive_address(&self) -> Result<Address> {
-    use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let hash = Sha256::digest(&self.public_key.bytes);
         Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }
 
     fn change_address(&self) -> Result<Address> {
-    use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let hash = Sha256::digest(&self.public_key.bytes);
         Ok(Address::new(self.inner().wallet.network_id()?.into(), Version::PubKey, &hash[..20]))
     }

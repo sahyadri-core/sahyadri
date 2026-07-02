@@ -5,7 +5,6 @@ use crate::converter::feerate_estimate::{FeeEstimateConverter, FeeEstimateVerbos
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
 use async_trait::async_trait;
 use faster_hex::hex_decode;
-use sahyadri_mining::mempool::tx::{Priority, Orphan, RbfPolicy};
 use sahyadri_consensus_core::api::counters::ProcessingCounters;
 use sahyadri_consensus_core::daa_score_timestamp::DaaScoreTimestamp;
 use sahyadri_consensus_core::errors::block::RuleError;
@@ -40,8 +39,9 @@ use sahyadri_index_core::{
     notifier::IndexNotifier,
 };
 use sahyadri_mining::feerate::FeeEstimateVerbose;
-use sahyadri_mining::model::tx_query::TransactionQuery;
 use sahyadri_mining::manager::MiningManagerProxy;
+use sahyadri_mining::mempool::tx::{Orphan, Priority, RbfPolicy};
+use sahyadri_mining::model::tx_query::TransactionQuery;
 use sahyadri_notify::listener::ListenerLifespan;
 use sahyadri_notify::subscription::context::SubscriptionContext;
 use sahyadri_notify::subscription::{MutationPolicies, UtxosChangedMutationPolicy};
@@ -276,7 +276,7 @@ impl RpcCoreService {
             .await
             .unwrap_or_default()
     }
-    
+
     async fn submit_account_transaction_call(
         &self,
         request: SubmitAccountTransactionRequest,
@@ -284,7 +284,7 @@ impl RpcCoreService {
         // 1. Hex Decoding
         let mut sender_bytes = vec![0u8; request.sender.len() / 2];
         hex_decode(request.sender.as_bytes(), &mut sender_bytes).map_err(|_| RpcError::General("Invalid sender hex".into()))?;
-        
+
         let mut receiver_bytes = vec![0u8; request.receiver.len() / 2];
         hex_decode(request.receiver.as_bytes(), &mut receiver_bytes).map_err(|_| RpcError::General("Invalid receiver hex".into()))?;
 
@@ -297,7 +297,7 @@ impl RpcCoreService {
             vec![],
             vec![sahyadri_consensus_core::tx::TransactionOutput::new(
                 request.amount,
-                sahyadri_consensus_core::tx::ScriptPublicKey::new(0, receiver_bytes.into())
+                sahyadri_consensus_core::tx::ScriptPublicKey::new(0, receiver_bytes.into()),
             )],
             0,
             sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([0; 20]),
@@ -309,22 +309,15 @@ impl RpcCoreService {
 
         // 3. Mining Manager Submission (FIXED: Using .clone() and direct enum imports)
         let session = self.consensus_manager.consensus().session().await;
-        
-        match self.mining_manager.clone().validate_and_insert_transaction(
-            &session, 
-            tx, 
-            Priority::High, 
-            Orphan::Forbidden, 
-            RbfPolicy::Forbidden
-        ).await {
-            Ok(_) => Ok(SubmitAccountTransactionResponse { 
-                transaction_id: tx_id.to_string(), 
-                error: None 
-            }),
-            Err(e) => Ok(SubmitAccountTransactionResponse { 
-                transaction_id: tx_id.to_string(), 
-                error: Some(e.to_string()) 
-            }),
+
+        match self
+            .mining_manager
+            .clone()
+            .validate_and_insert_transaction(&session, tx, Priority::High, Orphan::Forbidden, RbfPolicy::Forbidden)
+            .await
+        {
+            Ok(_) => Ok(SubmitAccountTransactionResponse { transaction_id: tx_id.to_string(), error: None }),
+            Err(e) => Ok(SubmitAccountTransactionResponse { transaction_id: tx_id.to_string(), error: Some(e.to_string()) }),
         }
     }
 
@@ -359,7 +352,7 @@ impl RpcApi for RpcCoreService {
         let _is_synced = self.mining_rule_engine.should_mine(sink_daa_score_timestamp);
 
         // if !self.config.enable_unsynced_mining && !is_synced {
-            // error = "Block not submitted - node is not synced"
+        // error = "Block not submitted - node is not synced"
         //  return Ok(SubmitBlockResponse { report: SubmitBlockReport::Reject(SubmitBlockRejectReason::IsInIBD) });
         // }
 
@@ -438,7 +431,9 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         let block_template = self.mining_manager.clone().get_block_template(&session, miner_data).await?;
 
         // Check coinbase tx payload length
-        if !block_template.block.transactions.is_empty() && block_template.block.transactions[COINBASE_TRANSACTION_INDEX].payload.len() > self.config.max_coinbase_payload_len {
+        if !block_template.block.transactions.is_empty()
+            && block_template.block.transactions[COINBASE_TRANSACTION_INDEX].payload.len() > self.config.max_coinbase_payload_len
+        {
             return Err(RpcError::CoinbasePayloadLengthAboveMax(self.config.max_coinbase_payload_len));
         }
 
@@ -543,9 +538,9 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             p2p_id: self.flow_context.node_id.to_string(),
             mempool_size: self.mining_manager.transaction_count_sample(TransactionQuery::TransactionsOnly),
             server_version: version().to_string(),
-            is_utxo_indexed: true, 
-            is_synced: true,       
-            
+            is_utxo_indexed: true,
+            is_synced: true,
+
             has_notify_command: true,
             has_message_id: true,
         })
@@ -606,10 +601,13 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         Ok(GetMempoolEntriesByAddressesResponse::new(mempool_entries))
     }
 
-    async fn submit_account_transaction(&self, request: SubmitAccountTransactionRequest) -> RpcResult<SubmitAccountTransactionResponse> {
+    async fn submit_account_transaction(
+        &self,
+        request: SubmitAccountTransactionRequest,
+    ) -> RpcResult<SubmitAccountTransactionResponse> {
         self.submit_account_transaction_call(request).await
     }
-    
+
     async fn submit_account_transaction_call(
         &self,
         _connection: Option<&DynRpcConnection>,
@@ -644,7 +642,6 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         })?;
         Ok(SubmitTransactionResponse::new(transaction_id))
     }
-
 
     async fn submit_transaction_replacement_call(
         &self,
@@ -758,7 +755,6 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: GetUtxosByAddressesRequest,
     ) -> RpcResult<GetUtxosByAddressesResponse> {
-        
         let session = self.consensus_manager.consensus().unguarded_session();
         let mut entries = vec![];
 
@@ -767,24 +763,13 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
 
             if balance > 0 {
                 let script_public_key = sahyadri_txscript::pay_to_address_script(&address);
-                
-                let outpoint = sahyadri_rpc_core::RpcTransactionOutpoint {
-                    transaction_id: Default::default(), 
-                    index: 0,
-                };
-                
-                let utxo_entry = sahyadri_rpc_core::RpcUtxoEntry {
-                    amount: balance, 
-                    script_public_key,
-                    block_daa_score: 0,
-                    is_coinbase: false,
-                };
-                
-                entries.push(sahyadri_rpc_core::RpcUtxosByAddressesEntry {
-                    address: Some(address.clone()),
-                    outpoint,
-                    utxo_entry,
-                });
+
+                let outpoint = sahyadri_rpc_core::RpcTransactionOutpoint { transaction_id: Default::default(), index: 0 };
+
+                let utxo_entry =
+                    sahyadri_rpc_core::RpcUtxoEntry { amount: balance, script_public_key, block_daa_score: 0, is_coinbase: false };
+
+                entries.push(sahyadri_rpc_core::RpcUtxosByAddressesEntry { address: Some(address.clone()), outpoint, utxo_entry });
             }
         }
 
@@ -1452,4 +1437,3 @@ impl AsyncService for RpcCoreService {
         })
     }
 }
-

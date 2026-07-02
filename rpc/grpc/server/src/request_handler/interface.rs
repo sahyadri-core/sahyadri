@@ -37,7 +37,9 @@ impl Interface {
                 match sahyadrid_request.payload {
                     Some(ref request) => Ok(SahyadridResponse {
                         id: sahyadrid_request.id,
-                        payload: Some(SahyadridPayloadOps::from(request).to_error_response(GrpcServerError::MethodNotImplemented.into())),
+                        payload: Some(
+                            SahyadridPayloadOps::from(request).to_error_response(GrpcServerError::MethodNotImplemented.into()),
+                        ),
                     }),
                     None => Err(GrpcServerError::InvalidRequestPayload),
                 }

@@ -1,12 +1,12 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use itertools::Itertools;
+use rand::{Rng, thread_rng};
 use sahyadri_consensus_core::{
     subnets::SUBNETWORK_ID_NATIVE,
     tx::{Transaction, TransactionInput, TransactionOutpoint},
 };
 use sahyadri_hashes::{HasherBase, TransactionID};
 use sahyadri_mining::{FeerateTransactionKey, Frontier, Policy, model::topological_index::TopologicalIndex};
-use rand::{Rng, thread_rng};
 use std::{
     collections::{HashMap, HashSet, hash_set::Iter},
     sync::Arc,

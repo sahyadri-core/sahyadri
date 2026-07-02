@@ -1,5 +1,6 @@
 use std::{cmp::max, sync::Arc};
 
+use log::debug;
 use sahyadri_consensus_core::api::ConsensusApi;
 use sahyadri_hashes::Hash;
 use sahyadri_p2p_lib::{
@@ -9,7 +10,6 @@ use sahyadri_p2p_lib::{
     dequeue, dequeue_with_request_id, make_response,
     pb::{self, BlockHeadersMessage, DoneHeadersMessage, sahyadrid_message::Payload},
 };
-use log::debug;
 
 use crate::{flow_context::FlowContext, flow_trait::Flow};
 

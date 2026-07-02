@@ -561,7 +561,7 @@ pub const MAINNET_PARAMS: Params = Params {
     // The network was down for three days shortly after launch
     // Three days in seconds = 3 * 24 * 60 * 60 = 259200
     deflationary_phase_daa_score: 126_144_000,
-    pre_deflationary_phase_base_subsidy: 8_318_123,  // 0.08318123 CSM per block
+    pre_deflationary_phase_base_subsidy: 8_318_123, // 0.08318123 CSM per block
     skip_proof_of_work: false,
     max_block_level: 225,
     pruning_proof_m: 1000,
@@ -616,7 +616,7 @@ pub const TESTNET_PARAMS: Params = Params {
     // The network was down for three days shortly after launch
     // Three days in seconds = 3 * 24 * 60 * 60 = 259200
     deflationary_phase_daa_score: 126_144_000,
-    pre_deflationary_phase_base_subsidy: 8_318_123,  // 0.08318123 CSM per block
+    pre_deflationary_phase_base_subsidy: 8_318_123, // 0.08318123 CSM per block
     skip_proof_of_work: false,
     max_block_level: 250,
     pruning_proof_m: 1000,

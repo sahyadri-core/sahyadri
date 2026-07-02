@@ -171,14 +171,20 @@ async fn daemon_utxos_propagation_test() {
 
     // Mining key and address
     let miner_kp = sahyadri_dilithium::generate_keypair().expect("generate miner keypair");
-    let miner_address =
-        Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(miner_kp.public_key())[0..20]);
+    let miner_address = Address::new(
+        sahyadrid1.network.into(),
+        sahyadri_addresses::Version::PubKeyDilithium,
+        &sha2::Sha256::digest(miner_kp.public_key())[0..20],
+    );
     let miner_spk = pay_to_address_script(&miner_address);
 
     // User key and address
     let user_kp = sahyadri_dilithium::generate_keypair().expect("generate user keypair");
-    let user_address =
-        Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(user_kp.public_key())[0..20]);
+    let user_address = Address::new(
+        sahyadrid1.network.into(),
+        sahyadri_addresses::Version::PubKeyDilithium,
+        &sha2::Sha256::digest(user_kp.public_key())[0..20],
+    );
 
     // Some dummy non-monitored address
     let blank_address = Address::new(sahyadrid1.network.into(), sahyadri_addresses::Version::PubKeyDilithium, &[0; 20]);
@@ -353,7 +359,9 @@ async fn daemon_utxos_propagation_test() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn daemon_cleaning_test() {
     init_allocator_with_default_settings();
-    sahyadri_core::log::try_init_logger("info,sahyadri_grpc_core=trace,sahyadri_grpc_server=trace,sahyadri_grpc_client=trace,sahyadri_core=trace");
+    sahyadri_core::log::try_init_logger(
+        "info,sahyadri_grpc_core=trace,sahyadri_grpc_server=trace,sahyadri_grpc_client=trace,sahyadri_core=trace",
+    );
     let args = Args { devnet: true, ..Default::default() };
     let consensus_manager;
     let async_runtime;

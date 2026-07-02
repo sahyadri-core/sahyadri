@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rocksdb::WriteBatch;
 use sahyadri_database::prelude::CachePolicy;
 use sahyadri_database::prelude::DB;
 use sahyadri_database::prelude::StoreResult;
@@ -7,7 +8,6 @@ use sahyadri_database::prelude::StoreResultExt;
 use sahyadri_database::prelude::{BatchDbWriter, CachedDbItem};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
-use rocksdb::WriteBatch;
 
 use super::utxo_set::DbUtxoSetStore;
 

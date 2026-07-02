@@ -440,7 +440,11 @@ impl IbdFlow {
         // (including the PP itself), alongside indexing denoting the respective metadata headers or sahyadri_consensus data
         let msg = dequeue_with_timeout!(self.incoming_route, Payload::TrustedData)?;
         let pkg: TrustedDataPackage = Versioned(self.header_format, msg).try_into()?;
-        debug!("received trusted data with {} daa entries and {} sahyadri_consensus entries", pkg.daa_window.len(), pkg.sahyadri_consensus_window.len());
+        debug!(
+            "received trusted data with {} daa entries and {} sahyadri_consensus entries",
+            pkg.daa_window.len(),
+            pkg.sahyadri_consensus_window.len()
+        );
 
         let mut entry_stream = TrustedEntryStream::new(&self.router, &mut self.incoming_route, self.header_format);
         // The first entry of the trusted data is the pruning point itself.
@@ -734,7 +738,10 @@ staging selected tip ({}) is too small or negative. Aborting IBD...",
                 // a trusted task is sent, however the header is already verified, and hence only the block body will be verified.
                 jobs.push(
                     consensus
-                        .validate_and_insert_trusted_block(TrustedBlock::new(block, consensus.async_get_sahyadri_consensus_data(hash).await?))
+                        .validate_and_insert_trusted_block(TrustedBlock::new(
+                            block,
+                            consensus.async_get_sahyadri_consensus_data(hash).await?,
+                        ))
                         .virtual_state_task,
                 );
             }
@@ -772,7 +779,10 @@ staging selected tip ({}) is too small or negative. Aborting IBD...",
                 // a trusted task is sent, however the header is already verified, and hence only the block body will be verified.
                 jobs.push(
                     consensus
-                        .validate_and_insert_trusted_block(TrustedBlock::new(block, consensus.async_get_sahyadri_consensus_data(hash).await?))
+                        .validate_and_insert_trusted_block(TrustedBlock::new(
+                            block,
+                            consensus.async_get_sahyadri_consensus_data(hash).await?,
+                        ))
                         .virtual_state_task,
                 );
             }

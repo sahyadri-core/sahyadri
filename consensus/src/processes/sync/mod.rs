@@ -1,17 +1,17 @@
 use std::{cmp::min, ops::Deref, sync::Arc};
 
 use itertools::Itertools;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::errors::sync::{SyncManagerError, SyncManagerResult};
 use sahyadri_database::prelude::StoreResultExt;
 use sahyadri_hashes::Hash;
 use sahyadri_math::uint::malachite_base::num::arithmetic::traits::CeilingLogBase2;
-use parking_lot::RwLock;
 
 use crate::model::{
     services::reachability::{MTReachabilityService, ReachabilityService},
     stores::{
-        sahyadri_consensus::SahyadriConsensusStoreReader, headers_selected_tip::HeadersSelectedTipStoreReader, pruning::PruningStoreReader,
-        reachability::ReachabilityStoreReader, relations::RelationsStoreReader, selected_chain::SelectedChainStoreReader,
+        headers_selected_tip::HeadersSelectedTipStoreReader, pruning::PruningStoreReader, reachability::ReachabilityStoreReader,
+        relations::RelationsStoreReader, sahyadri_consensus::SahyadriConsensusStoreReader, selected_chain::SelectedChainStoreReader,
         statuses::StatusesStoreReader,
     },
 };

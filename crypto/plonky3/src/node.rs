@@ -44,8 +44,7 @@ impl ZkpBlockData {
 
     /// Deserialize from block header.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ZKPError> {
-        bincode::deserialize(bytes)
-            .map_err(|e| ZKPError::ProofDeserializationFailed(e.to_string()))
+        bincode::deserialize(bytes).map_err(|e| ZKPError::ProofDeserializationFailed(e.to_string()))
     }
 
     /// Size in bytes when serialized.
@@ -137,12 +136,7 @@ pub fn validate_block_proof(zkp_data: &ZkpBlockData) -> Result<ZkpValidationResu
     // Estimated time for individual Dilithium3 verification: ~3ms per sig
     let estimated_time_saved_ms = zkp_data.batch_size as u64 * 3;
 
-    Ok(ZkpValidationResult {
-        is_valid: valid,
-        batch_size: zkp_data.batch_size,
-        verify_time_ms: verify_ms,
-        estimated_time_saved_ms,
-    })
+    Ok(ZkpValidationResult { is_valid: valid, batch_size: zkp_data.batch_size, verify_time_ms: verify_ms, estimated_time_saved_ms })
 }
 
 /// Estimate block header overhead for ZKP data.

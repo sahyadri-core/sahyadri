@@ -1,6 +1,6 @@
-use sahyadri_hashes::{BlockHash, HasherBase};
 use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
+use sahyadri_hashes::{BlockHash, HasherBase};
 
 /// Maximum target value (2^224 - 1)
 /// This is 28 bytes = 56 hex characters = 224 bits = 2^224 - 1
@@ -188,7 +188,9 @@ pub fn diff_to_hash(diff: f64) -> f64 {
 /// This creates the pre-PoW hash (hash WITHOUT timestamp and nonce)
 /// Uses sahyadri_hashes::BlockHash to match the working stratum implementation
 /// Returns the Hash type directly (not bytes) to match working stratum code
-pub fn serialize_block_header(block: &sahyadri_consensus_core::block::Block) -> Result<sahyadri_hashes::Hash, Box<dyn std::error::Error>> {
+pub fn serialize_block_header(
+    block: &sahyadri_consensus_core::block::Block,
+) -> Result<sahyadri_hashes::Hash, Box<dyn std::error::Error>> {
     let header = &block.header;
     let mut hasher = BlockHash::new();
 

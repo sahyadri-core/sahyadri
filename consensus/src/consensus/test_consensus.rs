@@ -1,4 +1,5 @@
 use async_channel::Sender;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::coinbase::MinerData;
 use sahyadri_consensus_core::mining_rules::MiningRules;
 use sahyadri_consensus_core::tx::ScriptPublicKey;
@@ -12,7 +13,6 @@ use sahyadri_core::{core::Core, service::Service};
 use sahyadri_database::utils::DbLifetime;
 use sahyadri_hashes::Hash;
 use sahyadri_notify::subscription::context::SubscriptionContext;
-use parking_lot::RwLock;
 
 use super::Consensus;
 use super::services::{DbDagTraversalManager, DbSahyadriConsensusManager, DbWindowManager};
@@ -25,7 +25,8 @@ use crate::{
     model::{
         services::reachability::MTReachabilityService,
         stores::{
-            DB, sahyadri_consensus::DbSahyadriConsensusStore, headers::HeaderStoreReader, reachability::DbReachabilityStore, virtual_state::VirtualStores,
+            DB, headers::HeaderStoreReader, reachability::DbReachabilityStore, sahyadri_consensus::DbSahyadriConsensusStore,
+            virtual_state::VirtualStores,
         },
     },
     params::Params,

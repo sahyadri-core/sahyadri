@@ -1,3 +1,4 @@
+use rand::{Rng, rngs::SmallRng, seq::SliceRandom};
 use sahyadri_consensus_core::{
     block::Block,
     header::Header,
@@ -6,7 +7,6 @@ use sahyadri_consensus_core::{
     utxo::utxo_collection::UtxoCollection,
 };
 use sahyadri_hashes::{HASH_SIZE, Hash};
-use rand::{Rng, rngs::SmallRng, seq::SliceRandom};
 
 pub fn header_from_precomputed_hash(hash: Hash, parents: Vec<Hash>) -> Header {
     Header::from_precomputed_hash(hash, parents)

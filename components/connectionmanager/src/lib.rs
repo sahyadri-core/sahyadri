@@ -9,12 +9,12 @@ use std::{
 use duration_string::DurationString;
 use futures_util::future::{join_all, try_join_all};
 use itertools::Itertools;
+use parking_lot::Mutex as ParkingLotMutex;
+use rand::{seq::SliceRandom, thread_rng};
 use sahyadri_addressmanager::{AddressManager, NetAddress};
 use sahyadri_core::{debug, info, warn};
 use sahyadri_p2p_lib::{ConnectionError, Peer, common::ProtocolError};
 use sahyadri_utils::triggers::SingleTrigger;
-use parking_lot::Mutex as ParkingLotMutex;
-use rand::{seq::SliceRandom, thread_rng};
 use tokio::{
     select,
     sync::{

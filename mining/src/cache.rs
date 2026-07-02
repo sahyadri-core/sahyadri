@@ -1,6 +1,6 @@
+use parking_lot::{Mutex, MutexGuard};
 use sahyadri_consensus_core::block::{BlockTemplate, VirtualStateApproxId};
 use sahyadri_core::time::unix_now;
-use parking_lot::{Mutex, MutexGuard};
 use std::sync::Arc;
 
 /// CACHE_LIFETIME indicates the default duration in milliseconds after which the cached data expires.

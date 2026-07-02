@@ -32,7 +32,7 @@ use sahyadri_notify::{
     scope::{Scope, VirtualDaaScoreChangedScope},
 };
 use sahyadri_wallet_keys::xpub::NetworkTaggedXpub;
-use sahyadri_wrpc_client::{SahyadriRpcClient, Resolver, WrpcEncoding};
+use sahyadri_wrpc_client::{Resolver, SahyadriRpcClient, WrpcEncoding};
 use workflow_core::task::spawn;
 
 pub type WalletGuard<'l> = AsyncMutexGuard<'l, ()>;
@@ -145,15 +145,20 @@ impl Wallet {
 
     pub fn payment_secret(&self) -> Option<Secret> {
         self.inner.payment_secret.lock().unwrap().clone()
-    }    
+    }
 
     pub fn try_new(storage: Arc<dyn Interface>, resolver: Option<Resolver>, network_id: Option<NetworkId>) -> Result<Wallet> {
         Wallet::try_with_wrpc(storage, resolver, network_id)
     }
 
     pub fn try_with_wrpc(store: Arc<dyn Interface>, resolver: Option<Resolver>, network_id: Option<NetworkId>) -> Result<Wallet> {
-        let rpc_client =
-            Arc::new(SahyadriRpcClient::new_with_args(WrpcEncoding::Borsh, Some("wrpc://127.0.0.1:17110"), resolver, network_id, None)?);
+        let rpc_client = Arc::new(SahyadriRpcClient::new_with_args(
+            WrpcEncoding::Borsh,
+            Some("wrpc://127.0.0.1:17110"),
+            resolver,
+            network_id,
+            None,
+        )?);
 
         let rpc_ctl = rpc_client.ctl().clone();
         let rpc_api: Arc<DynRpcApi> = rpc_client;
@@ -424,14 +429,13 @@ impl Wallet {
         args: WalletOpenArgs,
         _guard: &WalletGuard<'_>,
     ) -> Result<Vec<AccountDescriptor>> {
-        
         // Memory mein save karo duplicate key (Clone)
         *self.inner.wallet_secret.lock().unwrap() = Some(wallet_secret.clone());
 
         match self.open_impl(wallet_secret, filename, args).await {
             // Agar Option<Vec> milta hai, toh use extract karo
             Ok(Some(account_descriptors)) => Ok(account_descriptors),
-            Ok(None) => Ok(vec![]), 
+            Ok(None) => Ok(vec![]),
             Err(err) => {
                 self.notify(Events::WalletError { message: err.to_string() }).await?;
                 Err(err)
@@ -1064,7 +1068,7 @@ impl Wallet {
     }
 
     pub fn is_synced(&self) -> bool {
-    true
+        true
     }
 
     pub fn is_connected(&self) -> bool {

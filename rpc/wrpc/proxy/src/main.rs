@@ -2,15 +2,15 @@ mod error;
 mod result;
 
 use clap::Parser;
+use result::Result;
 use sahyadri_consensus_core::network::NetworkType;
 use sahyadri_rpc_core::api::ops::RpcApiOps;
 use sahyadri_wrpc_server::{
     connection::Connection,
     router::Router,
     server::Server,
-    service::{SahyadriRpcHandler, Options},
+    service::{Options, SahyadriRpcHandler},
 };
-use result::Result;
 use std::sync::Arc;
 use workflow_log::*;
 use workflow_rpc::server::WebSocketCounters;

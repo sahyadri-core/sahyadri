@@ -1,9 +1,9 @@
 use crate::processes::sahyadri_consensus::ordering::SortableBlock;
+use rocksdb::WriteBatch;
 use sahyadri_database::prelude::DB;
 use sahyadri_database::prelude::StoreResult;
 use sahyadri_database::prelude::{BatchDbWriter, CachedDbItem, DirectDbWriter};
 use sahyadri_database::registry::DatabaseStorePrefixes;
-use rocksdb::WriteBatch;
 use std::sync::Arc;
 
 /// Reader API for `SelectedTipStore`.

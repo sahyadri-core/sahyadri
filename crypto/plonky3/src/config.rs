@@ -5,11 +5,11 @@
 //! enabling Z_q multiplication as a single STARK constraint.
 
 use p3_challenger::DuplexChallenger;
-use p3_field::PrimeCharacteristicRing;
 use p3_commit::ExtensionMmcs;
 use p3_dft::Radix2DitParallel;
 use p3_field::extension::BinomialExtensionField;
 use p3_field::Field;
+use p3_field::PrimeCharacteristicRing;
 use p3_fri::TwoAdicFriPcs;
 use p3_goldilocks::{Goldilocks, Poseidon2Goldilocks};
 use p3_merkle_tree::MerkleTreeMmcs;
@@ -106,14 +106,8 @@ pub fn build_stark_config() -> DilithiumStarkConfig {
 /// Derive 3 public challenge field elements from the 32-byte commitment root.
 /// Returns (challenge, alpha, beta) used by the AIR for Fiat-Shamir binding.
 pub fn derive_public_challenges(commitment_root: &[u8; 32]) -> (F, F, F) {
-    let challenge = F::from_u64(u64::from_le_bytes(
-        commitment_root[0..8].try_into().unwrap(),
-    ));
-    let alpha = F::from_u64(u64::from_le_bytes(
-        commitment_root[8..16].try_into().unwrap(),
-    ));
-    let beta = F::from_u64(u64::from_le_bytes(
-        commitment_root[16..24].try_into().unwrap(),
-    ));
+    let challenge = F::from_u64(u64::from_le_bytes(commitment_root[0..8].try_into().unwrap()));
+    let alpha = F::from_u64(u64::from_le_bytes(commitment_root[8..16].try_into().unwrap()));
+    let beta = F::from_u64(u64::from_le_bytes(commitment_root[16..24].try_into().unwrap()));
     (challenge, alpha, beta)
 }

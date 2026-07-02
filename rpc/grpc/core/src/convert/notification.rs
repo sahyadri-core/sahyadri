@@ -1,5 +1,6 @@
 use crate::protowire::{
-    BlockAddedNotificationMessage, SahyadridResponse, NewBlockTemplateNotificationMessage, RpcNotifyCommand, sahyadrid_response::Payload,
+    BlockAddedNotificationMessage, NewBlockTemplateNotificationMessage, RpcNotifyCommand, SahyadridResponse,
+    sahyadrid_response::Payload,
 };
 use crate::protowire::{
     FinalityConflictNotificationMessage, FinalityConflictResolvedNotificationMessage, NotifyPruningPointUtxoSetOverrideRequestMessage,

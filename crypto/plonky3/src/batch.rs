@@ -3,8 +3,8 @@
 //! Collects (message, signature, pubkey) tuples, verifies each with dilithium-rs,
 //! computes Merkle commitment root, prepares data for STARK proof.
 
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::MAX_BATCH_SIZE;
@@ -94,8 +94,12 @@ pub fn hash_attestation(att: &DilithiumAttestation) -> [u8; 32] {
 
 /// Binary Merkle root from 32-byte leaves (SHA-256, odd = duplicate last).
 pub fn compute_merkle_root(leaves: &[[u8; 32]]) -> [u8; 32] {
-    if leaves.is_empty() { return [0u8; 32]; }
-    if leaves.len() == 1 { return leaves[0]; }
+    if leaves.is_empty() {
+        return [0u8; 32];
+    }
+    if leaves.len() == 1 {
+        return leaves[0];
+    }
     let mut cur: Vec<[u8; 32]> = leaves.to_vec();
     while cur.len() > 1 {
         let mut nxt = Vec::with_capacity((cur.len() + 1) / 2);
@@ -118,10 +122,7 @@ impl DilithiumBatch {
         Self {
             attestations: Vec::with_capacity(256),
             commitment_root: None,
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
+            created_at: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         }
     }
 
@@ -137,12 +138,7 @@ impl DilithiumBatch {
     }
 
     /// Add attestation + auto-verify with dilithium.
-    pub fn add_and_verify(
-        &mut self,
-        message: &[u8],
-        signature: &[u8],
-        public_key: &[u8],
-    ) -> Result<(), ZKPError> {
+    pub fn add_and_verify(&mut self, message: &[u8], signature: &[u8], public_key: &[u8]) -> Result<(), ZKPError> {
         const EXPECTED_SIG: usize = 3309;
         const EXPECTED_PK: usize = 1952;
 
@@ -153,13 +149,11 @@ impl DilithiumBatch {
             return Err(ZKPError::PubkeySizeMismatch(public_key.len(), EXPECTED_PK));
         }
 
-
         let idx = self.attestations.len();
-        crate::dilithium_stark::zk_verify::verify_dilithium_native(signature, public_key, message)
-            .map_err(|e| {
-                log::warn!("[ZKP] Dilithium verify failed at {}: {}", idx, e);
-                ZKPError::VerificationFailed { index: idx }
-            })?;
+        crate::dilithium_stark::zk_verify::verify_dilithium_native(signature, public_key, message).map_err(|e| {
+            log::warn!("[ZKP] Dilithium verify failed at {}: {}", idx, e);
+            ZKPError::VerificationFailed { index: idx }
+        })?;
 
         let mut att = DilithiumAttestation {
             message: message.to_vec(),
@@ -174,7 +168,9 @@ impl DilithiumBatch {
     }
 
     pub fn compute_commitment(&mut self) -> [u8; 32] {
-        if self.attestations.is_empty() { return [0u8; 32]; }
+        if self.attestations.is_empty() {
+            return [0u8; 32];
+        }
         let leaves: Vec<[u8; 32]> = self.attestations.iter().map(|a| a.attestation_hash).collect();
         let root = compute_merkle_root(&leaves);
         self.commitment_root = Some(root);
@@ -189,8 +185,16 @@ impl DilithiumBatch {
         self.attestations.iter().map(|a| a.attestation_hash).collect()
     }
 
-    pub fn len(&self) -> usize { self.attestations.len() }
-    pub fn is_empty(&self) -> bool { self.attestations.is_empty() }
+    pub fn len(&self) -> usize {
+        self.attestations.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.attestations.is_empty()
+    }
 }
 
-impl Default for DilithiumBatch { fn default() -> Self { Self::new() } }
+impl Default for DilithiumBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}

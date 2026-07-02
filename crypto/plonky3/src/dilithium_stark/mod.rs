@@ -18,15 +18,15 @@
 //! ## Estimated proof: ~200-400 KB
 //! ## Estimated prove time: ~5-15s
 
-pub mod params;
-pub mod field_zq;
-pub mod ntt_stark;
-pub mod poly_mult_stark;
-pub mod matrix_vec_stark;
-pub mod rejection_stark;
-pub mod fiat_shamir_stark;
-pub mod dilithium_verify_stark;
-pub mod sig_parse;
-pub mod zk_verify;
-pub mod witness;
 pub mod composed_stark;
+pub mod dilithium_verify_stark;
+pub mod fiat_shamir_stark;
+pub mod field_zq;
+pub mod matrix_vec_stark;
+pub mod ntt_stark;
+pub mod params;
+pub mod poly_mult_stark;
+pub mod rejection_stark;
+pub mod sig_parse;
+pub mod witness;
+pub mod zk_verify;

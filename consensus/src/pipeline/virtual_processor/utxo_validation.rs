@@ -2,16 +2,13 @@ use super::VirtualStateProcessor;
 use crate::{
     errors::{
         BlockProcessResult,
-        RuleError::{
-            BadUTXOCommitment, InvalidTransactionsInUtxoContext,
-            WrongHeaderPruningPoint,
-        },
+        RuleError::{BadUTXOCommitment, InvalidTransactionsInUtxoContext, WrongHeaderPruningPoint},
     },
     model::stores::{
         block_transactions::BlockTransactionsStoreReader,
         daa::DaaStoreReader,
-        sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusData},
         headers::HeaderStoreReader,
+        sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusData},
     },
     processes::{
         pruning::PruningPointReply,
@@ -247,19 +244,19 @@ impl VirtualStateProcessor {
         _mergeset_non_daa: &BlockHashSet,
     ) -> BlockProcessResult<()> {
         // SAHYADRI ACCOUNT MODEL BYPASS:
-        // We bypass the traditional UTXO-based coinbase validation 
+        // We bypass the traditional UTXO-based coinbase validation
         // because rewards are handled directly as account balance updates.
         Ok(())
     }
 
     pub(crate) fn validate_transactions_in_parallel<'a, V: UtxoView + Sync>(
         &self,
-        txs: &'a Vec<Transaction>,
+        txs: &'a [Transaction],
         _utxo_view: &V,
         _pov_daa_score: u64,
         _flags: TxValidationFlags,
     ) -> Vec<(ValidatedTransaction<'a>, u32)> {
-        // Sahyadri Account Model Bypass: 
+        // Sahyadri Account Model Bypass:
         // For now, we consider all transactions valid without UTXO context.
         // Future decentralized identity (DID) validation logic will be added here.
         txs.iter()

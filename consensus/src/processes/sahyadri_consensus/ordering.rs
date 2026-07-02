@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::{
     services::reachability::ReachabilityService,
-    stores::{sahyadri_consensus::SahyadriConsensusStoreReader, headers::HeaderStoreReader, relations::RelationsStoreReader},
+    stores::{headers::HeaderStoreReader, relations::RelationsStoreReader, sahyadri_consensus::SahyadriConsensusStoreReader},
 };
 
 use super::protocol::SahyadriConsensusManager;
@@ -41,11 +41,15 @@ impl Ord for SortableBlock {
     }
 }
 
-impl<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilityService, V: HeaderStoreReader> SahyadriConsensusManager<T, S, U, V> {
+impl<T: SahyadriConsensusStoreReader, S: RelationsStoreReader, U: ReachabilityService, V: HeaderStoreReader>
+    SahyadriConsensusManager<T, S, U, V>
+{
     pub fn sort_blocks(&self, blocks: impl IntoIterator<Item = Hash>) -> Vec<Hash> {
         let mut sorted_blocks: Vec<Hash> = blocks.into_iter().collect();
-        sorted_blocks
-            .sort_by_cached_key(|block| SortableBlock { hash: *block, blue_work: self.sahyadri_consensus_store.get_blue_work(*block).unwrap() });
+        sorted_blocks.sort_by_cached_key(|block| SortableBlock {
+            hash: *block,
+            blue_work: self.sahyadri_consensus_store.get_blue_work(*block).unwrap(),
+        });
         sorted_blocks
     }
 }

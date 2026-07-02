@@ -9,9 +9,9 @@ use crate::{
         stores::{
             DB,
             block_transactions::DbBlockTransactionsStore,
-            sahyadri_consensus::DbSahyadriConsensusStore,
             headers::DbHeadersStore,
             reachability::DbReachabilityStore,
+            sahyadri_consensus::DbSahyadriConsensusStore,
             statuses::{DbStatusesStore, StatusesStore, StatusesStoreBatchExtensions, StatusesStoreReader},
             tips::{DbTipsStore, TipsStore},
         },
@@ -23,6 +23,9 @@ use crate::{
     processes::{coinbase::CoinbaseManager, transaction_validator::TransactionValidator},
 };
 use crossbeam_channel::{Receiver, Sender};
+use parking_lot::RwLock;
+use rayon::ThreadPool;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{
     KType,
     block::Block,
@@ -38,9 +41,6 @@ use sahyadri_consensus_notify::{
 use sahyadri_consensusmanager::SessionLock;
 use sahyadri_hashes::Hash;
 use sahyadri_notify::notifier::Notify;
-use parking_lot::RwLock;
-use rayon::ThreadPool;
-use rocksdb::WriteBatch;
 use std::sync::{Arc, atomic::Ordering};
 
 pub struct BlockBodyProcessor {

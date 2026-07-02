@@ -4,13 +4,13 @@ use crate::model::{
     stores::{children::ChildrenStore, relations::RelationsStore},
 };
 use itertools::Itertools;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{
     BlockHashSet,
     blockhash::{BlockHashIteratorExtensions, BlockHashes, ORIGIN},
 };
 use sahyadri_database::prelude::{BatchDbWriter, DbWriter, DirectWriter, StoreError};
 use sahyadri_hashes::Hash;
-use rocksdb::WriteBatch;
 
 /// Initializes this relations store with an `origin` root
 pub fn init<S: RelationsStore + ChildrenStore + ?Sized>(relations: &mut S) {

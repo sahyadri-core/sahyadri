@@ -58,9 +58,9 @@ pub fn register_handlers(cli: &Arc<SahyadriCli>) -> Result<()> {
         cli,
         cli.handlers(),
         [
-            account, address, close, compound, connect, details, disconnect, estimate, exit, export, guide, help, history, rpc, list, miner,
-            message, monitor, mute, network, node, open, ping, pskb, reload, select, send, server, settings, sweep, track, transfer,
-            wallet,
+            account, address, close, compound, connect, details, disconnect, estimate, exit, export, guide, help, history, rpc, list,
+            miner, message, monitor, mute, network, node, open, ping, pskb, reload, select, send, server, settings, sweep, track,
+            transfer, wallet,
             // halt,
             // theme,  start, stop
         ]

@@ -1,5 +1,5 @@
 use crate::{
-    IncomingRoute, SahyadridMessagePayloadType, Router,
+    IncomingRoute, Router, SahyadridMessagePayloadType,
     common::ProtocolError,
     core::adaptor::ConnectionInitializer,
     handshake::SahyadridHandshake,

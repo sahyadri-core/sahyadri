@@ -1,8 +1,8 @@
-use sha2::{Sha256, Digest};
-use sahyadri_dilithium::generate_keypair_from_seed;
 use crate::PublicKey;
 use crate::Result;
 use crate::types::*;
+use sahyadri_dilithium::generate_keypair_from_seed;
+use sha2::{Digest, Sha256};
 
 /// Trait for private key types which can be derived using BIP32.
 pub trait PrivateKey: Sized {
@@ -30,8 +30,8 @@ impl PrivateKey for DilithiumSeed {
 
     fn derive_child(&self, other: PrivateKeyBytes) -> Result<Self> {
         let mut hasher = Sha256::new();
-        hasher.update(&self.0);
-        hasher.update(&other);
+        hasher.update(self.0);
+        hasher.update(other);
         let hash = hasher.finalize();
         let mut child_seed = [0u8; 32];
         child_seed.copy_from_slice(&hash[..32]);

@@ -6,6 +6,7 @@ use crate::flowcontext::{
 use crate::{v7, v8};
 use async_trait::async_trait;
 use futures::future::join_all;
+use parking_lot::{Mutex, RwLock};
 use sahyadri_addressmanager::AddressManager;
 use sahyadri_connectionmanager::ConnectionManager;
 use sahyadri_consensus_core::api::{BlockValidationFuture, BlockValidationFutures};
@@ -29,7 +30,7 @@ use sahyadri_mining::mempool::tx::{Orphan, Priority};
 use sahyadri_mining::{manager::MiningManagerProxy, mempool::tx::RbfPolicy};
 use sahyadri_notify::notifier::Notify;
 use sahyadri_p2p_lib::{
-    ConnectionInitializer, Hub, SahyadridHandshake, PeerKey, PeerProperties, Router,
+    ConnectionInitializer, Hub, PeerKey, PeerProperties, Router, SahyadridHandshake,
     common::ProtocolError,
     convert::model::version::Version,
     make_message,
@@ -38,7 +39,6 @@ use sahyadri_p2p_lib::{
 use sahyadri_p2p_mining::rule_engine::MiningRuleEngine;
 use sahyadri_utils::iter::IterExtensions;
 use sahyadri_utils::networking::PeerId;
-use parking_lot::{Mutex, RwLock};
 use std::collections::HashMap;
 use std::time::Instant;
 use std::{collections::hash_map::Entry, fmt::Display};
@@ -313,7 +313,8 @@ impl FlowContext {
 
         // The maximum amount of orphans allowed in the orphans pool. This number is an approximation
         // of how many orphans there can possibly be on average bounded by an upper bound.
-        let max_orphans = (2u64.pow(orphan_resolution_range) as usize * config.sahyadri_consensus_k() as usize).min(MAX_ORPHANS_UPPER_BOUND);
+        let max_orphans =
+            (2u64.pow(orphan_resolution_range) as usize * config.sahyadri_consensus_k() as usize).min(MAX_ORPHANS_UPPER_BOUND);
         Self {
             inner: Arc::new(FlowContextInner {
                 node_id: Uuid::new_v4().into(),

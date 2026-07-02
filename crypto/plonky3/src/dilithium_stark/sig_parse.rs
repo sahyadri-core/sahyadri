@@ -33,9 +33,13 @@ pub struct ParsedPublicKey {
 #[inline]
 fn to_u32_q(v: i32) -> u32 {
     let q = Q as i32;
-    if v < 0 { (v + q) as u32 }
-    else if v >= q { (v - q) as u32 }
-    else { v as u32 }
+    if v < 0 {
+        (v + q) as u32
+    } else if v >= q {
+        (v - q) as u32
+    } else {
+        v as u32
+    }
 }
 
 /// Parse an ML-DSA-65 signature from 3309 raw bytes.
@@ -122,19 +126,27 @@ mod tests {
         assert_eq!(parsed_pk.t1.len(), K);
 
         for poly in &parsed_sig.z {
-            for &c in poly { assert!(c < Q, "z coeff {} >= Q", c); }
+            for &c in poly {
+                assert!(c < Q, "z coeff {} >= Q", c);
+            }
         }
         for poly in &parsed_sig.h {
-            for &c in poly { assert!(c <= 1, "h coeff {} > 1", c); }
+            for &c in poly {
+                assert!(c <= 1, "h coeff {} > 1", c);
+            }
         }
         for poly in &parsed_pk.t1 {
-            for &c in poly { assert!(c < Q, "t1 coeff {} >= Q", c); }
+            for &c in poly {
+                assert!(c < Q, "t1 coeff {} >= Q", c);
+            }
         }
 
         let mut nonzero = 0;
         for &c in &parsed_sig.c {
             assert!(c == 0 || c == 1 || c == Q - 1, "c coeff {} invalid", c);
-            if c != 0 { nonzero += 1; }
+            if c != 0 {
+                nonzero += 1;
+            }
         }
         assert_eq!(nonzero, 49, "challenge should have tau=49 non-zero coeffs");
     }

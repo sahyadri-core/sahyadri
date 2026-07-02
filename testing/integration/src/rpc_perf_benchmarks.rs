@@ -7,6 +7,9 @@ use crate::{
     tasks::{Stopper, TasksRunner, block::group::MinerGroupTask, daemon::DaemonTask, tx::group::TxSenderGroupTask},
 };
 use futures_util::future::join_all;
+use rand::Rng;
+use rand::RngCore;
+use rand::thread_rng;
 use sahyadri_addresses::Address;
 use sahyadri_alloc::init_allocator_with_default_settings;
 use sahyadri_consensus::params::Params;
@@ -14,9 +17,6 @@ use sahyadri_consensus_core::network::NetworkType;
 use sahyadri_core::info;
 use sahyadri_rpc_core::api::rpc::RpcApi;
 use sahyadri_txscript::pay_to_address_script;
-use rand::Rng;
-use rand::thread_rng;
-use rand::RngCore;
 use sha2::Digest;
 use std::{
     sync::Arc,
@@ -49,7 +49,11 @@ async fn bench_rpc_high_load() {
     let mut seed = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut seed);
     let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
-    let prealloc_address = Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
+    let prealloc_address = Address::new(
+        NetworkType::Simnet.into(),
+        sahyadri_addresses::Version::PubKeyDilithium,
+        &sha2::Sha256::digest(prealloc_kp.public_key())[..20],
+    );
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, PREALLOC_AMOUNT_KANA) // Use simnet with prealloc args
@@ -121,7 +125,10 @@ async fn bench_rpc_high_load() {
                 let hash = thread_virtual_chain.get(index).unwrap();
 
                 let start = Instant::now();
-                client.get_virtual_chain_from_block_v2(*hash, Some(sahyadri_rpc_core::RpcDataVerbosityLevel::High), None).await.unwrap();
+                client
+                    .get_virtual_chain_from_block_v2(*hash, Some(sahyadri_rpc_core::RpcDataVerbosityLevel::High), None)
+                    .await
+                    .unwrap();
 
                 latencies.push(start.elapsed());
             }

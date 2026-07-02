@@ -2,9 +2,9 @@ extern crate self as sahyadri_core;
 
 pub mod assert;
 pub mod console;
-pub mod sahyadrid_env;
 pub mod log;
 pub mod panic;
+pub mod sahyadrid_env;
 pub mod time;
 
 cfg_if::cfg_if! {

@@ -80,12 +80,7 @@ pub fn create_input_signature(
     let populated_transaction = PopulatedTransaction::new(&cctx, utxos);
 
     let keypair = sahyadri_dilithium::generate_keypair_from_seed(&private_key.seed_bytes());
-    let signature = sign_input(
-        &populated_transaction,
-        input_index.into(),
-        &keypair,
-        sighash_type.unwrap_or(SighashType::All).into(),
-    );
+    let signature = sign_input(&populated_transaction, input_index.into(), &keypair, sighash_type.unwrap_or(SighashType::All).into());
     Ok(signature.to_hex().into())
 }
 
@@ -97,13 +92,10 @@ pub fn sign_script_hash(script_hash: JsValue, privkey: &PrivateKey) -> Result<St
     Ok(result.to_hex())
 }
 
-    fn sign_hash(sig_hash: Hash, privkey: &[u8; 32]) -> Result<Vec<u8>> {
-        let kp = sahyadri_dilithium::generate_keypair_from_seed(privkey);
-        let sig = sahyadri_dilithium::sign_bytes(&sig_hash.as_bytes(), &kp)
-            .map_err(|e| Error::Custom(format!("Dilithium signing failed: {e}")))?;
-        let signature = std::iter::once(65u8)
-            .chain(sig.as_bytes().iter().cloned())
-            .chain([SIG_HASH_ALL.to_u8()])
-            .collect();
-        Ok(signature)
-    }
+fn sign_hash(sig_hash: Hash, privkey: &[u8; 32]) -> Result<Vec<u8>> {
+    let kp = sahyadri_dilithium::generate_keypair_from_seed(privkey);
+    let sig = sahyadri_dilithium::sign_bytes(&sig_hash.as_bytes(), &kp)
+        .map_err(|e| Error::Custom(format!("Dilithium signing failed: {e}")))?;
+    let signature = std::iter::once(65u8).chain(sig.as_bytes().iter().cloned()).chain([SIG_HASH_ALL.to_u8()]).collect();
+    Ok(signature)
+}

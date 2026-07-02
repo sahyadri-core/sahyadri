@@ -1,3 +1,4 @@
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::BlockHasher;
 use sahyadri_consensus_core::acceptance_data::AcceptanceData;
 use sahyadri_consensus_core::acceptance_data::AcceptedTxEntry;
@@ -9,7 +10,6 @@ use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 use sahyadri_utils::mem_size::MemSizeEstimator;
-use rocksdb::WriteBatch;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;

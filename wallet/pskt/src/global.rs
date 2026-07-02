@@ -1,9 +1,9 @@
 //! Global PSKT data.
 
 use crate::pskt::{KeySource, Version};
-use sahyadri_bip32::DilithiumPkHash;
 use crate::utils::combine_if_no_conflicts;
 use derive_builder::Builder;
+use sahyadri_bip32::DilithiumPkHash;
 use sahyadri_consensus_core::tx::TransactionId;
 use serde::{Deserialize, Serialize};
 use std::{

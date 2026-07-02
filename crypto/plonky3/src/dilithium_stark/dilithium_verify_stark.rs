@@ -6,12 +6,12 @@ use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::Matrix;
 
-use crate::config::F;
 use super::field_zq::{self, build_ntt_trace};
+use super::matrix_vec_stark::build_matrix_vec_trace;
 use super::params::*;
 use super::poly_mult_stark::build_poly_mult_trace;
-use super::matrix_vec_stark::build_matrix_vec_trace;
 use super::rejection_stark::build_rejection_trace;
+use crate::config::F;
 
 // ── Sub-trace row counts ─────────────────────────────────
 
@@ -19,8 +19,7 @@ pub const AZ_ROWS: usize = 8192;
 pub const NTT_ROWS: usize = LOG_N * N;
 pub const POLY_MULT_ROWS: usize = N;
 pub const NORM_ROWS: usize = N;
-pub const TOTAL_VERIFY_ROWS: usize =
-    AZ_ROWS + 2 * NTT_ROWS + POLY_MULT_ROWS + 3 * NORM_ROWS;
+pub const TOTAL_VERIFY_ROWS: usize = AZ_ROWS + 2 * NTT_ROWS + POLY_MULT_ROWS + 3 * NORM_ROWS;
 
 // ── Verification traces ─────────────────────────────────
 
@@ -47,11 +46,7 @@ fn pointwise_mul_q(a: &[u32; N], b: &[u32; N]) -> [u32; N] {
 
 fn high_bits_q(r: u32, alpha: u32) -> u32 {
     let offset = (alpha - 1) / 2;
-    let v = if (r as u64) + (offset as u64) >= Q as u64 {
-        (r as u64 + offset as u64) - Q as u64
-    } else {
-        r as u64 + offset as u64
-    };
+    let v = if (r as u64) + (offset as u64) >= Q as u64 { (r as u64 + offset as u64) - Q as u64 } else { r as u64 + offset as u64 };
     (v / alpha as u64) as u32
 }
 
@@ -96,15 +91,7 @@ pub fn build_verification_traces(
     let norm_z2_trace = build_rejection_trace(&z2_vec[0]);
     let rejection_h_trace = build_rejection_trace(h);
 
-    VerificationTraces {
-        az_trace,
-        ntt_t1_trace,
-        poly_ct1_trace,
-        ntt_inv_ct1_trace,
-        norm_z1_trace,
-        norm_z2_trace,
-        rejection_h_trace,
-    }
+    VerificationTraces { az_trace, ntt_t1_trace, poly_ct1_trace, ntt_inv_ct1_trace, norm_z1_trace, norm_z2_trace, rejection_h_trace }
 }
 
 // ── Top-level reconstruction AIR ─────────────────────────
@@ -112,7 +99,9 @@ pub fn build_verification_traces(
 pub struct DilithiumVerifyAir;
 
 impl<Fld> BaseAir<Fld> for DilithiumVerifyAir {
-    fn width(&self) -> usize { 3 }
+    fn width(&self) -> usize {
+        3
+    }
 }
 
 impl<AB> Air<AB> for DilithiumVerifyAir
@@ -151,11 +140,7 @@ where
 pub fn build_verify_trace(w1_prime: &[u32; N], h: &[u32; N]) -> Vec<Vec<F>> {
     let mut rows = Vec::with_capacity(N);
     for i in 0..N {
-        rows.push(vec![
-            F::from_u64(i as u64),
-            F::from_u64(w1_prime[i] as u64),
-            F::from_u64(h[i] as u64),
-        ]);
+        rows.push(vec![F::from_u64(i as u64), F::from_u64(w1_prime[i] as u64), F::from_u64(h[i] as u64)]);
     }
     rows
 }
@@ -185,21 +170,26 @@ mod tests {
 
     #[test]
     fn test_total_row_count() {
-        assert_eq!(TOTAL_VERIFY_ROWS, AZ_ROWS + 2*NTT_ROWS + POLY_MULT_ROWS + 3*NORM_ROWS);
+        assert_eq!(TOTAL_VERIFY_ROWS, AZ_ROWS + 2 * NTT_ROWS + POLY_MULT_ROWS + 3 * NORM_ROWS);
     }
 
     #[test]
     fn test_verify_trace_shape() {
         let trace = build_verify_trace(&[0u32; N], &[0u32; N]);
         assert_eq!(trace.len(), N);
-        for row in &trace { assert_eq!(row.len(), 3); }
+        for row in &trace {
+            assert_eq!(row.len(), 3);
+        }
     }
 
     #[test]
     fn test_verify_trace_matching() {
         let mut w1p = [0u32; N];
         let mut h = [0u32; N];
-        for i in 0..N { w1p[i] = (i * 1000) as u32 % Q; h[i] = w1p[i]; }
+        for i in 0..N {
+            w1p[i] = (i * 1000) as u32 % Q;
+            h[i] = w1p[i];
+        }
         let trace = build_verify_trace(&w1p, &h);
         for (i, row) in trace.iter().enumerate() {
             assert_eq!(row[0], F::from_u64(i as u64));

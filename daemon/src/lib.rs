@@ -1,8 +1,8 @@
 pub mod cpu_miner;
 pub mod error;
 pub mod imports;
-pub mod sahyadrid;
 pub mod result;
+pub mod sahyadrid;
 
 use std::fmt::Display;
 

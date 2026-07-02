@@ -129,6 +129,7 @@ impl Collector<Notification> for Processor {
 mod tests {
     use super::*;
     use async_channel::{Receiver, Sender, unbounded};
+    use rand::{SeedableRng, rngs::SmallRng};
     use sahyadri_consensus::{config::Config, consensus::test_consensus::TestConsensus, params::DEVNET_PARAMS, test_helpers::*};
     use sahyadri_consensus_core::utxo::{utxo_collection::UtxoCollection, utxo_diff::UtxoDiff};
     use sahyadri_consensusmanager::ConsensusManager;
@@ -137,7 +138,6 @@ mod tests {
     use sahyadri_database::utils::DbLifetime;
     use sahyadri_notify::notifier::test_helpers::NotifyMock;
     use sahyadri_utxoindex::UtxoIndex;
-    use rand::{SeedableRng, rngs::SmallRng};
     use std::sync::Arc;
 
     // TODO: rewrite with Simnet, when possible.

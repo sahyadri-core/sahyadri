@@ -78,7 +78,7 @@ impl Mempool {
         // =====================================================================
         // SAHYADRI 100% ANTI-SPAM SHIELD: ZERO-PENDING VIP RULE
         // =====================================================================
-        
+
         // 1. Calculate Mempool Fullness (Emergency Mode Trigger)
         let max_tx_count = self.config.maximum_transaction_count as f64;
         let current_tx_count = self.transaction_pool.len() as f64;
@@ -104,7 +104,7 @@ impl Mempool {
         // RULE A: Absolute Max 50 pending per account (Hacker Blocked)
         if pending_count >= 50 {
             debug!("Sahyadri Anti-Spam: Sender {} reached max 50 pending txs. Dropping.", sender_address);
-            return Err(RuleError::RejectInvalid(transaction_id)); 
+            return Err(RuleError::RejectInvalid(transaction_id));
         }
 
         // RULE B: Emergency Mode VIP Entry

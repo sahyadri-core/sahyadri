@@ -7,13 +7,13 @@ pub mod descriptor;
 pub mod kind;
 pub mod pskb;
 pub mod variants;
-use sahyadri_hashes::Hash;
-use sahyadri_wallet_pskt::bundle::Bundle;
 pub use kind::*;
 use pskb::{
     PSKBSigner, PSKTGenerator, bundle_from_pskt_generator, bundle_to_finalizer_stream, commit_reveal_batch_bundle,
     pskb_signer_for_address, pskt_to_pending_transaction,
 };
+use sahyadri_hashes::Hash;
+use sahyadri_wallet_pskt::bundle::Bundle;
 pub use variants::*;
 
 use crate::derivation::AddressDerivationManagerTrait;
@@ -69,11 +69,11 @@ impl Inner {
         let utxo_context = UtxoContext::new(wallet.utxo_processor(), UtxoContextBinding::AccountId(id));
 
         let context = Context { settings };
-        Inner { 
-            context: Mutex::new(context), 
-            id, 
-            storage_key, 
-            wallet: wallet.clone(), 
+        Inner {
+            context: Mutex::new(context),
+            id,
+            storage_key,
+            wallet: wallet.clone(),
             utxo_context: utxo_context.clone(),
             account_balance: std::sync::atomic::AtomicU64::new(0), // Initial balance 0
         }
@@ -215,31 +215,26 @@ pub trait Account: AnySync + Send + Sync + 'static {
     /// Global Fix for all Sahyadri Miners.
     async fn perform_auto_compounding(self: Arc<Self>, wallet_secret: Secret, payment_secret: Option<Secret>) -> Result<()> {
         let mature_utxos = self.utxo_context().mature_utxo_size();
-        
+
         if mature_utxos < 500 {
             return Ok(());
         }
 
-        let address = self.receive_address()?; 
+        let address = self.receive_address()?;
         let abortable = Abortable::default();
         let tiers = vec![5_000_000_000, 2_000_000_000, 1_000_000_000];
 
         for target_kana in tiers {
             let outputs = crate::tx::PaymentOutputs::from((address.clone(), target_kana));
 
-            match self.clone().send(
-                outputs.into(),
-                None,
-                0u64.into(),
-                None,
-                wallet_secret.clone(),
-                payment_secret.clone(), 
-                &abortable,
-                None,
-            ).await {
+            match self
+                .clone()
+                .send(outputs.into(), None, 0u64.into(), None, wallet_secret.clone(), payment_secret.clone(), &abortable, None)
+                .await
+            {
                 Ok(_) => {
                     return Ok(());
-                },
+                }
                 Err(_) => {
                     continue;
                 }
@@ -332,11 +327,11 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
     /// handle connection event
     async fn connect(self: Arc<Self>) -> Result<()> {
-        let account_for_loop = self.clone(); 
+        let account_for_loop = self.clone();
 
         let vacated = self.wallet().active_accounts().insert(self.clone().as_dyn_arc());
         if vacated.is_none() && self.wallet().is_connected() {
-            self.scan(None, None).await?; 
+            self.scan(None, None).await?;
         }
 
         // Auto-Pilot Loop
@@ -355,21 +350,21 @@ pub trait Account: AnySync + Send + Sync + 'static {
                 }
                 if let Some(ws) = account_for_loop.wallet().secret() {
                     let ps = account_for_loop.wallet().payment_secret();
-                  
+
                     let _tiers = vec![
-                     100_000_000u64,         // 1 CSM Note
-                     1_000_000_000u64,       // 10 CSM Note
-                     10_000_000_000u64,      // 100 CSM Note
-                     100_000_000_000u64      // 1000 CSM Note
-                    ];             
+                        100_000_000u64,     // 1 CSM Note
+                        1_000_000_000u64,   // 10 CSM Note
+                        10_000_000_000u64,  // 100 CSM Note
+                        100_000_000_000u64, // 1000 CSM Note
+                    ];
                     let _ = account_for_loop.clone().perform_auto_compounding(ws, ps).await;
                 }
-            } 
+            }
         });
 
         Ok(())
     } // <--- 4. Ye CONNECT function ka bracket hai
- 
+
     /// handle disconnection event
     async fn disconnect(&self) -> Result<()> {
         self.wallet().active_accounts().remove(self.id());
@@ -950,9 +945,9 @@ mod tests {
     use crate::imports::LEGACY_ACCOUNT_KIND;
     use sahyadri_addresses::Address;
     use sahyadri_addresses::Prefix;
+    use sahyadri_bip32::DilithiumSeed;
     use sahyadri_bip32::PrivateKey;
     use sahyadri_bip32::SecretKeyExt;
-    use sahyadri_bip32::DilithiumSeed;
     use sahyadri_wallet_keys::derivation::gen0::PubkeyDerivationManagerV0;
     use std::str::FromStr;
 

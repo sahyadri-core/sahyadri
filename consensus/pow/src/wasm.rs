@@ -1,5 +1,6 @@
 use crate::matrix::Matrix;
 use js_sys::BigInt;
+use num::Float;
 use sahyadri_consensus_client::Header;
 use sahyadri_consensus_client::HeaderT;
 use sahyadri_consensus_core::hashing;
@@ -8,7 +9,6 @@ use sahyadri_hashes::PowHash;
 use sahyadri_math::Uint256;
 use sahyadri_utils::hex::FromHex;
 use sahyadri_utils::hex::ToHex;
-use num::Float;
 use wasm_bindgen::prelude::*;
 use workflow_wasm::convert::TryCastFromJs;
 use workflow_wasm::error::Error;

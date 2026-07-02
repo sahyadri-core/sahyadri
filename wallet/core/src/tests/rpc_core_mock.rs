@@ -82,12 +82,19 @@ impl Default for RpcCoreMock {
 
 #[async_trait]
 impl RpcApi for RpcCoreMock {
-    async fn submit_account_transaction(&self, _request: sahyadri_rpc_core::SubmitAccountTransactionRequest) -> Result<sahyadri_rpc_core::SubmitAccountTransactionResponse, sahyadri_rpc_core::RpcError> {
-    unimplemented!()
+    async fn submit_account_transaction(
+        &self,
+        _request: sahyadri_rpc_core::SubmitAccountTransactionRequest,
+    ) -> Result<sahyadri_rpc_core::SubmitAccountTransactionResponse, sahyadri_rpc_core::RpcError> {
+        unimplemented!()
     }
 
-    async fn submit_account_transaction_call(&self, _request: Option<&std::sync::Arc<dyn sahyadri_rpc_core::api::connection::RpcConnection>>, _req: sahyadri_rpc_core::SubmitAccountTransactionRequest) -> Result<sahyadri_rpc_core::SubmitAccountTransactionResponse, sahyadri_rpc_core::RpcError> {
-    unimplemented!()
+    async fn submit_account_transaction_call(
+        &self,
+        _request: Option<&std::sync::Arc<dyn sahyadri_rpc_core::api::connection::RpcConnection>>,
+        _req: sahyadri_rpc_core::SubmitAccountTransactionRequest,
+    ) -> Result<sahyadri_rpc_core::SubmitAccountTransactionResponse, sahyadri_rpc_core::RpcError> {
+        unimplemented!()
     }
     // This fn needs to succeed while the client connects
     async fn get_info_call(&self, _connection: Option<&DynRpcConnection>, _request: GetInfoRequest) -> RpcResult<GetInfoResponse> {

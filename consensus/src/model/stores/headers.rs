@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{BlockHasher, BlockLevel, header::Header};
 use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess};
 use sahyadri_database::prelude::{CachePolicy, DB};
@@ -7,7 +8,6 @@ use sahyadri_database::prelude::{StoreError, StoreResult};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 use sahyadri_utils::mem_size::MemSizeEstimator;
-use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 
 pub trait HeaderStoreReader {

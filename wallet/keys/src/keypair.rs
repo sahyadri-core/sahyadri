@@ -5,7 +5,7 @@
 
 use crate::imports::*;
 use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair, generate_keypair_from_seed};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /// Data structure that contains a Dilithium keypair.
 /// @category Wallet SDK

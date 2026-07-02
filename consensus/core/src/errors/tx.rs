@@ -6,7 +6,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum TxRuleError {
-
     #[error("Unknown error")]
     Unknown,
 
@@ -15,7 +14,7 @@ pub enum TxRuleError {
 
     #[error("Transaction fee is below the fixed minimum of 1000 Kana")]
     ZeroFee,
-    
+
     #[error("Transaction payload is invalid")]
     InvalidPayload,
 

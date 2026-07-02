@@ -9,9 +9,9 @@ use crate::{
         relations::{RelationsStore, RelationsStoreReader},
     },
     processes::{
-        sahyadri_consensus::mergeset::unordered_mergeset_without_selected_parent,
         reachability::interval::Interval,
         relations::{RelationsStoreExtensions, delete_reachability_relations, init as relations_init},
+        sahyadri_consensus::mergeset::unordered_mergeset_without_selected_parent,
     },
 };
 use itertools::Itertools;

@@ -13,8 +13,8 @@ use crate::{
 };
 use async_channel::Sender;
 use async_trait::async_trait;
-use sahyadri_core::{debug, trace};
 use parking_lot::RwLock;
+use sahyadri_core::{debug, trace};
 use std::sync::Arc;
 
 /// Root of a notification system

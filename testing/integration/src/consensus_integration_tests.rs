@@ -10,10 +10,10 @@ use sahyadri_consensus::consensus::test_consensus::{TestConsensus, TestConsensus
 use sahyadri_consensus::model::stores::block_transactions::{
     BlockTransactionsStore, BlockTransactionsStoreReader, DbBlockTransactionsStore,
 };
-use sahyadri_consensus::model::stores::sahyadri_consensus::{SahyadriConsensusStoreReader, KType as SahyadriConsensusKType};
 use sahyadri_consensus::model::stores::headers::HeaderStoreReader;
 use sahyadri_consensus::model::stores::reachability::DbReachabilityStore;
 use sahyadri_consensus::model::stores::relations::DbRelationsStore;
+use sahyadri_consensus::model::stores::sahyadri_consensus::{KType as SahyadriConsensusKType, SahyadriConsensusStoreReader};
 use sahyadri_consensus::model::stores::selected_chain::SelectedChainStoreReader;
 use sahyadri_consensus::params::{DEVNET_PARAMS, ForkActivation, MAINNET_PARAMS, OverrideParams};
 use sahyadri_consensus::pipeline::ProcessingCounters;
@@ -280,7 +280,8 @@ async fn sahyadri_consensus_test() {
         }
 
         // Clone with a new cache in order to verify correct writes to the DB itself
-        let sahyadri_consensus_store = consensus.sahyadri_consensus_store().clone_with_new_cache(CachePolicy::Count(10_000), CachePolicy::Count(10_000));
+        let sahyadri_consensus_store =
+            consensus.sahyadri_consensus_store().clone_with_new_cache(CachePolicy::Count(10_000), CachePolicy::Count(10_000));
 
         // Assert SAHYADRI_CONSENSUS output data
         for block in test.blocks {
@@ -1626,16 +1627,16 @@ async fn payload_for_native_tx_test() {
 //         hashing::sighash::SigHashReusedValuesUnsync, hashing::sighash_type::SIG_HASH_ALL, subnets::SUBNETWORK_ID_NATIVE,
 //     };
 //     use sahyadri_txscript::{opcodes::codes::*, script_builder::ScriptBuilder};
-// 
+//
 //     init_allocator_with_default_settings();
-// 
+//
 //     // Set up signing key for signature verification
 //     let (secret_key, _) = secp.generate_keypair(&mut rand::thread_rng());
 //     let keypair = Dilithium::Keypair::from_seckey_slice(Dilithium::DILITHIUM3, &secret_key.secret_bytes()).unwrap();
 //     let pub_key = keypair.x_only_public_key().0.serialize();
-// 
+//
 //     let reused_values = SigHashReusedValuesUnsync::new();
-// 
+//
 //     // Create redeem script that has 1 sig op in the executed branch (true)
 //     // and 3 sig ops in the non-executed branch (false)
 //     let redeem_script = || -> ScriptBuilderResult<Vec<u8>> {
@@ -1651,15 +1652,15 @@ async fn payload_for_native_tx_test() {
 //             .drain())
 //     }()
 //     .unwrap();
-// 
+//
 //     let script_pub_key = sahyadri_txscript::pay_to_script_hash_script(&redeem_script);
-// 
+//
 //     // Set up initial UTXO with P2SH script
 //     let initial_utxo_collection = [(
 //         TransactionOutpoint::new(1.into(), 0),
 //         UtxoEntry { amount: KANA_PER_SAHYADRI, script_public_key: script_pub_key.clone(), block_daa_score: 0, is_coinbase: false },
 //     )];
-// 
+//
 //     let config = ConfigBuilder::new(DEVNET_PARAMS)
 //         .skip_proof_of_work()
 //         .apply_args(|cfg| {
@@ -1675,16 +1676,16 @@ async fn payload_for_native_tx_test() {
 //             p.raigad_activation = ForkActivation::always();
 //         })
 //         .build();
-// 
+//
 //     let consensus = TestConsensus::new(&config);
 //     let mut genesis_multiset = MuHash::new();
 //     consensus.append_imported_pruning_point_utxos(&initial_utxo_collection, &mut genesis_multiset);
 //     consensus.import_pruning_point_utxo_set(config.genesis.hash, genesis_multiset).unwrap();
 //     consensus.init();
-// 
+//
 //     // Build blockchain up to one block before activation
 //     let index = 0;
-// 
+//
 //     // Create transaction spending P2SH with 1 sig op limit
 //     let mut tx = Transaction::new(
 //         0,
@@ -1700,11 +1701,11 @@ async fn payload_for_native_tx_test() {
 //         0,
 //         vec![],
 //     );
-// 
+//
 //     // Sign transaction
 //     let mut tx_for_signing = MutableTransaction::new(tx.clone());
 //     tx_for_signing.entries = vec![Some(initial_utxo_collection[0].1.clone())];
-// 
+//
 //     let signature = {
 //         let hash = calc_Dilithium3_signature_hash(&tx_for_signing.as_verifiable(), 0, SIG_HASH_ALL, &reused_values);
 //         let msg = Dilithium::Message::from_digest_slice(hash.as_bytes().as_slice()).unwrap();
@@ -1713,24 +1714,24 @@ async fn payload_for_native_tx_test() {
 //         signature.push(SIG_HASH_ALL.to_u8());
 //         signature
 //     };
-// 
+//
 //     // Complete transaction with signature script
 //     tx.inputs[0].signature_script =
 //         ScriptBuilder::new().add_data(&signature).unwrap().add_data(&pub_key).unwrap().add_data(&redeem_script).unwrap().drain();
-// 
+//
 //     tx.finalize();
-// 
+//
 //     let mut tx = MutableTransaction::from_tx(tx);
 //     // This triggers storage mass population
 //     let _ = consensus.validate_mempool_transaction(&mut tx, &TransactionValidationArgs::default());
 //     let tx = tx.tx.unwrap_or_clone();
-// 
+//
 //     // Verify transaction is accepted with runtime sig op counting from genesis
 //     // Runtime counting sees only 1 executed sig op (in the IF branch), not the 3 total CheckSig opcodes
 //     let status = consensus.add_utxo_valid_block_with_parents((index + 1).into(), vec![config.genesis.hash], vec![tx]).await;
 //     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
 // }
-// 
+//
 // #[tokio::test]
 // async fn sighash_type_commitment_test() {
 //     use sahyadri_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
@@ -1742,18 +1743,18 @@ async fn payload_for_native_tx_test() {
 //     use sahyadri_txscript::pay_to_script_hash_script;
 //     use sahyadri_txscript::script_builder::ScriptBuilder;
 //     use Dilithium::Keypair;
-// 
+//
 //     init_allocator_with_default_settings();
-// 
+//
 //     let (secret_key, _) = secp.generate_keypair(&mut rand::thread_rng());
 //     let keypair = Keypair::from_seckey_slice(Dilithium::DILITHIUM3, &secret_key.secret_bytes()).unwrap();
 //     let pub_key = keypair.x_only_public_key().0.serialize();
-// 
+//
 //     // Basic redeem script: check a single Dilithium3 signature against the generated pubkey
 //     let redeem_script = ScriptBuilder::new().add_data(&pub_key).unwrap().add_op(OpCheckSig).unwrap().drain();
 //     let p2sh_script = pay_to_script_hash_script(&redeem_script);
 //     let op_true_spk = ScriptPublicKey::from_vec(0, vec![OpTrue]);
-// 
+//
 //     let mut initial_utxo_collection: Vec<(TransactionOutpoint, UtxoEntry)> = Vec::new();
 //     for i in 0..6 {
 //         initial_utxo_collection.push((
@@ -1767,7 +1768,7 @@ async fn payload_for_native_tx_test() {
 //             UtxoEntry { amount: KANA_PER_SAHYADRI / 20, script_public_key: op_true_spk.clone(), block_daa_score: 0, is_coinbase: false },
 //         ));
 //     }
-// 
+//
 //     let config = ConfigBuilder::new(DEVNET_PARAMS)
 //         .skip_proof_of_work()
 //         .apply_args(|cfg| {
@@ -1780,13 +1781,13 @@ async fn payload_for_native_tx_test() {
 //             cfg.params.genesis.hash = genesis_header.hash;
 //         })
 //         .build();
-// 
+//
 //     let consensus = TestConsensus::new(&config);
 //     let mut genesis_multiset = MuHash::new();
 //     consensus.append_imported_pruning_point_utxos(&initial_utxo_collection, &mut genesis_multiset);
 //     consensus.import_pruning_point_utxo_set(config.genesis.hash, genesis_multiset).unwrap();
 //     consensus.init();
-// 
+//
 //     let make_sig_script = |tx: &Transaction, utxo: &UtxoEntry, sig_hash: SigHashType| -> Vec<u8> {
 //         let reused_values = SigHashReusedValuesUnsync::new();
 //         let mut tx_for_signing = MutableTransaction::from_tx(tx.clone());
@@ -1798,9 +1799,9 @@ async fn payload_for_native_tx_test() {
 //         signature.push(sig_hash.to_u8());
 //         ScriptBuilder::new().add_data(&signature).unwrap().add_data(&redeem_script).unwrap().drain()
 //     };
-// 
+//
 //     let mut block_index: u64 = 0;
-// 
+//
 //     // SIGHASH_ALL commits to every input and output. Signed transaction is accepted as-is.
 //     let mut tx_all = Transaction::new(
 //         0,
@@ -1820,7 +1821,7 @@ async fn payload_for_native_tx_test() {
 //     let status = consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_all]).await;
 //     block_index += 1;
 //     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
-// 
+//
 //     // SIGHASH_NONE commits to inputs only; outputs can be added after signing.
 //     let mut tx_none = Transaction::new(
 //         0,
@@ -1841,7 +1842,7 @@ async fn payload_for_native_tx_test() {
 //     let status = consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_none]).await;
 //     block_index += 1;
 //     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
-// 
+//
 //     // SIGHASH_SINGLE commits input 0 to output 0 only; later outputs do not invalidate the signature.
 //     let mut tx_single = Transaction::new(
 //         0,
@@ -1863,7 +1864,7 @@ async fn payload_for_native_tx_test() {
 //         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_single]).await;
 //     block_index += 1;
 //     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
-// 
+//
 //     // SIGHASH_ALL | ANYONECANPAY commits to this input and all outputs; adding inputs later remains valid.
 //     let mut tx_all_acp = Transaction::new(
 //         0,
@@ -1888,7 +1889,7 @@ async fn payload_for_native_tx_test() {
 //         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_all_acp]).await;
 //     block_index += 1;
 //     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
-// 
+//
 //     // SIGHASH_NONE | ANYONECANPAY commits to this input only; outputs and additional inputs may be appended after signing.
 //     let mut tx_none_acp = Transaction::new(
 //         0,
@@ -1911,7 +1912,7 @@ async fn payload_for_native_tx_test() {
 //         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_none_acp]).await;
 //     block_index += 1;
 //     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
-// 
+//
 //     // SIGHASH_SINGLE | ANYONECANPAY commits to this input and its matching output; other outputs and inputs are free to change.
 //     let mut tx_single_acp = Transaction::new(
 //         0,
@@ -1934,7 +1935,7 @@ async fn payload_for_native_tx_test() {
 //         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_single_acp]).await;
 //     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
 // }
-// 
+//
 // // Checks that pruning works and that we do not allow attaching a body to a pruned block
 #[tokio::test]
 async fn pruning_test() {

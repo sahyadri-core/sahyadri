@@ -1,6 +1,6 @@
 use crate::{
     error::{Error, Result},
-    resolver::{SahyadridResponseReceiver, SahyadridResponseSender, Resolver},
+    resolver::{Resolver, SahyadridResponseReceiver, SahyadridResponseSender},
 };
 use sahyadri_core::trace;
 use sahyadri_grpc_core::{

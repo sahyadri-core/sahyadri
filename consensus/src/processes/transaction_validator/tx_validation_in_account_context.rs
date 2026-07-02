@@ -1,9 +1,9 @@
-use sahyadri_consensus_core::tx::{VerifiableTransaction, ScriptPublicKey};
-use crate::model::stores::account_store::AccountStoreReader;
 use super::{
     TransactionValidator,
     errors::{TxResult, TxRuleError},
 };
+use crate::model::stores::account_store::AccountStoreReader;
+use sahyadri_consensus_core::tx::{ScriptPublicKey, VerifiableTransaction};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TxValidationFlags {
@@ -20,7 +20,6 @@ impl TransactionValidator {
         flags: TxValidationFlags,
         _mass_and_feerate_threshold: Option<(u64, f64)>,
     ) -> TxResult<u64> {
-        
         if tx.is_coinbase() {
             return Ok(0);
         }

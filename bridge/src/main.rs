@@ -194,10 +194,13 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // Create shared sahyadri API client (all instances use the same node)
-    let sahyadri_api =
-        SahyadriApi::new(config.global.sahyadrid_address.clone(), config.global.block_wait_time, config.global.coinbase_tag_suffix.clone())
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create Sahyadri API client: {}", e))?;
+    let sahyadri_api = SahyadriApi::new(
+        config.global.sahyadrid_address.clone(),
+        config.global.block_wait_time,
+        config.global.coinbase_tag_suffix.clone(),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to create Sahyadri API client: {}", e))?;
 
     let mut instance_handles = Vec::new();
     for (idx, instance_config) in config.instances.iter().enumerate() {
@@ -245,9 +248,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 coinbase_tag_suffix: global.coinbase_tag_suffix.clone(),
             };
 
-            listen_and_serve(bridge_config, Arc::clone(&sahyadri_api_clone), if is_first_instance { Some(sahyadri_api_clone) } else { None })
-                .await
-                .map_err(|e| format!("[Instance {}] Bridge server error: {}", instance_num, e))
+            listen_and_serve(
+                bridge_config,
+                Arc::clone(&sahyadri_api_clone),
+                if is_first_instance { Some(sahyadri_api_clone) } else { None },
+            )
+            .await
+            .map_err(|e| format!("[Instance {}] Bridge server error: {}", instance_num, e))
         });
         instance_handles.push(handle);
     }

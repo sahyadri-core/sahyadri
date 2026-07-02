@@ -1,4 +1,5 @@
 use crate::{flow_context::FlowContext, flow_trait::Flow};
+use rand::Rng;
 use sahyadri_core::{debug, task::tick::TickReason};
 use sahyadri_p2p_lib::{
     IncomingRoute, Router,
@@ -6,7 +7,6 @@ use sahyadri_p2p_lib::{
     dequeue, dequeue_with_timeout, make_message,
     pb::{PingMessage, PongMessage, sahyadrid_message::Payload},
 };
-use rand::Rng;
 use std::{
     sync::{Arc, Weak},
     time::{Duration, Instant},

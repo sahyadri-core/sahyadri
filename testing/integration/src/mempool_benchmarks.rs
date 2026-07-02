@@ -9,6 +9,10 @@ use crate::{
     tasks::{Stopper, TasksRunner, block::group::MinerGroupTask, daemon::DaemonTask, tx::group::TxSenderGroupTask},
 };
 use futures_util::future::join_all;
+use parking_lot::Mutex;
+use rand::RngCore;
+use rand::thread_rng;
+use rand_distr::{Distribution, Exp};
 use sahyadri_addresses::Address;
 use sahyadri_consensus::params::Params;
 use sahyadri_consensus_core::{constants::KANA_PER_SAHYADRI, network::NetworkType, tx::Transaction};
@@ -21,11 +25,7 @@ use sahyadri_rpc_core::{Notification, RpcError, api::rpc::RpcApi};
 use sahyadri_txscript::pay_to_address_script;
 use sahyadri_utils::fd_budget;
 use sahyadrid_lib::args::Args;
-use parking_lot::Mutex;
-use rand::thread_rng;
-use rand::RngCore;
 use sha2::Digest;
-use rand_distr::{Distribution, Exp};
 use std::{
     cmp::max,
     sync::{
@@ -80,7 +80,11 @@ async fn bench_bbt_latency() {
     let mut seed = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut seed);
     let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
-    let prealloc_address = Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
+    let prealloc_address = Address::new(
+        NetworkType::Simnet.into(),
+        sahyadri_addresses::Version::PubKeyDilithium,
+        &sha2::Sha256::digest(prealloc_kp.public_key())[..20],
+    );
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = Args {
@@ -112,8 +116,11 @@ async fn bench_bbt_latency() {
 
     // Mining key and address
     let pay_kp = sahyadri_dilithium::generate_keypair().expect("generate pay keypair");
-    let pay_address =
-        Address::new(network.network_type().into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(pay_kp.public_key())[..20]);
+    let pay_address = Address::new(
+        network.network_type().into(),
+        sahyadri_addresses::Version::PubKeyDilithium,
+        &sha2::Sha256::digest(pay_kp.public_key())[..20],
+    );
     debug!("Generated address {}", pay_address);
 
     let current_template = Arc::new(Mutex::new(bbt_client.get_block_template(pay_address.clone(), vec![]).await.unwrap()));
@@ -328,7 +335,11 @@ async fn bench_bbt_latency_2() {
     let mut seed = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut seed);
     let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
-    let prealloc_address = Address::new(NetworkType::Simnet.into(), sahyadri_addresses::Version::PubKeyDilithium, &sha2::Sha256::digest(prealloc_kp.public_key())[..20]);
+    let prealloc_address = Address::new(
+        NetworkType::Simnet.into(),
+        sahyadri_addresses::Version::PubKeyDilithium,
+        &sha2::Sha256::digest(prealloc_kp.public_key())[..20],
+    );
     let spk = pay_to_address_script(&prealloc_address);
 
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, 500)

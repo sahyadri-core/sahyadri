@@ -1,3 +1,4 @@
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::BlockHashSet;
 use sahyadri_consensus_core::BlockHasher;
 use sahyadri_consensus_core::BlockLevel;
@@ -11,7 +12,6 @@ use sahyadri_database::prelude::StoreError;
 use sahyadri_database::prelude::StoreResult;
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
-use rocksdb::WriteBatch;
 use std::sync::Arc;
 
 pub trait ChildrenStoreReader {

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use sahyadri_consensus_core::{
     BlockHashMap, BlockHashSet,
     coinbase::*,
@@ -6,6 +5,7 @@ use sahyadri_consensus_core::{
     errors::coinbase::{CoinbaseError, CoinbaseResult},
     tx::{ScriptPublicKey, ScriptVec},
 };
+use std::collections::HashMap;
 use std::convert::TryInto;
 
 use crate::model::stores::sahyadri_consensus::SahyadriConsensusData;
@@ -69,7 +69,7 @@ impl CoinbaseManager {
             core::array::from_fn(|i| SUBSIDY_BY_MONTH_TABLE[i].div_ceil(bps_history.before()));
         let subsidy_by_month_table_after: SubsidyByMonthTable =
             core::array::from_fn(|i| SUBSIDY_BY_MONTH_TABLE[i].div_ceil(bps_history.after()));
-    Self {
+        Self {
             coinbase_payload_script_public_key_max_len,
             max_coinbase_payload_len,
             _deflationary_phase_daa_score: deflationary_phase_daa_score,
@@ -77,7 +77,7 @@ impl CoinbaseManager {
             _bps_history: bps_history,
             _subsidy_by_month_table_before: subsidy_by_month_table_before,
             _subsidy_by_month_table_after: subsidy_by_month_table_after,
-        }    
+        }
     }
 
     #[cfg(test)]
@@ -95,7 +95,6 @@ impl CoinbaseManager {
         mergeset_rewards: &BlockHashMap<BlockRewardData>,
         mergeset_non_daa: &BlockHashSet,
     ) -> CoinbaseResult<HashMap<String, i64>> {
-        
         let mut account_rewards: HashMap<String, i64> = HashMap::new();
 
         // Native formatting to string to bypass complex address traits for now
@@ -112,27 +111,25 @@ impl CoinbaseManager {
 
         // --- 1. SAHYADRI BLUE BLOCK REWARD SPLIT ---
         for blue in sahyadri_consensus_data.mergeset_blues.iter().filter(|h| !mergeset_non_daa.contains(h)) {
-            
             let reward_data = match mergeset_rewards.get(blue) {
                 Some(data) => data,
-                None => continue, 
+                None => continue,
             };
-            
+
             let total_reward = reward_data.subsidy + reward_data.total_fees;
-            
+
             if total_reward > 0 {
                 // 98-2 split for Block Subsidy -> 2% to treasury
-                let subsidy_dev_fee = reward_data.subsidy / 50; 
-                
+                let subsidy_dev_fee = reward_data.subsidy / 50;
+
                 // 90-10 split for Transaction Fees -> 10% to treasury
-                let tx_dev_fee = reward_data.total_fees / 10;   
+                let tx_dev_fee = reward_data.total_fees / 10;
 
                 // Total dev fee and remaining for miner
                 let total_dev_fee = subsidy_dev_fee + tx_dev_fee;
-                let miner_reward = total_reward - total_dev_fee; 
+                let miner_reward = total_reward - total_dev_fee;
 
                 let miner_address = extract_address(&reward_data.script_public_key);
-                
 
                 *account_rewards.entry(miner_address).or_insert(0) += miner_reward as i64;
                 *account_rewards.entry(SAHYADRI_TREASURY_ADDRESS.to_string()).or_insert(0) += total_dev_fee as i64;
@@ -158,20 +155,19 @@ impl CoinbaseManager {
         }
 
         let total_red_reward = red_subsidy + red_fees;
-        
+
         if total_red_reward > 0 {
             // 98-2 split for Block Subsidy -> 2% to treasury
-            let subsidy_dev_fee = red_subsidy / 50; 
-            
+            let subsidy_dev_fee = red_subsidy / 50;
+
             // 90-10 split for Tx Fees -> 10% to treasury
-            let tx_dev_fee = red_fees / 10; 
+            let tx_dev_fee = red_fees / 10;
 
             // Total dev fee and remaining for miner
             let total_dev_fee = subsidy_dev_fee + tx_dev_fee;
-            let miner_reward = total_red_reward - total_dev_fee; 
+            let miner_reward = total_red_reward - total_dev_fee;
 
             let miner_address = extract_address(&miner_data.script_public_key);
-            
 
             *account_rewards.entry(miner_address).or_insert(0) += miner_reward as i64;
             *account_rewards.entry(SAHYADRI_TREASURY_ADDRESS.to_string()).or_insert(0) += total_dev_fee as i64;
@@ -258,24 +254,24 @@ impl CoinbaseManager {
         Ok(CoinbaseData { blue_score, subsidy, miner_data: MinerData { script_public_key, extra_data } })
     }
 
-pub fn calc_block_subsidy(&self, blue_score: u64) -> u64 { 
-        // 1. Sahyadri Base Reward: 8,318,123 Kana (0.08318123 CSM) 
-        let base_reward: u64 = 8_318_123; 
+    pub fn calc_block_subsidy(&self, blue_score: u64) -> u64 {
+        // 1. Sahyadri Base Reward: 8,318,123 Kana (0.08318123 CSM)
+        let base_reward: u64 = 8_318_123;
 
-        // 2. Halving Interval: 126,230,400 rewarded blocks (~4 years at ~1 block/sec) 
-        // Sahyadri math: 1 block/sec * 60 * 60 * 24 * 365.25 * 4 
-        let halving_interval: u64 = 126_230_400; 
+        // 2. Halving Interval: 126,230,400 rewarded blocks (~4 years at ~1 block/sec)
+        // Sahyadri math: 1 block/sec * 60 * 60 * 24 * 365.25 * 4
+        let halving_interval: u64 = 126_230_400;
 
-        // 3. Check kitne 4-saal (halvings) beet chuke hain 
-        let halvings = blue_score / halving_interval; 
+        // 3. Check kitne 4-saal (halvings) beet chuke hain
+        let halvings = blue_score / halving_interval;
 
-        // 4. Safety: 64 halvings ke baad reward hamesha 0 
-        if halvings >= 64 { 
-            return 0; 
-        } 
+        // 4. Safety: 64 halvings ke baad reward hamesha 0
+        if halvings >= 64 {
+            return 0;
+        }
 
-        // 5. Safe division: Har halving pe reward aadha (2 se divide) 
-        base_reward.checked_shr(halvings as u32).unwrap_or(0) 
+        // 5. Safe division: Har halving pe reward aadha (2 se divide)
+        base_reward.checked_shr(halvings as u32).unwrap_or(0)
     }
     /// Get the subsidy month as function of the current DAA score.
     ///
@@ -324,19 +320,13 @@ mod tests {
 
     // Helper to create a basic CoinbaseManager for testing
     fn create_test_manager() -> CoinbaseManager {
-        CoinbaseManager::new(
-            150, 
-            204, 
-            15778800, 
-            8318123, 
-            ForkedParam::new_const(1)
-        )
+        CoinbaseManager::new(150, 204, 15778800, 8318123, ForkedParam::new_const(1))
     }
 
     #[test]
     fn test_sahyadri_base_reward_math() {
         let cbm = create_test_manager();
-        
+
         // 1. Check Genesis / First Block Reward (Should be 8,318,123 Kana = 0.08318123 CSM)
         let block_1_reward = cbm.calc_block_subsidy(1);
         assert_eq!(block_1_reward, 8_318_123, "Sahyadri base reward math failed!");
@@ -355,4 +345,3 @@ mod tests {
         assert!(account_rewards.is_empty(), "Account ledger should start empty");
     }
 }
-

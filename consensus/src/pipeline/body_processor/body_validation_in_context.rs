@@ -10,10 +10,10 @@ use crate::{
         window::WindowManager,
     },
 };
+use once_cell::unsync::Lazy;
 use sahyadri_consensus_core::block::Block;
 use sahyadri_database::prelude::StoreResultExt;
 use sahyadri_hashes::Hash;
-use once_cell::unsync::Lazy;
 use std::sync::Arc;
 
 impl BlockBodyProcessor {
@@ -69,9 +69,9 @@ impl BlockBodyProcessor {
 
                 let _expected_subsidy = self.coinbase_manager.calc_block_subsidy(block.header.daa_score);
 
-           //   if data.subsidy != expected_subsidy {
-          //       return Err(RuleError::WrongSubsidy(expected_subsidy, data.subsidy));
-          //    }
+                //   if data.subsidy != expected_subsidy {
+                //       return Err(RuleError::WrongSubsidy(expected_subsidy, data.subsidy));
+                //    }
 
                 Ok(())
             }

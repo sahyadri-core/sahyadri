@@ -14,7 +14,9 @@ use crate::account::create_private_keys;
 use crate::error::Error;
 use crate::imports::*;
 use crate::result::Result;
-use sahyadri_bip32::{AddressType, DerivationPath, DilithiumPkHash, DilithiumSeed, ExtendedPrivateKey, ExtendedPublicKey, Language, Mnemonic};
+use sahyadri_bip32::{
+    AddressType, DerivationPath, DilithiumPkHash, DilithiumSeed, ExtendedPrivateKey, ExtendedPublicKey, Language, Mnemonic,
+};
 use sahyadri_consensus_core::network::{NetworkType, NetworkTypeT};
 use sahyadri_txscript::{
     extract_script_pub_key_address, multisig_redeem_script, multisig_redeem_script_ecdsa, pay_to_script_hash_script,
@@ -250,7 +252,8 @@ impl AddressDerivationManager {
     pub fn create_legacy_pubkey_managers(
         wallet: &Arc<Wallet>,
         account_index: u64,
-        address_derivation_indexes: AddressDerivationMeta, xprv: &str,
+        address_derivation_indexes: AddressDerivationMeta,
+        xprv: &str,
     ) -> Result<Arc<AddressDerivationManager>> {
         let mut receive_pubkey_managers = vec![];
         let mut change_pubkey_managers = vec![];
@@ -440,16 +443,26 @@ pub trait AddressDerivationManagerTrait: AnySync + Send + Sync + 'static {
     ) -> Result<Vec<(Address, DilithiumSeed)>>;
 }
 
-pub fn create_multisig_address(
-    minimum_signatures: usize,
-    keys: Vec<PublicKey>,
-    prefix: Prefix,
-    ecdsa: bool,
-) -> Result<Address> {
+pub fn create_multisig_address(minimum_signatures: usize, keys: Vec<PublicKey>, prefix: Prefix, ecdsa: bool) -> Result<Address> {
     let script = if !ecdsa {
-        multisig_redeem_script(keys.iter().map(|pk| { let mut h = [0u8; 32]; h.copy_from_slice(&pk.bytes[..32]); h }), minimum_signatures)
+        multisig_redeem_script(
+            keys.iter().map(|pk| {
+                let mut h = [0u8; 32];
+                h.copy_from_slice(&pk.bytes[..32]);
+                h
+            }),
+            minimum_signatures,
+        )
     } else {
-        multisig_redeem_script_ecdsa(keys.iter().map(|pk| { let mut h = [0u8; 33]; h[..32].copy_from_slice(&pk.bytes[..32]); h[32] = 0x02; h }), minimum_signatures)
+        multisig_redeem_script_ecdsa(
+            keys.iter().map(|pk| {
+                let mut h = [0u8; 33];
+                h[..32].copy_from_slice(&pk.bytes[..32]);
+                h[32] = 0x02;
+                h
+            }),
+            minimum_signatures,
+        )
     }?;
     let script_pub_key = pay_to_script_hash_script(&script);
     let address = extract_script_pub_key_address(&script_pub_key, prefix)?;
@@ -465,13 +478,7 @@ pub fn create_address_js(
     account_kind: Option<AccountKind>,
 ) -> Result<Address> {
     let public_key = PublicKey::try_cast_from(key)?.into_owned();
-    create_address(
-        1,
-        vec![public_key],
-        NetworkType::try_from(network)?.into(),
-        ecdsa.unwrap_or(false),
-        account_kind,
-    )
+    create_address(1, vec![public_key], NetworkType::try_from(network)?.into(), ecdsa.unwrap_or(false), account_kind)
 }
 
 /// @category Wallet SDK
@@ -483,9 +490,7 @@ pub fn create_multisig_address_js(
     ecdsa: Option<bool>,
     account_kind: Option<AccountKind>,
 ) -> Result<Address> {
-    let pub_keys: Vec<PublicKey> = keys.iter()
-        .map(|v| Ok(PublicKey::try_cast_from(&v)?.into_owned()))
-        .collect::<Result<Vec<_>>>()?;
+    let pub_keys: Vec<PublicKey> = keys.iter().map(|v| Ok(PublicKey::try_cast_from(&v)?.into_owned())).collect::<Result<Vec<_>>>()?;
     create_address(minimum_signatures, pub_keys, network_type.into(), ecdsa.unwrap_or(false), account_kind)
 }
 
@@ -506,9 +511,17 @@ pub fn create_address(
     }
 
     if account_kind.map(|kind| kind == LEGACY_ACCOUNT_KIND).unwrap_or(false) {
-        Ok(PubkeyDerivationManager::create_address(&DilithiumPkHash(keys[0].bytes[..32].try_into().unwrap_or_default()), prefix, ecdsa)?)
+        Ok(PubkeyDerivationManager::create_address(
+            &DilithiumPkHash(keys[0].bytes[..32].try_into().unwrap_or_default()),
+            prefix,
+            ecdsa,
+        )?)
     } else {
-        Ok(PubkeyDerivationManager::create_address(&DilithiumPkHash(keys[0].bytes[..32].try_into().unwrap_or_default()), prefix, ecdsa)?)
+        Ok(PubkeyDerivationManager::create_address(
+            &DilithiumPkHash(keys[0].bytes[..32].try_into().unwrap_or_default()),
+            prefix,
+            ecdsa,
+        )?)
     }
 }
 

@@ -7,7 +7,7 @@ use sahyadri_consensus_core::{
     BlockHashMap, BlockHashSet, HashMapCustomHasher,
     block::Block,
     blockhash::ORIGIN,
-    trusted::{TrustedBlock, TrustedSahyadriConsensusData, TrustedHeader},
+    trusted::{TrustedBlock, TrustedHeader, TrustedSahyadriConsensusData},
 };
 
 use crate::common::ProtocolError;

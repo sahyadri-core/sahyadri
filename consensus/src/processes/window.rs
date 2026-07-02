@@ -2,11 +2,12 @@ use crate::{
     model::stores::{
         block_window_cache::{BlockWindowCacheReader, BlockWindowCacheWriter, BlockWindowHeap},
         daa::DaaStoreReader,
-        sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
         headers::HeaderStoreReader,
+        sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
     },
     processes::sahyadri_consensus::ordering::SortableBlock,
 };
+use once_cell::unsync::Lazy;
 use sahyadri_consensus_core::{
     BlockHashSet, BlueWorkType, HashMapCustomHasher,
     blockhash::{BlockHashExtensions, ORIGIN},
@@ -15,7 +16,6 @@ use sahyadri_consensus_core::{
 };
 use sahyadri_hashes::Hash;
 use sahyadri_math::Uint256;
-use once_cell::unsync::Lazy;
 use std::{
     cmp::Reverse,
     iter::once,
@@ -45,18 +45,24 @@ impl DaaWindow {
 }
 
 pub trait WindowManager {
-    fn block_window(&self, sahyadri_consensus_data: &SahyadriConsensusData, window_type: WindowType) -> Result<Arc<BlockWindowHeap>, RuleError>;
+    fn block_window(
+        &self,
+        sahyadri_consensus_data: &SahyadriConsensusData,
+        window_type: WindowType,
+    ) -> Result<Arc<BlockWindowHeap>, RuleError>;
     fn calc_daa_window(&self, sahyadri_consensus_data: &SahyadriConsensusData, window: Arc<BlockWindowHeap>) -> DaaWindow;
     fn block_daa_window(&self, sahyadri_consensus_data: &SahyadriConsensusData) -> Result<DaaWindow, RuleError>;
     fn calculate_difficulty_bits(&self, sahyadri_consensus_data: &SahyadriConsensusData, daa_window: &DaaWindow) -> u32;
-    fn calc_past_median_time(&self, sahyadri_consensus_data: &SahyadriConsensusData) -> Result<(u64, Arc<BlockWindowHeap>), RuleError>;
+    fn calc_past_median_time(&self, sahyadri_consensus_data: &SahyadriConsensusData)
+    -> Result<(u64, Arc<BlockWindowHeap>), RuleError>;
     fn calc_past_median_time_for_known_hash(&self, hash: Hash) -> Result<u64, RuleError>;
     fn estimate_network_hashes_per_second(&self, window: Arc<BlockWindowHeap>) -> DifficultyResult<u64>;
     fn window_size(&self, sahyadri_consensus_data: &SahyadriConsensusData, window_type: WindowType) -> usize;
     fn sample_rate(&self, sahyadri_consensus_data: &SahyadriConsensusData, window_type: WindowType) -> u64;
 
     /// Returns the full consecutive sub-DAG containing all blocks required to restore the (possibly sampled) window.
-    fn consecutive_cover_for_window(&self, sahyadri_consensus_data: Arc<SahyadriConsensusData>, window: &BlockWindowHeap) -> Vec<Hash>;
+    fn consecutive_cover_for_window(&self, sahyadri_consensus_data: Arc<SahyadriConsensusData>, window: &BlockWindowHeap)
+    -> Vec<Hash>;
 }
 
 enum SampledBlock {
@@ -207,7 +213,8 @@ impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCac
                 break;
             }
 
-            let parent_sahyadri_consensus = self.sahyadri_consensus_store.get_data(current_sahyadri_consensus.selected_parent).unwrap();
+            let parent_sahyadri_consensus =
+                self.sahyadri_consensus_store.get_data(current_sahyadri_consensus.selected_parent).unwrap();
 
             // No need to further iterate since past of selected parent has only lower blue work
             if !window_heap.can_push(current_sahyadri_consensus.selected_parent, parent_sahyadri_consensus.blue_work) {
@@ -215,7 +222,13 @@ impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCac
             }
 
             // push the current mergeset into the window
-            self.push_mergeset(&mut &mut window_heap, sample_rate, &current_sahyadri_consensus, parent_sahyadri_consensus.blue_work, None::<fn(Hash)>);
+            self.push_mergeset(
+                &mut &mut window_heap,
+                sample_rate,
+                &current_sahyadri_consensus,
+                parent_sahyadri_consensus.blue_work,
+                None::<fn(Hash)>,
+            );
 
             // see if we can inherit and merge with the selected parent cache
             if self.try_merge_with_selected_parent_cache(&mut window_heap, &cache, &current_sahyadri_consensus.selected_parent) {
@@ -322,16 +335,21 @@ impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCac
     }
 }
 
-impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCacheWriter, V: HeaderStoreReader, W: DaaStoreReader> WindowManager
-    for SampledWindowManager<T, U, V, W>
+impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCacheWriter, V: HeaderStoreReader, W: DaaStoreReader>
+    WindowManager for SampledWindowManager<T, U, V, W>
 {
-    fn block_window(&self, sahyadri_consensus_data: &SahyadriConsensusData, window_type: WindowType) -> Result<Arc<BlockWindowHeap>, RuleError> {
+    fn block_window(
+        &self,
+        sahyadri_consensus_data: &SahyadriConsensusData,
+        window_type: WindowType,
+    ) -> Result<Arc<BlockWindowHeap>, RuleError> {
         self.build_block_window(sahyadri_consensus_data, window_type, |_| {})
     }
 
     fn calc_daa_window(&self, sahyadri_consensus_data: &SahyadriConsensusData, window: Arc<BlockWindowHeap>) -> DaaWindow {
-        let (daa_score, mergeset_non_daa) =
-            self.difficulty_manager.calc_daa_score_and_mergeset_non_daa_blocks(sahyadri_consensus_data, self.sahyadri_consensus_store.deref());
+        let (daa_score, mergeset_non_daa) = self
+            .difficulty_manager
+            .calc_daa_score_and_mergeset_non_daa_blocks(sahyadri_consensus_data, self.sahyadri_consensus_store.deref());
         DaaWindow::new(window, daa_score, mergeset_non_daa)
     }
 
@@ -348,9 +366,13 @@ impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCac
         self.difficulty_manager.calculate_difficulty_bits(&daa_window.window, sahyadri_consensus_data)
     }
 
-    fn calc_past_median_time(&self, sahyadri_consensus_data: &SahyadriConsensusData) -> Result<(u64, Arc<BlockWindowHeap>), RuleError> {
+    fn calc_past_median_time(
+        &self,
+        sahyadri_consensus_data: &SahyadriConsensusData,
+    ) -> Result<(u64, Arc<BlockWindowHeap>), RuleError> {
         let window = self.block_window(sahyadri_consensus_data, WindowType::MedianTimeWindow)?;
-        let past_median_time = self.past_median_time_manager.calc_past_median_time(&window, sahyadri_consensus_data.selected_parent)?;
+        let past_median_time =
+            self.past_median_time_manager.calc_past_median_time(&window, sahyadri_consensus_data.selected_parent)?;
         Ok((past_median_time, window))
     }
 

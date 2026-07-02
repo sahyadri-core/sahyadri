@@ -6,6 +6,7 @@ use crate::{
     stores::store_manager::Store,
     update_container::UtxoIndexChanges,
 };
+use parking_lot::RwLock;
 use sahyadri_consensus_core::{BlockHashSet, tx::ScriptPublicKeys, utxo::utxo_diff::UtxoDiff};
 use sahyadri_consensusmanager::{ConsensusManager, ConsensusResetHandler};
 use sahyadri_core::{info, trace};
@@ -13,7 +14,6 @@ use sahyadri_database::prelude::{DB, StoreError, StoreResult};
 use sahyadri_hashes::Hash;
 use sahyadri_index_core::indexed_utxos::BalanceByScriptPublicKey;
 use sahyadri_utils::arc::ArcExtensions;
-use parking_lot::RwLock;
 use std::{
     fmt::Debug,
     sync::{Arc, Weak},
@@ -229,7 +229,7 @@ mod tests {
         model::stores::virtual_state::{VirtualState, VirtualStateStore},
         params::DEVNET_PARAMS,
     };
-    
+
     use sahyadri_consensusmanager::ConsensusManager;
     use sahyadri_core::info;
     use sahyadri_database::create_temp_db;
@@ -246,7 +246,7 @@ mod tests {
         let config = Config::new(DEVNET_PARAMS);
         let tc = Arc::new(TestConsensus::new(&config));
         let consensus_manager = Arc::new(ConsensusManager::from_consensus(tc.consensus_clone()));
-        
+
         let utxoindex = UtxoIndex::new(consensus_manager, utxoindex_db).unwrap();
 
         // 2. Setup mock data
@@ -270,13 +270,13 @@ mod tests {
         virtual_change_emulator.change_virtual_state(100, 100, 1);
 
         let now = Instant::now();
-        
+
         // Diff is passed directly to the update function
         let _state_changes = utxoindex
             .write()
             .update(virtual_change_emulator.accumulated_utxo_diff.clone(), virtual_change_emulator.virtual_parents.clone())
             .expect("expected state index changes");
-            
+
         let bench_time = now.elapsed().as_millis();
         info!("Updated state index in {bench_time} ms");
 

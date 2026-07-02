@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::BlockHasher;
 use sahyadri_database::prelude::CachePolicy;
 use sahyadri_database::prelude::DB;
@@ -8,7 +9,6 @@ use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 use sahyadri_utils::mem_size::MemSizeEstimator;
-use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 
 pub trait DepthStoreReader {

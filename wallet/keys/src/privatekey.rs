@@ -6,7 +6,7 @@ use crate::imports::*;
 use crate::keypair::Keypair;
 use js_sys::{Array, Uint8Array};
 use sahyadri_dilithium::generate_keypair_from_seed;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /// Data structure that envelops a Private Key (32-byte seed for Dilithium key derivation).
 /// @category Wallet SDK
@@ -29,8 +29,7 @@ impl PrivateKey {
     #[wasm_bindgen(constructor)]
     pub fn try_new(key: &str) -> Result<PrivateKey> {
         let mut seed = [0u8; 32];
-        faster_hex::hex_decode(key.as_bytes(), &mut seed)
-            .map_err(|_| Error::custom("Invalid hex for PrivateKey seed"))?;
+        faster_hex::hex_decode(key.as_bytes(), &mut seed).map_err(|_| Error::custom("Invalid hex for PrivateKey seed"))?;
         Ok(Self { inner: seed })
     }
 }

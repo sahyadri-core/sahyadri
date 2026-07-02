@@ -1,7 +1,7 @@
 use crate::{
     BlueWorkType,
     header::Header,
-    trusted::{TrustedSahyadriConsensusData, TrustedHeader},
+    trusted::{TrustedHeader, TrustedSahyadriConsensusData},
 };
 use sahyadri_hashes::Hash;
 use std::sync::Arc;

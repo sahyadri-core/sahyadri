@@ -77,7 +77,7 @@ impl PublicKeyGenerator {
     /// Generate a single Receive Public Key derivation at a given index and return it as a string.
     #[wasm_bindgen(js_name=receivePubkeyAsString)]
     pub fn receive_pubkey_as_string(&self, index: u32) -> Result<String> {
-         Ok(faster_hex::hex_string(&self.hd_wallet.receive_pubkey_manager().derive_pubkey(index)?.0))
+        Ok(faster_hex::hex_string(&self.hd_wallet.receive_pubkey_manager().derive_pubkey(index)?.0))
     }
 
     /// Generate Receive Address derivations for a given range.

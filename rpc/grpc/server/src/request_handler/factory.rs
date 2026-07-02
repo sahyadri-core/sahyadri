@@ -137,31 +137,29 @@ impl Factory {
             })
         });
         interface.replace_method(SahyadridPayloadOps::NotifyFinalityConflict, method);
- 
-       // SubmitAccountTransaction custom handler
-       let method: SahyadridMethod = Method::new(|server_ctx: ServerContext, _connection: Connection, request: SahyadridRequest| {
-       Box::pin(async move {
-        let mut response: SahyadridResponse = match request.payload {
-            Some(Payload::SubmitAccountTransactionRequest(ref req)) => {
-                match sahyadri_rpc_core::SubmitAccountTransactionRequest::try_from(req) {
-                    Ok(rpc_req) => {
-                        match server_ctx.core_service.submit_account_transaction(rpc_req).await {
-                            Ok(res) => SubmitAccountTransactionResponseMessage::from(res).into(),
+
+        // SubmitAccountTransaction custom handler
+        let method: SahyadridMethod = Method::new(|server_ctx: ServerContext, _connection: Connection, request: SahyadridRequest| {
+            Box::pin(async move {
+                let mut response: SahyadridResponse = match request.payload {
+                    Some(Payload::SubmitAccountTransactionRequest(ref req)) => {
+                        match sahyadri_rpc_core::SubmitAccountTransactionRequest::try_from(req) {
+                            Ok(rpc_req) => match server_ctx.core_service.submit_account_transaction(rpc_req).await {
+                                Ok(res) => SubmitAccountTransactionResponseMessage::from(res).into(),
+                                Err(e) => SubmitAccountTransactionResponseMessage::from(e).into(),
+                            },
                             Err(e) => SubmitAccountTransactionResponseMessage::from(e).into(),
                         }
                     }
-                    Err(e) => SubmitAccountTransactionResponseMessage::from(e).into(),
-                }
-            }
-            _ => return Err(GrpcServerError::InvalidRequestPayload),
-        };
-        response.id = request.id;
-        Ok(response)
-      })
-    });
-    interface.replace_method(SahyadridPayloadOps::SubmitAccountTransaction, method);
-    
-    // SubmitAccountTransactionResponseMessage -> SahyadridResponse impl
+                    _ => return Err(GrpcServerError::InvalidRequestPayload),
+                };
+                response.id = request.id;
+                Ok(response)
+            })
+        });
+        interface.replace_method(SahyadridPayloadOps::SubmitAccountTransaction, method);
+
+        // SubmitAccountTransactionResponseMessage -> SahyadridResponse impl
 
         // Methods with special properties
         let network_bps = network_bps as usize;

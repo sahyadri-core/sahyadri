@@ -39,7 +39,7 @@ impl SahyadriX {
     pub fn hash(data: &[u8]) -> Hash {
         MEMORY_BUFFER.with(|mem| {
             let mut buffer = mem.borrow_mut();
-            
+
             // 1. Fill 16MB buffer using blake3 (EXACT MINER LOGIC)
             let mut current_hash = blake3::hash(data);
             for i in 0..524288 {
@@ -54,13 +54,13 @@ impl SahyadriX {
                 let mut index_bytes = [0u8; 4];
                 index_bytes.copy_from_slice(&state_bytes[0..4]);
                 let raw_index = u32::from_le_bytes(index_bytes) as usize;
-                
+
                 let address = (raw_index % 524288) * 32;
-                
+
                 let mut mix = [0u8; 64];
                 mix[0..32].copy_from_slice(state_bytes);
                 mix[32..64].copy_from_slice(&buffer[address..address + 32]);
-                
+
                 state = blake3::hash(&mix);
             }
 

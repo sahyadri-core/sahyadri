@@ -4,30 +4,16 @@
 use dilithium::packing;
 use dilithium::poly::Poly;
 use dilithium::polyvec::{
-    PolyVecK, PolyVecL,
-    matrix_pointwise_montgomery,
-    polyveck_pointwise_poly_montgomery,
-    polyveck_sub,
-    polyveck_invntt_tomont,
-    polyveck_ntt,
-    polyvecl_ntt,
-    polyveck_reduce,
-    polyveck_shiftl,
-    polyveck_caddq,
-    polyveck_use_hint,
-    polyveck_pack_w1,
-    polyvecl_chknorm,
+    matrix_pointwise_montgomery, polyveck_caddq, polyveck_invntt_tomont, polyveck_ntt, polyveck_pack_w1,
+    polyveck_pointwise_poly_montgomery, polyveck_reduce, polyveck_shiftl, polyveck_sub, polyveck_use_hint, polyvecl_chknorm,
+    polyvecl_ntt, PolyVecK, PolyVecL,
 };
 
 use super::params::*;
 
 /// Verify ML-DSA-65 signature (same logic as dilithium-rs verify_internal).
 /// Returns Ok(()) if valid.
-pub fn verify_dilithium_native(
-    sig_bytes: &[u8],
-    pk_bytes: &[u8],
-    msg: &[u8],
-) -> Result<(), String> {
+pub fn verify_dilithium_native(sig_bytes: &[u8], pk_bytes: &[u8], msg: &[u8]) -> Result<(), String> {
     let mode = dilithium::ML_DSA_65;
     let k = mode.k();
     let beta = mode.beta();
@@ -162,15 +148,13 @@ mod tests {
             }
         }
     }
-        #[test]
+    #[test]
     fn test_dilithium_rs_verify_directly() {
         let kp = generate_keypair().unwrap();
         let msg = "test-zk-native";
         let sig = sign_message(msg, &kp).unwrap();
         let mode = dilithium::ML_DSA_65;
-        let valid = dilithium::sign::verify(
-            mode, sig.as_bytes(), msg.as_bytes(), b"", kp.public_key()
-        );
+        let valid = dilithium::sign::verify(mode, sig.as_bytes(), msg.as_bytes(), b"", kp.public_key());
         eprintln!("dilithium-rs verify: {}", valid);
         assert!(valid, "dilithium-rs should verify its own sig");
     }

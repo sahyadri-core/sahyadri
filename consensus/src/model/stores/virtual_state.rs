@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::api::stats::VirtualStateStats;
 use sahyadri_consensus_core::{
     BlockHashMap, BlockHashSet, HashMapCustomHasher, block::VirtualStateApproxId, coinbase::BlockRewardData,
@@ -13,7 +14,6 @@ use sahyadri_database::prelude::{DB, StoreError};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 use sahyadri_muhash::MuHash;
-use rocksdb::WriteBatch;
 use serde::{Deserialize, Serialize};
 
 use super::sahyadri_consensus::SahyadriConsensusData;
@@ -26,9 +26,9 @@ pub struct VirtualState {
     pub daa_score: u64,
     pub bits: u32,
     pub past_median_time: u64,
-    pub multiset: MuHash, 
-    pub account_diff: HashMap<String, i64>, 
-    pub accepted_tx_ids: Vec<TransactionId>, 
+    pub multiset: MuHash,
+    pub account_diff: HashMap<String, i64>,
+    pub accepted_tx_ids: Vec<TransactionId>,
     pub mergeset_rewards: BlockHashMap<BlockRewardData>,
     pub mergeset_non_daa: BlockHashSet,
 }
@@ -127,19 +127,14 @@ impl LkgVirtualState {
     }
 }
 
-
 /// Used in order to group virtual related stores under a single lock
 pub struct VirtualStores {
     pub state: DbVirtualStateStore,
-
 }
 
 impl VirtualStores {
     pub fn new(db: Arc<DB>, lkg_virtual_state: LkgVirtualState, _cache_policy: CachePolicy) -> Self {
-        Self {
-            state: DbVirtualStateStore::new(db.clone(), lkg_virtual_state),
-
-        }
+        Self { state: DbVirtualStateStore::new(db.clone(), lkg_virtual_state) }
     }
 }
 

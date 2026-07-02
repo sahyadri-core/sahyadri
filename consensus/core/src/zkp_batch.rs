@@ -106,9 +106,7 @@ mod zkp_impl {
     /// Generate a STARK proof for all signatures in a block.
     ///
     /// This should be called by the block producer after collecting all transactions.
-    pub fn generate_block_zkp(
-        transactions: &[Transaction],
-    ) -> Result<BlockZkpProof, ZKPError> {
+    pub fn generate_block_zkp(transactions: &[Transaction]) -> Result<BlockZkpProof, ZKPError> {
         let (messages, signatures, public_keys) = extract_signatures_from_block(transactions);
 
         if messages.is_empty() {
@@ -155,7 +153,7 @@ mod zkp_impl {
 }
 
 #[cfg(feature = "zkp")]
-pub use zkp_impl::{generate_block_zkp, verify_block_zkp, should_use_zkp};
+pub use zkp_impl::{generate_block_zkp, should_use_zkp, verify_block_zkp};
 
 #[cfg(test)]
 mod tests {

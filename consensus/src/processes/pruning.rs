@@ -3,21 +3,21 @@ use std::{collections::VecDeque, sync::Arc};
 use crate::model::{
     services::reachability::{MTReachabilityService, ReachabilityService},
     stores::{
-        sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusStoreReader},
         headers::HeaderStoreReader,
         headers_selected_tip::HeadersSelectedTipStoreReader,
         past_pruning_points::PastPruningPointsStoreReader,
         pruning_samples::PruningSamplesStore,
         reachability::ReachabilityStoreReader,
+        sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusStoreReader},
     },
 };
+use parking_lot::RwLock;
 use sahyadri_consensus_core::{
     blockhash::BlockHashExtensions,
     errors::pruning::{PruningImportError, PruningImportResult},
 };
 use sahyadri_database::prelude::StoreResultUnitExt;
 use sahyadri_hashes::Hash;
-use parking_lot::RwLock;
 
 pub struct PruningPointReply {
     /// The most recent pruning sample from POV of the queried block (with distance up to ~F)
@@ -129,8 +129,10 @@ impl<
             }
         };
 
-        let is_self_pruning_sample = self.is_pruning_sample(sahyadri_consensus_data.blue_score, selected_parent_blue_score, finality_depth);
-        let selected_parent_pruning_point = self.headers_store.get_header(sahyadri_consensus_data.selected_parent).unwrap().pruning_point;
+        let is_self_pruning_sample =
+            self.is_pruning_sample(sahyadri_consensus_data.blue_score, selected_parent_blue_score, finality_depth);
+        let selected_parent_pruning_point =
+            self.headers_store.get_header(sahyadri_consensus_data.selected_parent).unwrap().pruning_point;
         let mut steps = 1;
         let mut current = pruning_sample;
         let pruning_point = loop {
@@ -166,7 +168,11 @@ impl<
         self.finality_score(epoch_chain_ancestor_blue_score, finality_depth) < self.finality_score(self_blue_score, finality_depth)
     }
 
-    pub fn next_pruning_points(&self, sink_sahyadri_consensus: CompactSahyadriConsensusData, current_pruning_point: Hash) -> Vec<Hash> {
+    pub fn next_pruning_points(
+        &self,
+        sink_sahyadri_consensus: CompactSahyadriConsensusData,
+        current_pruning_point: Hash,
+    ) -> Vec<Hash> {
         if sink_sahyadri_consensus.selected_parent.is_origin() {
             // This only happens when sink is genesis
             return vec![];

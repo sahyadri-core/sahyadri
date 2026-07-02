@@ -10,10 +10,10 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use sahyadri_addresses::{Address, Prefix};
 use sahyadri_consensus_core::tx::ScriptPublicKey;
 use sahyadri_core::trace;
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     collections::hash_set,
     fmt::{Debug, Display},

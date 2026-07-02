@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::BlockHashSet;
 use sahyadri_consensus_core::{BlockHashMap, BlockHasher, BlockLevel, blockhash::BlockHashes};
 use sahyadri_database::prelude::{BatchDbWriter, CachePolicy, DbWriter};
@@ -8,7 +9,6 @@ use sahyadri_database::prelude::{DirectWriter, MemoryWriter};
 use sahyadri_database::prelude::{ReadLock, StoreError};
 use sahyadri_database::registry::{DatabaseStorePrefixes, SEPARATOR};
 use sahyadri_hashes::Hash;
-use rocksdb::WriteBatch;
 use std::collections::HashSet;
 use std::collections::hash_map::Entry;
 use std::iter::once;

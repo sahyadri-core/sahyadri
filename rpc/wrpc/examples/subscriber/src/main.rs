@@ -51,7 +51,8 @@ impl Listener {
         let (resolver, url) = if let Some(url) = url { (None, Some(url)) } else { (Some(Resolver::default()), None) };
 
         // Create a basic Sahyadri RPC client instance using Borsh encoding.
-        let client = Arc::new(SahyadriRpcClient::new_with_args(WrpcEncoding::Borsh, url.as_deref(), resolver, Some(network_id), None)?);
+        let client =
+            Arc::new(SahyadriRpcClient::new_with_args(WrpcEncoding::Borsh, url.as_deref(), resolver, Some(network_id), None)?);
 
         let inner = Inner {
             task_ctl: DuplexChannel::oneshot(),

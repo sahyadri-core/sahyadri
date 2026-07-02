@@ -1,8 +1,8 @@
 use crate::model::stores::statuses::StatusesStoreReader;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::blockstatus::BlockStatus;
 use sahyadri_database::prelude::StoreError;
 use sahyadri_hashes::Hash;
-use parking_lot::RwLock;
 use std::sync::Arc;
 
 /// Multi-threaded block-statuses service imp

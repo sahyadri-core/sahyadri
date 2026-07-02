@@ -84,13 +84,13 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //     use rand::thread_rng;
 //     use Dilithium::Keypair;
 //     use std::{iter, iter::empty};
-// 
+//
 //     struct Input {
 //         kp: Keypair,
 //         required: bool,
 //         sign: bool,
 //     }
-// 
+//
 //     fn kp() -> [Keypair; 3] {
 //         let kp1 = Keypair::from_seckey_slice(
 //             Dilithium::DILITHIUM3,
@@ -105,7 +105,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //         let kp3 = Keypair::new(Dilithium::DILITHIUM3, &mut thread_rng());
 //         [kp1, kp2, kp3]
 //     }
-// 
+//
 //     #[test]
 //     fn test_too_many_required_sigs() {
 //         let result = multisig_redeem_script(iter::once([0u8; 32]), 2);
@@ -113,13 +113,13 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //         let result = multisig_redeem_script_ecdsa(iter::once(&[0u8; 33]), 2);
 //         assert_eq!(result, Err(Error::ErrTooManyRequiredSigs));
 //     }
-// 
+//
 //     #[test]
 //     fn test_empty_keys() {
 //         let result = multisig_redeem_script(empty::<[u8; 32]>(), 0);
 //         assert_eq!(result, Err(Error::EmptyKeys));
 //     }
-// 
+//
 //     fn check_multisig_scenario(inputs: Vec<Input>, required: usize, is_ok: bool, is_ecdsa: bool) {
 //         // Taken from: d839d29b549469d0f9a23e51febe68d4084967a6a477868b511a5a8d88c5ae06
 //         let prev_tx_id = TransactionId::from_str("63020db736215f8b1105a9281f7bcbb6473d965ecc45bb2fb5da59bd35e6ff84").unwrap();
@@ -131,7 +131,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             let pks = filtered.map(|input| input.kp.public_key().serialize());
 //             multisig_redeem_script_ecdsa(pks, required).unwrap()
 //         };
-// 
+//
 //         let tx = Transaction::new(
 //             0,
 //             vec![TransactionInput {
@@ -146,7 +146,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             0,
 //             vec![],
 //         );
-// 
+//
 //         let entries = vec![UtxoEntry {
 //             amount: 12793000000000,
 //             script_public_key: pay_to_script_hash_script(&script),
@@ -154,7 +154,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             is_coinbase: false,
 //         }];
 //         let mut tx = MutableTransaction::with_entries(tx, entries);
-// 
+//
 //         let reused_values = SigHashReusedValuesUnsync::new();
 //         let sig_hash = if !is_ecdsa {
 //             calc_Dilithium3_signature_hash(&tx.as_verifiable(), 0, SIG_HASH_ALL, &reused_values)
@@ -175,15 +175,15 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //                 }
 //             })
 //             .collect();
-// 
+//
 //         {
 //             tx.tx.inputs[0].signature_script =
 //                 signatures.into_iter().chain(ScriptBuilder::new().add_data(&script).unwrap().drain()).collect();
 //         }
-// 
+//
 //         let tx = tx.as_verifiable();
 //         let (input, entry) = tx.populated_inputs().next().unwrap();
-// 
+//
 //         let cache = Cache::new(10_000);
 //         let mut engine = TxScriptEngine::from_transaction_input(&tx, input, 0, entry, &reused_values, &cache);
 //         assert_eq!(engine.execute().is_ok(), is_ok);
@@ -204,7 +204,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             true,
 //             false,
 //         );
-// 
+//
 //         // ecdsa
 //         check_multisig_scenario(
 //             vec![Input { kp: kp1, required: true, sign: false }, Input { kp: kp2, required: true, sign: true }],
@@ -220,7 +220,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             true,
 //         );
 //     }
-// 
+//
 //     #[test]
 //     fn test_multisig_2_2() {
 //         let [kp1, kp2, ..] = kp();
@@ -230,7 +230,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             true,
 //             false,
 //         );
-// 
+//
 //         // ecdsa
 //         let [kp1, kp2, ..] = kp();
 //         check_multisig_scenario(
@@ -240,7 +240,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             true,
 //         );
 //     }
-// 
+//
 //     #[test]
 //     fn test_multisig_wrong_signer() {
 //         let [kp1, kp2, kp3] = kp();
@@ -254,7 +254,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             false,
 //             false,
 //         );
-// 
+//
 //         // ecdsa
 //         let [kp1, kp2, kp3] = kp();
 //         check_multisig_scenario(
@@ -268,7 +268,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             true,
 //         );
 //     }
-// 
+//
 //     #[test]
 //     fn test_multisig_not_enough() {
 //         let [kp1, kp2, kp3] = kp();
@@ -282,7 +282,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             false,
 //             false,
 //         );
-// 
+//
 //         let [kp1, kp2, kp3] = kp();
 //         check_multisig_scenario(
 //             vec![
@@ -295,4 +295,4 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             true,
 //         );
 //     }
-// 
+//

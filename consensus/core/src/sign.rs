@@ -5,12 +5,8 @@ use crate::{
     },
     tx::{SignableTransaction, VerifiableTransaction},
 };
-use sahyadri_dilithium::{
-    DilithiumKeyPair, DilithiumSignature, DilithiumError,
-    PUBKEY_SIZE, SIG_SIZE, SAHYADRI_MODE,
-    sign_bytes,
-};
-use sha2::{Sha256, Digest};
+use sahyadri_dilithium::{DilithiumError, DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHYADRI_MODE, SIG_SIZE, sign_bytes};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
@@ -194,11 +190,8 @@ pub fn verify(tx: &impl VerifiableTransaction) -> Result<(), Error> {
 /// Call this instead of `verify()` when ZKP proofs are available.
 #[cfg(feature = "zkp")]
 #[allow(dead_code)]
-pub fn verify_with_zkp(
-    tx: &impl VerifiableTransaction,
-    zkp_proof: Option<&crate::zkp_batch::BlockZkpProof>,
-) -> Result<(), Error> {
-    use crate::zkp_batch::{verify_block_zkp, should_use_zkp};
+pub fn verify_with_zkp(tx: &impl VerifiableTransaction, zkp_proof: Option<&crate::zkp_batch::BlockZkpProof>) -> Result<(), Error> {
+    use crate::zkp_batch::{should_use_zkp, verify_block_zkp};
 
     // Count sig ops in this transaction
     let sig_count = tx.populated_inputs().len();
@@ -239,21 +232,41 @@ mod tests {
         let unsigned_tx = Transaction::new(
             0,
             vec![
-                TransactionInput { previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id.clone(), index: 0 }, signature_script: vec![], sequence: 0, sig_op_count: 0 },
-                TransactionInput { previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: 1 }, signature_script: vec![], sequence: 1, sig_op_count: 0 },
+                TransactionInput {
+                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id.clone(), index: 0 },
+                    signature_script: vec![],
+                    sequence: 0,
+                    sig_op_count: 0,
+                },
+                TransactionInput {
+                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: 1 },
+                    signature_script: vec![],
+                    sequence: 1,
+                    sig_op_count: 0,
+                },
             ],
             vec![
                 TransactionOutput { value: 300, script_public_key: ScriptPublicKey::new(0, script_pub_key.clone()) },
                 TransactionOutput { value: 300, script_public_key: ScriptPublicKey::new(0, script_pub_key.clone()) },
             ],
             1615462089000,
-            SubnetworkId::from_bytes([1,2,3,4,5,6,7,8,9,10,0,0,0,0,0,0,0,0,0,0]),
+            SubnetworkId::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
             0,
             vec![],
         );
         let entries = vec![
-            UtxoEntry { amount: 100, script_public_key: ScriptPublicKey::new(0, script_pub_key.clone()), block_daa_score: 0, is_coinbase: false },
-            UtxoEntry { amount: 200, script_public_key: ScriptPublicKey::new(0, script_pub_key2), block_daa_score: 0, is_coinbase: false },
+            UtxoEntry {
+                amount: 100,
+                script_public_key: ScriptPublicKey::new(0, script_pub_key.clone()),
+                block_daa_score: 0,
+                is_coinbase: false,
+            },
+            UtxoEntry {
+                amount: 200,
+                script_public_key: ScriptPublicKey::new(0, script_pub_key2),
+                block_daa_score: 0,
+                is_coinbase: false,
+            },
         ];
         let signed_tx = sign_with_multiple(SignableTransaction::with_entries(unsigned_tx, entries), vec![&keypair, &keypair2]);
         assert!(verify(&signed_tx.as_verifiable()).is_ok());

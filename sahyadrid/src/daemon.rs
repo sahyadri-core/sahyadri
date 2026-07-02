@@ -46,7 +46,9 @@ use sahyadri_p2p_flows::{flow_context::FlowContext, service::P2pService};
 
 use sahyadri_perf_monitor::{builder::Builder as PerfMonitorBuilder, counters::CountersSnapshot};
 use sahyadri_utxoindex::{UtxoIndex, api::UtxoIndexProxy};
-use sahyadri_wrpc_server::service::{Options as WrpcServerOptions, WebSocketCounters as WrpcServerCounters, WrpcEncoding, WrpcService};
+use sahyadri_wrpc_server::service::{
+    Options as WrpcServerOptions, WebSocketCounters as WrpcServerCounters, WrpcEncoding, WrpcService,
+};
 
 /// Desired soft FD limit that needs to be configured
 /// for the sahyadrid process.
@@ -117,7 +119,8 @@ pub fn validate_args(args: &Args) -> ConfigResult<()> {
 }
 
 fn request_database_deletion_approval(approve: bool) -> bool {
-    let msg = "Node database is from a different Sahyadrid *DB* version and needs to be fully deleted, do you confirm the delete? (y/n)";
+    let msg =
+        "Node database is from a different Sahyadrid *DB* version and needs to be fully deleted, do you confirm the delete? (y/n)";
     get_user_approval_or_exit(msg, approve);
     info!("Deleting databases from previous Sahyadrid version");
     true // if consensus not exited, always return true

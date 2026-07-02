@@ -263,9 +263,9 @@ impl UtxoContext {
 
     pub(crate) async fn notify_outgoing_transaction(&self, pending_tx: &PendingTransaction) -> Result<()> {
         let outgoing_tx = match self.inner.processor.outgoing().get(&pending_tx.id()) {
-        Some(tx) => tx,
-        None => return Ok(()),
-        };        
+            Some(tx) => tx,
+            None => return Ok(()),
+        };
 
         if pending_tx.is_batch() {
             let record = TransactionRecord::new_batch(self, &outgoing_tx, None)?;

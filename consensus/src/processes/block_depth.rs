@@ -6,9 +6,9 @@ use crate::model::{
     services::reachability::{MTReachabilityService, ReachabilityService},
     stores::{
         depth::DepthStoreReader,
-        sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
         headers::HeaderStoreReader,
         reachability::ReachabilityStoreReader,
+        sahyadri_consensus::{SahyadriConsensusData, SahyadriConsensusStoreReader},
     },
 };
 
@@ -28,7 +28,9 @@ pub struct BlockDepthManager<S: DepthStoreReader, U: ReachabilityStoreReader, V:
     _headers_store: Arc<T>,
 }
 
-impl<S: DepthStoreReader, U: ReachabilityStoreReader, V: SahyadriConsensusStoreReader, T: HeaderStoreReader> BlockDepthManager<S, U, V, T> {
+impl<S: DepthStoreReader, U: ReachabilityStoreReader, V: SahyadriConsensusStoreReader, T: HeaderStoreReader>
+    BlockDepthManager<S, U, V, T>
+{
     pub fn new(
         merge_depth: u64,
         finality_depth: u64,
@@ -56,7 +58,12 @@ impl<S: DepthStoreReader, U: ReachabilityStoreReader, V: SahyadriConsensusStoreR
         self.calculate_block_at_depth(sahyadri_consensus_data, BlockDepthType::Finality, pruning_point)
     }
 
-    fn calculate_block_at_depth(&self, sahyadri_consensus_data: &SahyadriConsensusData, depth_type: BlockDepthType, pruning_point: Hash) -> Hash {
+    fn calculate_block_at_depth(
+        &self,
+        sahyadri_consensus_data: &SahyadriConsensusData,
+        depth_type: BlockDepthType,
+        pruning_point: Hash,
+    ) -> Hash {
         if sahyadri_consensus_data.selected_parent.is_origin() {
             return ORIGIN;
         }

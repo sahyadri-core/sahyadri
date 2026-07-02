@@ -5,9 +5,9 @@ use crate::{
 };
 
 use feerate_key::FeerateTransactionKey;
+use rand::{Rng, distributions::Uniform, prelude::Distribution};
 use sahyadri_consensus_core::{block::TemplateTransactionSelector, tx::Transaction};
 use sahyadri_core::trace;
-use rand::{Rng, distributions::Uniform, prelude::Distribution};
 use search_tree::SearchTree;
 use selectors::{SequenceSelector, SequenceSelectorInput, TakeAllSelector};
 use std::{collections::HashSet, iter::FusedIterator, sync::Arc};

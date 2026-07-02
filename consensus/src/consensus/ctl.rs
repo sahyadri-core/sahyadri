@@ -1,7 +1,7 @@
 use super::{Consensus, factory::MultiConsensusManagementStore};
+use parking_lot::RwLock;
 use sahyadri_consensusmanager::ConsensusCtl;
 use sahyadri_database::prelude::DB;
-use parking_lot::RwLock;
 use std::{
     path::PathBuf,
     sync::{Arc, Weak},

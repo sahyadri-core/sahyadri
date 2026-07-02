@@ -1,5 +1,5 @@
-use crate::types::*;
 use crate::Result;
+use crate::types::*;
 use ripemd::{Digest, Ripemd160};
 use sha2::Sha256;
 

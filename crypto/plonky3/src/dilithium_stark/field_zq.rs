@@ -17,13 +17,21 @@ use p3_field::PrimeCharacteristicRing;
 #[inline]
 pub fn add_q(a: u32, b: u32) -> u32 {
     let s = a + b;
-    if s >= Q { s - Q } else { s }
+    if s >= Q {
+        s - Q
+    } else {
+        s
+    }
 }
 
 /// Subtract two Z_q values.
 #[inline]
 pub fn sub_q(a: u32, b: u32) -> u32 {
-    if a >= b { a - b } else { a + Q - b }
+    if a >= b {
+        a - b
+    } else {
+        a + Q - b
+    }
 }
 
 /// Multiply two Z_q values (Barrett reduction).
@@ -94,7 +102,6 @@ pub fn ntt_twiddles() -> Vec<Vec<u32>> {
 }
 
 // ─── NTT / INTT ────────────────────────────────────────────────────
-
 
 /// Generate inverse NTT twiddle factors (ω^{-2^s * j}).
 fn ntt_twiddles_inv() -> Vec<Vec<u32>> {
@@ -222,11 +229,7 @@ pub fn build_ntt_trace(input: &[u32; N], is_inverse: bool) -> Vec<Vec<F>> {
                 // Compute butterfly
                 let t = mul_q(w, b);
                 let new_even = if is_inverse { add_q(a, b) } else { add_q(a, t) };
-                let new_odd = if is_inverse {
-                    mul_q(sub_q(a, b), w)
-                } else {
-                    sub_q(a, t)
-                };
+                let new_odd = if is_inverse { mul_q(sub_q(a, b), w) } else { sub_q(a, t) };
 
                 // Row 2: after butterfly
                 trace_rows.push(vec![
@@ -247,12 +250,16 @@ pub fn build_ntt_trace(input: &[u32; N], is_inverse: bool) -> Vec<Vec<F>> {
         }
 
         if is_inverse {
-            if stage == end_stage { break; }
+            if stage == end_stage {
+                break;
+            }
             stage = (stage as isize + step) as usize;
             len = half;
         } else {
             len *= 2;
-            if stage + 1 >= end_stage { break; }
+            if stage + 1 >= end_stage {
+                break;
+            }
             stage += 1;
         }
     }
@@ -320,7 +327,6 @@ mod tests {
         assert_eq!(trace.len(), NTT_TRACE_ROWS);
         assert_eq!(trace[0].len(), NTT_TRACE_COLS);
     }
-
 
     #[test]
     fn test_primitive_root() {

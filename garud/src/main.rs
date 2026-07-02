@@ -2,6 +2,10 @@ use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
 use clap::{Arg, ArgAction, Command};
 use itertools::Itertools;
+use parking_lot::Mutex;
+use rand::Rng;
+use rand::RngCore;
+use rayon::prelude::*;
 use sahyadri_addresses::{Address, Prefix, Version};
 use sahyadri_consensus_core::{
     config::params::TESTNET_PARAMS,
@@ -12,16 +16,12 @@ use sahyadri_consensus_core::{
     tx::{MutableTransaction, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
 };
 use sahyadri_core::{info, sahyadrid_env::version, time::unix_now, warn};
+use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair, generate_keypair_from_seed};
 use sahyadri_grpc_client::{ClientPool, GrpcClient};
 use sahyadri_notify::subscription::context::SubscriptionContext;
 use sahyadri_rpc_core::{RpcUtxoEntry, api::rpc::RpcApi, notify::mode::NotificationMode};
 use sahyadri_txscript::pay_to_address_script;
-use parking_lot::Mutex;
-use rayon::prelude::*;
-use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair_from_seed, generate_keypair};
-use rand::RngCore;
-use rand::Rng;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use tokio::time::{Instant, MissedTickBehavior, interval};
 
 const DEFAULT_SEND_AMOUNT: u64 = 10 * KANA_PER_SAHYADRI;
@@ -215,7 +215,8 @@ async fn main() {
     let pk_hash = Sha256::digest(dilithium_keypair.public_key());
     let sahyadri_addr = Address::new(address_prefix, ADDRESS_VERSION, &pk_hash[0..20]);
 
-    let sahyadri_to_addr = args.addr.as_ref().map_or_else(|| sahyadri_addr.clone(), |addr_str| Address::try_from(addr_str.clone()).unwrap());
+    let sahyadri_to_addr =
+        args.addr.as_ref().map_or_else(|| sahyadri_addr.clone(), |addr_str| Address::try_from(addr_str.clone()).unwrap());
 
     (args.payload_size <= 20000).then_some(()).expect("payload-size can be max 20000");
 
@@ -501,7 +502,14 @@ async fn maybe_send_tx(
         .into_par_iter()
         .map(|utxo_option| {
             if let Some((selected_utxos, selected_amount)) = utxo_option {
-                let tx = generate_tx(dilithium_keypair.clone(), &selected_utxos, selected_amount, num_outs, &sahyadri_addr, tx_config.payload_size);
+                let tx = generate_tx(
+                    dilithium_keypair.clone(),
+                    &selected_utxos,
+                    selected_amount,
+                    num_outs,
+                    &sahyadri_addr,
+                    tx_config.payload_size,
+                );
 
                 return Some((tx, selected_utxos.len(), selected_utxos.into_iter().map(|(_, entry)| entry.amount).sum::<u64>()));
             }
@@ -560,8 +568,10 @@ fn generate_tx(
     let mut data = vec![0u8; payload_size];
     rand::thread_rng().fill_bytes(&mut data);
     let unsigned_tx = Transaction::new_non_finalized(TX_VERSION, inputs, outputs, 0, SUBNETWORK_ID_NATIVE, 0, data);
-    let signed_tx =
-        sign(MutableTransaction::with_entries(unsigned_tx, utxos.iter().map(|(_, entry)| entry.clone()).collect_vec()), &dilithium_keypair);
+    let signed_tx = sign(
+        MutableTransaction::with_entries(unsigned_tx, utxos.iter().map(|(_, entry)| entry.clone()).collect_vec()),
+        &dilithium_keypair,
+    );
     signed_tx.tx
 }
 

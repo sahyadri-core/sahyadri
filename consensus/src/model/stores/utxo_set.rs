@@ -1,3 +1,4 @@
+use rocksdb::WriteBatch;
 use sahyadri_consensus_core::{
     tx::{TransactionIndexType, TransactionOutpoint, UtxoEntry},
     utxo::{
@@ -10,7 +11,6 @@ use sahyadri_database::prelude::StoreResultExt;
 use sahyadri_database::prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter};
 use sahyadri_database::prelude::{CachePolicy, StoreError};
 use sahyadri_hashes::Hash;
-use rocksdb::WriteBatch;
 use std::{error::Error, fmt::Display, sync::Arc};
 
 type UtxoCollectionIterator<'a> = Box<dyn Iterator<Item = Result<(TransactionOutpoint, UtxoEntry), Box<dyn Error>>> + 'a>;

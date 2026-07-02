@@ -21,6 +21,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use parking_lot::RwLock;
 use sahyadri_consensus_core::{
     api::{
         ConsensusApi,
@@ -34,7 +35,6 @@ use sahyadri_consensus_core::{
 use sahyadri_consensusmanager::{ConsensusProxy, spawn_blocking};
 use sahyadri_core::{debug, error, info, time::Stopwatch, warn};
 use sahyadri_mining_errors::{manager::MiningManagerError, mempool::RuleError};
-use parking_lot::RwLock;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 

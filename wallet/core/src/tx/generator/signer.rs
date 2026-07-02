@@ -3,9 +3,10 @@
 //!
 
 use crate::imports::*;
+use sahyadri_bip32::DilithiumSeed;
 use sahyadri_bip32::PrivateKey;
-use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair_from_seed}; use sahyadri_bip32::DilithiumSeed;
 use sahyadri_consensus_core::{sign::sign_with_multiple_v2, tx::SignableTransaction};
+use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair_from_seed};
 
 pub trait SignerT: Send + Sync + 'static {
     fn try_sign(&self, transaction: SignableTransaction, addresses: &[Address]) -> Result<SignableTransaction>;

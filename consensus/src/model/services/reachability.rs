@@ -1,8 +1,8 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use sahyadri_consensus_core::blockhash;
 use parking_lot::RwLock;
+use sahyadri_consensus_core::blockhash;
 
 use crate::model::stores::reachability::ReachabilityStoreReader;
 use crate::processes::reachability::{Result, inquirer};

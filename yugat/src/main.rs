@@ -9,9 +9,9 @@ use sahyadri_consensus::{
     constants::perf::PerfParams,
     model::stores::{
         block_transactions::BlockTransactionsStoreReader,
-        sahyadri_consensus::{SahyadriConsensusStoreReader, KType},
         headers::HeaderStoreReader,
         relations::RelationsStoreReader,
+        sahyadri_consensus::{KType, SahyadriConsensusStoreReader},
     },
     params::{DEVNET_PARAMS, ForkActivation, NETWORK_DELAY_BOUND, OverrideParams, Params, SIMNET_PARAMS, TenBps},
 };
@@ -496,12 +496,12 @@ pub(crate) fn topologically_ordered_hashes(src_consensus: &Consensus, genesis_ha
 }
 
 fn print_stats(src_consensus: &Consensus, hashes: &[Hash], delay: f64, bps: f64, k: KType) -> usize {
-    let blues_mean = hashes.iter().map(|&h| src_consensus.sahyadri_consensus_store.get_data(h).unwrap().mergeset_blues.len()).sum::<usize>()
-        as f64
-        / hashes.len() as f64;
-    let reds_mean = hashes.iter().map(|&h| src_consensus.sahyadri_consensus_store.get_data(h).unwrap().mergeset_reds.len()).sum::<usize>()
-        as f64
-        / hashes.len() as f64;
+    let blues_mean =
+        hashes.iter().map(|&h| src_consensus.sahyadri_consensus_store.get_data(h).unwrap().mergeset_blues.len()).sum::<usize>() as f64
+            / hashes.len() as f64;
+    let reds_mean =
+        hashes.iter().map(|&h| src_consensus.sahyadri_consensus_store.get_data(h).unwrap().mergeset_reds.len()).sum::<usize>() as f64
+            / hashes.len() as f64;
     let parents_mean = hashes.iter().map(|&h| src_consensus.headers_store.get_header(h).unwrap().direct_parents().len()).sum::<usize>()
         as f64
         / hashes.len() as f64;

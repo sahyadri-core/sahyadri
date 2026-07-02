@@ -135,7 +135,8 @@ impl PrvKeyDataPayload {
         match &self.prv_key_variant {
             PrvKeyDataVariant::Mnemonic(mnemonic) => {
                 let mnemonic = Mnemonic::new(mnemonic, Language::English)?;
-                let xkey = ExtendedPrivateKey::<sahyadri_bip32::DilithiumSeed>::new(mnemonic.to_seed(payment_secret.unwrap_or_default()))?;
+                let xkey =
+                    ExtendedPrivateKey::<sahyadri_bip32::DilithiumSeed>::new(mnemonic.to_seed(payment_secret.unwrap_or_default()))?;
                 Ok(xkey)
             }
             PrvKeyDataVariant::Bip39Seed(seed) => {
@@ -165,7 +166,8 @@ impl PrvKeyDataPayload {
     pub fn as_secret_key(&self) -> Result<Option<sahyadri_bip32::DilithiumSeed>> {
         match &self.prv_key_variant {
             PrvKeyDataVariant::SecretKey(private_key) => {
-                let bytes: Vec<u8> = sahyadri_utils::hex::FromHex::from_hex(private_key.as_str()).map_err(|e| crate::error::Error::Custom(format!("hex decode: {}", e)))?;
+                let bytes: Vec<u8> = sahyadri_utils::hex::FromHex::from_hex(private_key.as_str())
+                    .map_err(|e| crate::error::Error::Custom(format!("hex decode: {}", e)))?;
                 let mut arr = [0u8; 32];
                 arr.copy_from_slice(&bytes);
                 Ok(Some(sahyadri_bip32::DilithiumSeed(arr)))

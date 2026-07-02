@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::pb::{ReadyMessage, VerackMessage, VersionMessage, sahyadrid_message::Payload};
-use crate::{IncomingRoute, SahyadridMessagePayloadType, Router};
+use crate::{IncomingRoute, Router, SahyadridMessagePayloadType};
 use crate::{common::ProtocolError, dequeue_with_timeout, make_message};
 use sahyadri_core::debug;
 
