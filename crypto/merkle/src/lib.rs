@@ -1,3 +1,5 @@
+#![allow(clippy::explicit_counter_loop)]
+
 use sahyadri_hashes::{Hash, HasherBase, MerkleBranchHash, ZERO_HASH};
 
 pub fn calc_merkle_root(hashes: impl ExactSizeIterator<Item = Hash>) -> Hash {
