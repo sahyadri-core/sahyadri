@@ -143,7 +143,6 @@ impl Miner {
         // In the Account model, transactions use Balances and Nonces.
         // ---------------------------------------------------------
 
-
         // TODO for Simulator:
         // 1. Fetch simulator account balances from `self.consensus.account_store()`
         // 2. Build `tx.payload` as `[sender_script_bytes][nonce_bytes]`

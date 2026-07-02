@@ -1,4 +1,10 @@
-#![allow(clippy::needless_range_loop, clippy::clone_on_copy, clippy::assign_op_pattern, clippy::needless_borrows_for_generic_args, clippy::manual_div_ceil)]
+#![allow(
+    clippy::needless_range_loop,
+    clippy::clone_on_copy,
+    clippy::assign_op_pattern,
+    clippy::needless_borrows_for_generic_args,
+    clippy::manual_div_ceil
+)]
 //! # sahyadri-plonky3 — STARK ZKP Batch Verification
 //!
 //! 10,000 Dilithium3 signatures (33 MB) → 1 STARK proof (~30 KB) → verify in ~1ms.
