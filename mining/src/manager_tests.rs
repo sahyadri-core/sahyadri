@@ -36,6 +36,7 @@ mod tests {
         test_helpers::{create_transaction, create_transaction_with_change, op_true_script},
     };
     use sahyadri_utils::mem_size::MemSizeEstimator;
+    use sha2::Digest;
     use std::{iter::once, sync::Arc};
     use tokio::sync::mpsc::{error::TryRecvError, unbounded_channel};
 

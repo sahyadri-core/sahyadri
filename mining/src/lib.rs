@@ -1,15 +1,15 @@
+use mempool::tx::Priority;
 use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
 };
-
-use mempool::tx::Priority;
 
 mod block_template;
 pub(crate) mod cache;
 pub mod errors;
 pub mod feerate;
 pub mod manager;
+#[cfg(test)]
 mod manager_tests;
 pub mod mempool;
 pub mod model;

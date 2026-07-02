@@ -54,6 +54,8 @@ serde_json.workspace = true
 flate2.workspace = true
 rand_distr.workspace = true
 sahyadri-txscript-errors.workspace = true
+sahyadri-dilithium.workspace = true
+sha2.workspace = true
 sahyadri-addresses.workspace = true
 
 [[bench]]

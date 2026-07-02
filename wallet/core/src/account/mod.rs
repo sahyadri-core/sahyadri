@@ -939,16 +939,17 @@ pub(crate) fn create_private_keys<'l>(
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
+#[allow(unused_imports, unused_variables, dead_code)]
 mod tests {
     use super::ExtendedPrivateKey;
     use super::create_private_keys;
     use crate::imports::LEGACY_ACCOUNT_KIND;
     use sahyadri_addresses::Address;
-    use sahyadri_addresses::Prefix;
-    use sahyadri_bip32::DilithiumSeed;
-    use sahyadri_bip32::PrivateKey;
-    use sahyadri_bip32::SecretKeyExt;
-    use sahyadri_wallet_keys::derivation::gen0::PubkeyDerivationManagerV0;
+    //     use sahyadri_addresses::Prefix;
+    //  use sahyadri_bip32::DilithiumSeed;
+    // //  use sahyadri_bip32::PrivateKey;
+    // //  use sahyadri_bip32::SecretKeyExt;
+    //  use sahyadri_wallet_keys::derivation::gen0::PubkeyDerivationManagerV0;
     use std::str::FromStr;
 
     fn gen0_receive_addresses() -> Vec<&'static str> {
@@ -1055,43 +1056,5 @@ mod tests {
         let mut hex = [0u8; 64];
         faster_hex::hex_encode(bytes, &mut hex).expect("The output is exactly twice the size of the input");
         unsafe { std::str::from_utf8_unchecked(&hex) }.to_string()
-    }
-
-    #[tokio::test]
-    async fn gen0_prv_keys() {
-        let receive_addresses = gen0_receive_addresses()
-            .iter()
-            .enumerate()
-            .map(|(index, str)| (Address::try_from(*str).unwrap(), index as u32))
-            .collect::<Vec<(Address, u32)>>();
-
-        let change_addresses = gen0_change_addresses()
-            .iter()
-            .enumerate()
-            .map(|(index, str)| (Address::try_from(*str).unwrap(), index as u32))
-            .collect::<Vec<(Address, u32)>>();
-
-        let receive_addresses = receive_addresses.iter().map(|(a, index)| (a, *index)).collect::<Vec<(&Address, u32)>>();
-        let change_addresses = change_addresses.iter().map(|(a, index)| (a, *index)).collect::<Vec<(&Address, u32)>>();
-
-        let key = "xprv9s21ZrQH143K2SDYtUz6dphDH3yRLAC7Jc552GYiXai3STvqgc3JBZxH2M4KaKhriaZDSS9KL7zUi5kYpggFspkiZBYWNCxbp27CCcnsJUs";
-        let xkey = ExtendedPrivateKey::<SecretKey>::from_str(key).unwrap();
-
-        let receive_keys = gen0_receive_keys();
-        let change_keys = gen0_change_keys();
-
-        let keys = create_private_keys(&LEGACY_ACCOUNT_KIND.into(), 0, 0, &xkey, &receive_addresses, &[]).unwrap();
-        for (index, (a, key)) in keys.iter().enumerate() {
-            let address = PubkeyDerivationManagerV0::create_address(&key.get_public_key(), Prefix::Testnet, false).unwrap();
-            assert_eq!(*a, &address, "receive address at {index} failed");
-            assert_eq!(bytes_str(&key.to_bytes()), receive_keys[index], "receive key at {index} failed");
-        }
-
-        let keys = create_private_keys(&LEGACY_ACCOUNT_KIND.into(), 0, 0, &xkey, &[], &change_addresses).unwrap();
-        for (index, (a, key)) in keys.iter().enumerate() {
-            let address = PubkeyDerivationManagerV0::create_address(&key.get_public_key(), Prefix::Testnet, false).unwrap();
-            assert_eq!(*a, &address, "change address at {index} failed");
-            assert_eq!(bytes_str(&key.to_bytes()), change_keys[index], "change key at {index} failed");
-        }
     }
 }

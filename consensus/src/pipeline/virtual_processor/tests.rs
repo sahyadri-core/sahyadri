@@ -10,6 +10,7 @@ use sahyadri_consensus_core::{
     tx::{ScriptPublicKey, ScriptVec, Transaction},
 };
 use sahyadri_hashes::Hash;
+use sha2::Digest;
 use std::{collections::VecDeque, thread::JoinHandle};
 
 struct OnetimeTxSelector {
