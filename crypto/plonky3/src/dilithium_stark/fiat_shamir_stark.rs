@@ -3,7 +3,6 @@ use p3_matrix::Matrix;
 use p3_air::{Air, BaseAir};
 use p3_field::PrimeCharacteristicRing;
 use crate::config::F;
-use super::params::CTILDEBYTES;
 
 pub const FS_COLS: usize = 2;
 pub struct FiatShamirAir;
