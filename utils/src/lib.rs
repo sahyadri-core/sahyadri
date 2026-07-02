@@ -1,3 +1,4 @@
+#![allow(unstable_name_collisions)]
 //!
 //! # Sahyadri Utilities
 //!
