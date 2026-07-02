@@ -1118,8 +1118,9 @@ impl Wallet {
 
     async fn handle_event(self: &Arc<Self>, event: Box<Events>) -> Result<()> {
         match &*event {
-            Events::Pending { record } | Events::Maturity { record } | Events::Reorg { record }
-                if !record.is_change() => {
+            #[allow(clippy::collapsible_match)]
+            Events::Pending { record } | Events::Maturity { record } | Events::Reorg { record } => {
+                if !record.is_change() {
                     self.store().as_transaction_record_store()?.store(&[record]).await?;
                 }
             }
