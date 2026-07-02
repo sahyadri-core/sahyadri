@@ -41,7 +41,7 @@ pub fn estimate_batch(batch_size: usize) -> crate::batch::ProverStats {
         batch_size,
         raw_signature_bytes: raw,
         compressed_proof_bytes: proof_est,
-        compression_ratio: if proof_est > 0 { raw / proof_est } else { 0 },
+        compression_ratio: raw.checked_div(proof_est).unwrap_or(0),
         prove_time_ms: 0,
         verify_time_ms: batch_size as u64,
         trace_rows: 0,

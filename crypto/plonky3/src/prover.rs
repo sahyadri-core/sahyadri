@@ -28,7 +28,7 @@ pub fn generate_stark_proof(batch: &mut DilithiumBatch) -> Result<BatchProof, ZK
     let prove_ms = start.elapsed().as_millis() as u64;
     let raw_bytes: usize = batch.attestations.iter().map(|a| a.message.len() + a.signature.len() + a.public_key.len()).sum();
     let proof_len = proof_bytes.len();
-    let ratio = if proof_len > 0 { raw_bytes / proof_len } else { 0 };
+    let ratio = raw_bytes.checked_div(proof_len).unwrap_or(0);
     info!("[STARK-PROVER] Done: {} sigs -> {} bytes ({}x) in {}ms", batch_size, proof_len, ratio, prove_ms);
     Ok(BatchProof {
         proof_bytes,
