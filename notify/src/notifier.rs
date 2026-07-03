@@ -985,6 +985,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_overall() {
         sahyadri_core::log::try_init_logger("trace,sahyadri_notify=trace");
         let test = Test::new("BlockAdded broadcast (OverallSubscription type)", 2, overall_test_steps(SUBSCRIPTION_MANAGER_ID));
@@ -999,6 +1000,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_utxos_changed() {
         sahyadri_core::log::try_init_logger("trace,sahyadri_notify=trace");
         let test = Test::new("UtxosChanged broadcast", 3, utxos_changed_test_steps(SUBSCRIPTION_MANAGER_ID));

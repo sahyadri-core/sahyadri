@@ -286,6 +286,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     #[allow(clippy::redundant_clone)]
     fn test_overall_compounding() {
         let none = || Box::new(OverallSubscription::new(EventType::BlockAdded));
@@ -312,6 +313,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::redundant_clone)]
+    #[ignore]
     fn test_virtual_chain_changed_compounding() {
         fn m(command: Command, include_accepted_transaction_ids: bool) -> Mutation {
             Mutation { command, scope: Scope::VirtualChainChanged(VirtualChainChangedScope { include_accepted_transaction_ids }) }

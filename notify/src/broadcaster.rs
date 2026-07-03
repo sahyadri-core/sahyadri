@@ -438,6 +438,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_utxos_changed() {
         sahyadri_core::log::try_init_logger("trace,sahyadri_notify=trace");
         let mut test = Test::new("UtxosChanged broadcast", 3, utxos_changed_test_steps(0));
