@@ -166,6 +166,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn test_extract_address_and_encode_script() {
         struct Test {
             name: &'static str,

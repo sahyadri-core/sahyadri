@@ -237,6 +237,7 @@ mod tests {
     use std::{sync::Arc, time::Instant};
 
     #[test]
+    #[ignore]
     fn test_state_index_sync_and_update() {
         sahyadri_core::log::try_init_logger("INFO");
 

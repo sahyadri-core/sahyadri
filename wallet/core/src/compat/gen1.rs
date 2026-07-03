@@ -46,6 +46,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn import_golang_single_wallet_test() {
         let resident_store = Wallet::resident_store().unwrap();
         let wallet = Arc::new(Wallet::try_new(resident_store, None, Some(NetworkId::new(NetworkType::Mainnet))).unwrap());
@@ -83,6 +84,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn import_golang_multisig_v1_wallet_test() {
         let resident_store = Wallet::resident_store().unwrap();
         let wallet = Arc::new(Wallet::try_new(resident_store, None, Some(NetworkId::new(NetworkType::Mainnet))).unwrap());

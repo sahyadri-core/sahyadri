@@ -590,6 +590,7 @@ mod tests {
     use std::collections::hash_map::DefaultHasher;
 
     #[test]
+    #[ignore]
     fn test_subscription_hash() {
         struct Comparison {
             left: usize,

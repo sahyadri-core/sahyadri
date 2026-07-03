@@ -53,7 +53,6 @@ fn test_stark_dilithium3_proof() {
 
 #[test]
 #[ignore]
-#[ignore]
 fn test_stark_batch_scaling() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
     use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};

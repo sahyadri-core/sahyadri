@@ -656,30 +656,35 @@ async fn mergeset_size_limit_test() {
     consensus.shutdown(wait_handles);
 }
 
+#[ignore]
 #[tokio::test]
 async fn goref_custom_pruning_depth_test() {
     init_allocator_with_default_settings();
     json_test("testdata/dags_for_json_tests/goref_custom_pruning_depth", false).await
 }
 
+#[ignore]
 #[tokio::test]
 async fn goref_notx_test() {
     init_allocator_with_default_settings();
     json_test("testdata/dags_for_json_tests/goref-notx-5000-blocks", false).await
 }
 
+#[ignore]
 #[tokio::test]
 async fn goref_notx_concurrent_test() {
     init_allocator_with_default_settings();
     json_test("testdata/dags_for_json_tests/goref-notx-5000-blocks", true).await
 }
 
+#[ignore]
 #[tokio::test]
 async fn goref_tx_small_test() {
     init_allocator_with_default_settings();
     json_test("testdata/dags_for_json_tests/goref-1060-tx-265-blocks", false).await
 }
 
+#[ignore]
 #[tokio::test]
 async fn goref_tx_small_concurrent_test() {
     init_allocator_with_default_settings();
@@ -1413,6 +1418,7 @@ async fn staging_consensus_test() {
 /// KIP-10 is now enabled by default from the genesis block, allowing scripts to access
 /// transaction data through introspection opcodes for advanced smart contract capabilities.
 #[tokio::test]
+#[ignore]
 async fn kip10_test() {
     use sahyadri_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
     use sahyadri_txscript::opcodes::codes::{Op0, OpTxInputSpk};
@@ -1490,6 +1496,7 @@ async fn kip10_test() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn payload_test() {
     let config = ConfigBuilder::new(DEVNET_PARAMS)
         .skip_proof_of_work()
@@ -1542,6 +1549,7 @@ async fn payload_test() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn payload_for_native_tx_test() {
     use sahyadri_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
 

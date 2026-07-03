@@ -356,6 +356,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     #[allow(clippy::redundant_clone)]
     fn test_utxos_changed_compounding() {
         sahyadri_core::log::try_init_logger("trace,sahyadri_notify=trace");

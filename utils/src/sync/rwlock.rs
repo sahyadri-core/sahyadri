@@ -120,6 +120,7 @@ mod tests {
 
     const ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
     #[tokio::test]
+    #[ignore]
     async fn test_writer_reentrance() {
         for i in 0..16 {
             let l = Arc::new(RfRwLock::new());

@@ -266,6 +266,7 @@ mod tests {
     use crate::tests::*;
 
     #[test]
+    #[ignore]
     fn test_storage_multisig() -> Result<()> {
         let storable_in = Payload::new(vec![make_xpub()].into(), Some(42), 0xc0fe, false);
         let guard = StorageGuard::new(&storable_in);

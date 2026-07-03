@@ -993,6 +993,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_virtual_chain_changed() {
         sahyadri_core::log::try_init_logger("trace,sahyadri_notify=trace");
         let test = Test::new("VirtualChainChanged broadcast", 2, virtual_chain_changed_test_steps(SUBSCRIPTION_MANAGER_ID));

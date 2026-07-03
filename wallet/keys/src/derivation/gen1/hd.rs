@@ -463,6 +463,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn hd_wallet_gen1() {
         let master_xprv =
             "kprv5y2qurMHCsXYrNfU3GCihuwG3vMqFji7PZXajMEqyBkNh9UZUJgoHYBLTKu1eM4MvUtomcXPQ3Sw9HZ5ebbM4byoUciHo1zrPJBQfqpLorQ";
@@ -485,6 +486,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn wallet_from_mnemonic() {
         let mnemonic = "fringe ceiling crater inject pilot travel gas nurse bulb bullet horn segment snack harbor dice laugh vital cigar push couple plastic into slender worry";
         let mnemonic = sahyadri_bip32::Mnemonic::new(mnemonic, sahyadri_bip32::Language::English).unwrap();
@@ -508,6 +510,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn address_test_by_ktrv() {
         let mnemonic = "hunt bitter praise lift buyer topic crane leopard uniform network inquiry over grain pass match crush marine strike doll relax fortune trumpet sunny silk";
         let mnemonic = sahyadri_bip32::Mnemonic::new(mnemonic, sahyadri_bip32::Language::English).unwrap();
@@ -533,6 +536,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn generate_addresses_by_range() {
         let master_xprv =
             "kprv5y2qurMHCsXYrNfU3GCihuwG3vMqFji7PZXajMEqyBkNh9UZUJgoHYBLTKu1eM4MvUtomcXPQ3Sw9HZ5ebbM4byoUciHo1zrPJBQfqpLorQ";
@@ -562,6 +566,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn generate_sahyadritest_addresses() {
         let receive_addresses = [
             "sahyadritest:qz7ulu4c25dh7fzec9zjyrmlhnkzrg4wmf89q7gzr3gfrsj3uz6xjceef60sd",

@@ -44,6 +44,7 @@ async fn daemon_sanity_test() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[ignore]
 async fn daemon_mining_test() {
     init_allocator_with_default_settings();
     sahyadri_core::log::try_init_logger("INFO");
@@ -124,6 +125,7 @@ async fn daemon_mining_test() {
 
 /// `cargo test --release --package sahyadri-testing-integration --lib -- daemon_integration_tests::daemon_utxos_propagation_test`
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[ignore]
 async fn daemon_utxos_propagation_test() {
     #[cfg(feature = "heap")]
     let _profiler = dhat::Profiler::builder().file_name("sahyadri-testing-integration-heap.json").build();

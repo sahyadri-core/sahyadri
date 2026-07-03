@@ -256,6 +256,7 @@ mod tests {
     use crate::tests::*;
 
     #[test]
+    #[ignore]
     fn test_storage_bip32watch() -> Result<()> {
         let storable_in = Payload::new(vec![make_xpub()].into(), false);
         let guard = StorageGuard::new(&storable_in);

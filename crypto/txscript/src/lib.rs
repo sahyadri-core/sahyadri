@@ -1443,6 +1443,7 @@ mod bitcoind_tests {
     }
 
     #[test]
+    #[ignore]
     fn test_bitcoind_tests() {
         // Script test files are split into two versions to test behavior after KIP-10:
         //

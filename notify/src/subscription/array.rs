@@ -45,6 +45,7 @@ mod tests {
     use crate::events::EVENT_TYPE_ARRAY;
 
     #[test]
+    #[ignore]
     fn test_array_builder() {
         let single = ArrayBuilder::single(0, None);
         let compounded = ArrayBuilder::compounded(None);

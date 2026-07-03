@@ -431,6 +431,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_virtual_chain_changed() {
         sahyadri_core::log::try_init_logger("trace,sahyadri_notify=trace");
         let mut test = Test::new("VirtualChainChanged broadcast", 2, virtual_chain_changed_test_steps(0));

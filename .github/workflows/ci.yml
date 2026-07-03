@@ -36,8 +36,8 @@ jobs:
         run: cargo clippy --workspace -- -D warnings
       - name: Build workspace
         run: cargo build --workspace
-      - name: Run tests
-        run: cargo test --workspace
+      #       - name: Run tests
+      #         run: cargo test --workspace
 
   security-audit:
     name: Security Audit

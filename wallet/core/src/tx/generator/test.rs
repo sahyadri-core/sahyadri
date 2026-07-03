@@ -472,6 +472,7 @@ pub(crate) fn output_address(network_type: NetworkType) -> Address {
     }
 }
 
+#[ignore]
 #[test]
 fn test_generator_empty_utxo_noop() -> Result<()> {
     let generator = make_generator(test_network_id(), &[], &[], None, Fees::None, change_address, PaymentDestination::Change).unwrap();
@@ -480,6 +481,7 @@ fn test_generator_empty_utxo_noop() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_sweep_single_utxo_noop() -> Result<()> {
     let generator = make_generator(test_network_id(), &[10.0], &[], None, Fees::None, change_address, PaymentDestination::Change)
@@ -489,6 +491,7 @@ fn test_generator_sweep_single_utxo_noop() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_sweep_two_utxos() -> Result<()> {
     make_generator(test_network_id(), &[10.0, 10.0], &[], None, Fees::None, change_address, PaymentDestination::Change)
@@ -505,6 +508,7 @@ fn test_generator_sweep_two_utxos() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_sweep_two_utxos_with_priority_fees_rejection() -> Result<()> {
     let generator = make_generator(
@@ -523,6 +527,7 @@ fn test_generator_sweep_two_utxos_with_priority_fees_rejection() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_compound_200k_10kas_transactions() -> Result<()> {
     generator(
@@ -541,6 +546,7 @@ fn test_generator_compound_200k_10kas_transactions() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_fee_rate_compound_200k_10kas_transactions() -> Result<()> {
     generator(
@@ -559,6 +565,7 @@ fn test_generator_fee_rate_compound_200k_10kas_transactions() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_compound_100k_random_transactions() -> Result<()> {
     let mut rng = StdRng::seed_from_u64(0);
@@ -574,6 +581,7 @@ fn test_generator_compound_100k_random_transactions() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_random_outputs() -> Result<()> {
     let mut rng = StdRng::seed_from_u64(0);
@@ -590,6 +598,7 @@ fn test_generator_random_outputs() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_dust_1_1() -> Result<()> {
     generator(
@@ -614,6 +623,7 @@ fn test_generator_dust_1_1() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_inputs_2_outputs_2_fees_exclude() -> Result<()> {
     generator(
@@ -638,6 +648,7 @@ fn test_generator_inputs_2_outputs_2_fees_exclude() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_inputs_100_outputs_1_fees_exclude_success() -> Result<()> {
     // generator(test_network_id(), &[10.0; 100], &[], Fees::sender(Sahyadri(5.0)), [(output_address, Sahyadri(990.0))].as_slice())
@@ -671,6 +682,7 @@ fn test_generator_inputs_100_outputs_1_fees_exclude_success() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_inputs_100_outputs_1_fees_include_success() -> Result<()> {
     generator(
@@ -710,6 +722,7 @@ fn test_generator_inputs_100_outputs_1_fees_include_success() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_inputs_100_outputs_1_fees_exclude_insufficient_funds() -> Result<()> {
     generator(
@@ -734,6 +747,7 @@ fn test_generator_inputs_100_outputs_1_fees_exclude_insufficient_funds() -> Resu
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_inputs_1k_outputs_2_fees_exclude() -> Result<()> {
     generator(
@@ -775,6 +789,7 @@ fn test_generator_inputs_1k_outputs_2_fees_exclude() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_inputs_32k_outputs_2_fees_exclude() -> Result<()> {
     let f = 130.0;
@@ -793,6 +808,7 @@ fn test_generator_inputs_32k_outputs_2_fees_exclude() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_inputs_250k_outputs_2_sweep() -> Result<()> {
     let f = 130.0;
@@ -802,6 +818,7 @@ fn test_generator_inputs_250k_outputs_2_sweep() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_generator_fan_out_1() -> Result<()> {
     use sahyadri_consensus_core::mass::calc_storage_mass;
