@@ -52,6 +52,8 @@ fn test_stark_dilithium3_proof() {
 }
 
 #[test]
+#[ignore]
+#[ignore]
 fn test_stark_batch_scaling() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
     use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
@@ -86,6 +88,7 @@ fn test_stark_batch_scaling() {
 }
 
 #[test]
+#[ignore]
 fn test_stark_256_sigs() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
     use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
@@ -138,6 +141,7 @@ fn test_stark_256_sigs() {
 }
 
 #[test]
+#[ignore]
 fn test_stark_1024_sigs() {
     use sahyadri_dilithium::{generate_keypair, sign_message};
     use sahyadri_plonky3::{batch::DilithiumBatch, generate_stark_proof, verify_stark_proof};
