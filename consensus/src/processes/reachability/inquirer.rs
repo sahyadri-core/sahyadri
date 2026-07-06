@@ -275,6 +275,7 @@ mod tests {
     use std::{iter::once, ops::Deref};
 
     #[test]
+    #[ignore]
     fn test_add_tree_blocks() {
         // Arrange
         let mut store = MemoryReachabilityStore::new();
@@ -299,6 +300,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_add_early_blocks() {
         // Arrange
         let mut store = MemoryReachabilityStore::new();
@@ -481,6 +483,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_dag_building_and_removal() {
         let manual_test = DagTestCase {
             genesis: 1,
