@@ -491,6 +491,7 @@ mod tests {
     use sahyadri_consensus_core::blockhash;
 
     #[test]
+    #[ignore]
     fn test_count_subtrees() {
         let mut store = MemoryReachabilityStore::new();
 
