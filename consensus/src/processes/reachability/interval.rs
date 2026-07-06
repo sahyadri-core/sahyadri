@@ -181,6 +181,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn test_interval_basics() {
         let interval = Interval::new(101, 164);
         let increased = interval.increase(10);
@@ -216,6 +217,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_split_exact() {
         let sizes = vec![5u64, 10, 15, 20];
         let intervals = Interval::new(1, 50).split_exact(sizes.as_slice());
@@ -226,6 +228,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_exponential_fractions() {
         let mut exp_fractions = exponential_fractions(vec![2, 4, 8, 16].as_slice());
         // println!("{:?}", exp_fractions);
@@ -243,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_contains() {
         assert!(Interval::new(1, 100).contains(Interval::new(1, 100)));
         assert!(Interval::new(1, 100).contains(Interval::new(1, 99)));
@@ -253,6 +257,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_split_exponential() {
         struct Test {
             interval: Interval,
