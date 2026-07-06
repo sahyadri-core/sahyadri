@@ -64,8 +64,6 @@ members = [
     "metrics/core",
     "metrics/perf_monitor",
     "utils/alloc",
-    "crypto/dilithium",
-    "crypto/plonky3",
 ]
 
 [workspace.package]
@@ -73,7 +71,7 @@ rust-version = "1.88.0"
 version = "1.1.0"
 authors = ["Sahyadri developers"]
 license = "ISC"
-repository = "https://github.com/sahyadrinet/rusty-sahyadri"
+repository = "https://github.com/sahyadri-core/sahyadri"
 edition = "2024"
 include = [
     "src/**/*.rs",
