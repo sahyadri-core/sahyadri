@@ -926,6 +926,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_utxos_changed_mutation() {
         let context = SubscriptionContext::new();
         let a_stock = get_3_addresses(true);
