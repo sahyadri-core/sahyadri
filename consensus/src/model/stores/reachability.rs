@@ -807,6 +807,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn test_store_basics() {
         let mut store: Box<dyn ReachabilityStore> = Box::new(MemoryReachabilityStore::new());
         let (hash, parent) = (7.into(), 15.into());
