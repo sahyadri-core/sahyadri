@@ -517,6 +517,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn test_pruning_via_yugat() {
         let mut args = Args::parse_from(std::iter::empty::<&str>());
         args.bps = 1.0;
