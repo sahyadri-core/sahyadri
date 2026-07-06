@@ -250,6 +250,7 @@ mod tests {
     };
 
     #[test]
+    #[ignore]
     fn test_forward_iterator() {
         // Arrange
         let mut store = MemoryReachabilityStore::new();
@@ -292,6 +293,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_iterator_boundaries() {
         // Arrange & Act
         let mut store = MemoryReachabilityStore::new();

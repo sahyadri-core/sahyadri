@@ -37,7 +37,7 @@ use std::{collections::VecDeque, sync::Arc, time::Duration};
 mod blocks_json;
 pub mod simulator;
 
-/// Sahyadri Network Simulator
+// Sahyadri Network Simulator
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
