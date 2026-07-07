@@ -586,7 +586,8 @@ impl VirtualStateProcessor {
                     // Reverse the outputs (Deduct what was wrongly added)
                     for output in tx.outputs.iter() {
                         let amount = -(output.value as i64); // Negative to deduct
-                        let _ = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount);
+                        self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount)
+                            .expect("SAHYADRI: CRITICAL — failed to reverse balance during reorg, state may be inconsistent");
                     }
 
                     if i > 0 {
@@ -614,11 +615,12 @@ impl VirtualStateProcessor {
                                 let miner_reward = total_reward - dev_fee;
 
                                 // 3. Miner ka balance update kar
-                                let _ = self.account_store.update_balance_batch(
+                                self.account_store.update_balance_batch(
                                     &mut batch,
                                     &coinbase_data.miner_data.script_public_key,
                                     miner_reward as i64,
-                                );
+                                )
+                                .expect("SAHYADRI: CRITICAL — failed to credit miner reward, state may be inconsistent");
 
                                 // TODO: Treasury address ko string se ScriptPublicKey me convert karke dev_fee bhi add karni hai
 
@@ -634,7 +636,8 @@ impl VirtualStateProcessor {
                     else {
                         for output in tx.outputs.iter() {
                             let amount = output.value as i64;
-                            let _ = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount);
+                            self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount)
+                                .expect("SAHYADRI: CRITICAL — failed to credit receiver balance, state may be inconsistent");
                         }
 
                         if tx.payload.len() >= 8 {
@@ -654,8 +657,10 @@ impl VirtualStateProcessor {
                             }
                             total_spent += tx.gas;
 
-                            let _ = self.account_store.update_balance_batch(&mut batch, &sender_spk, -(total_spent as i64));
-                            let _ = self.account_store.increment_nonce_batch(&mut batch, &sender_spk);
+                            self.account_store.update_balance_batch(&mut batch, &sender_spk, -(total_spent as i64))
+                                .expect("SAHYADRI: CRITICAL — failed to deduct sender balance, state may be inconsistent");
+                            self.account_store.increment_nonce_batch(&mut batch, &sender_spk)
+                                .expect("SAHYADRI: CRITICAL — failed to increment sender nonce, state may be inconsistent");
                         }
                     }
                 }
