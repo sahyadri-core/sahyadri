@@ -3,12 +3,14 @@
 pub mod matrix;
 #[cfg(feature = "wasm32-sdk")]
 pub mod wasm;
+pub mod memory_loop;
 #[doc(hidden)]
 pub mod xoshiro;
 
 use std::cmp::max;
 
 use crate::matrix::Matrix;
+use crate::memory_loop::MemoryLoop;
 use sahyadri_consensus_core::{BlockLevel, hashing, header::Header};
 use sahyadri_hashes::PowHash;
 use sahyadri_math::Uint256;
@@ -19,6 +21,7 @@ pub struct State {
     pub(crate) target: Uint256,
     // PRE_POW_HASH || TIME || 32 zero byte padding; without NONCE
     pub(crate) hasher: PowHash,
+    memory_loop: MemoryLoop,
 }
 
 impl State {
@@ -31,7 +34,7 @@ impl State {
         let hasher = PowHash::new(pre_pow_hash, header.timestamp);
         let matrix = Matrix::generate(pre_pow_hash);
 
-        Self { matrix, target, hasher }
+        Self { matrix, target, hasher, memory_loop: MemoryLoop::new(&pre_pow_hash) }
     }
 
     #[inline]
@@ -40,7 +43,7 @@ impl State {
     pub fn calculate_pow(&self, nonce: u64) -> Uint256 {
         // Hasher already contains PRE_POW_HASH || TIME || 32 zero byte padding; so only the NONCE is missing
         let hash = self.hasher.clone().finalize_with_nonce(nonce);
-        let hash = self.matrix.heavy_hash(hash);
+        let hash = self.matrix.heavy_hash(self.memory_loop.process(&hash.as_bytes()).into());
         Uint256::from_le_bytes(hash.as_bytes())
     }
 
