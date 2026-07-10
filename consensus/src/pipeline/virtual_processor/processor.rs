@@ -16,7 +16,7 @@ use crate::{
         stores::{
             DB,
             acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
-            account_store::{AccountStore, DbAccountStore},
+            account_store::{AccountStore, AccountStoreReader, DbAccountStore},
             block_transactions::{BlockTransactionsStoreReader, DbBlockTransactionsStore},
             block_window_cache::{BlockWindowCacheStore, BlockWindowCacheWriter},
             daa::DbDaaStore,
@@ -49,6 +49,8 @@ use crate::{
         window::WindowManager,
     },
 };
+use sahyadri_dilithium::{DilithiumSignature, DilithiumKeyPair, PUBKEY_SIZE, SIG_SIZE, SAHYADRI_MODE};
+use sha2::{Sha256, Digest};
 use once_cell::unsync::Lazy;
 use sahyadri_consensus_core::{
     BlockHashSet, ChainPath,
@@ -634,34 +636,69 @@ impl VirtualStateProcessor {
                     // FIX 2: USER TRANSACTIONS
                     // ==========================================
                     else {
+                        let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
+                        if tx.payload.len() < min_payload {
+                            panic!("SAHYADRI: CRITICAL — account tx undersized payload ({}) in commit_virtual_state", tx.payload.len());
+                        }
+
+                        let sig_start = tx.payload.len() - SIG_SIZE;
+                        let nonce_start = sig_start - 8;
+                        let sender_pubkey = &tx.payload[..nonce_start];
+                        let expected_nonce = u64::from_le_bytes(tx.payload[nonce_start..sig_start].try_into().unwrap());
+                        let sig_bytes = &tx.payload[sig_start..];
+                        let sender_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, sender_pubkey.to_vec());
+
+                        // Defense-in-depth: re-verify Dilithium signature
+                        {
+                            let signable_payload = &tx.payload[..sig_start];
+                            let sighash = {
+                                let mut h = Sha256::new();
+                                h.update(b"SAHYADRI_ACCOUNT_TX_V1");
+                                h.update(&tx.version.to_le_bytes());
+                                for output in &tx.outputs {
+                                    h.update(&output.value.to_le_bytes());
+                                    h.update(&output.script_public_key.version.to_le_bytes());
+                                    let s = output.script_public_key.script();
+                                    h.update(&(s.len() as u64).to_le_bytes());
+                                    h.update(s);
+                                }
+                                h.update(&tx.lock_time.to_le_bytes());
+                                h.update(&tx.subnetwork_id.as_bytes());
+                                h.update(&tx.gas.to_le_bytes());
+                                h.update(&(signable_payload.len() as u64).to_le_bytes());
+                                h.update(signable_payload);
+                                h.finalize()
+                            };
+                            let sig = DilithiumSignature::from_slice(sig_bytes);
+                            assert!(DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE),
+                                "SAHYADRI: CRITICAL — invalid sig in commit_virtual_state");
+                        }
+
+                        // Verify nonce
+                        let current_nonce = self.account_store.get_nonce(&sender_spk)
+                            .expect("SAHYADRI: CRITICAL — failed to read nonce");
+                        assert_eq!(expected_nonce, current_nonce,
+                            "SAHYADRI: CRITICAL — nonce mismatch (have {}, tx claims {})", current_nonce, expected_nonce);
+
+                        // Verify balance
+                        let mut total_spent: u64 = 0;
+                        for output in tx.outputs.iter() { total_spent += output.value; }
+                        total_spent += tx.gas;
+                        let balance = self.account_store.get_balance(&sender_spk)
+                            .expect("SAHYADRI: CRITICAL — failed to read balance");
+                        assert!((balance as u64) >= total_spent,
+                            "SAHYADRI: CRITICAL — insufficient balance (have {}, need {})", balance, total_spent);
+
+                        // All checks passed — apply state changes
                         for output in tx.outputs.iter() {
                             let amount = output.value as i64;
                             self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount)
-                                .expect("SAHYADRI: CRITICAL — failed to credit receiver balance, state may be inconsistent");
+                                .expect("SAHYADRI: CRITICAL — failed to credit receiver");
                         }
-
-                        if tx.payload.len() >= 8 {
-                            let nonce_bytes_start = tx.payload.len() - 8;
-
-                            let mut nonce_bytes = [0u8; 8];
-                            nonce_bytes.copy_from_slice(&tx.payload[nonce_bytes_start..]);
-                            let _expected_nonce = u64::from_le_bytes(nonce_bytes);
-
-                            let sender_script = tx.payload[..nonce_bytes_start].to_vec();
-
-                            let sender_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, sender_script);
-
-                            let mut total_spent: u64 = 0;
-                            for output in tx.outputs.iter() {
-                                total_spent += output.value;
-                            }
-                            total_spent += tx.gas;
-
-                            self.account_store.update_balance_batch(&mut batch, &sender_spk, -(total_spent as i64))
-                                .expect("SAHYADRI: CRITICAL — failed to deduct sender balance, state may be inconsistent");
-                            self.account_store.increment_nonce_batch(&mut batch, &sender_spk)
-                                .expect("SAHYADRI: CRITICAL — failed to increment sender nonce, state may be inconsistent");
-                        }
+                        self.account_store.update_balance_batch(&mut batch, &sender_spk, -(total_spent as i64))
+                            .expect("SAHYADRI: CRITICAL — failed to deduct sender");
+                        self.account_store.increment_nonce_batch(&mut batch, &sender_spk)
+                            .expect("SAHYADRI: CRITICAL — failed to increment nonce");
                     }
                 }
             }
