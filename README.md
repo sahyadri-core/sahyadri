@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://www.sahyadri.io/img/IMG_3277.png" alt="Sahyadri Logo" width="200"/>
   <h1>Sahyadri on Rust</h1>
-  <p><b>High-Performance PoW DAG | Web5 Native | Sovereign Infrastructure | High TPS | Account-Object Based Model | 21 Million Fixed Supply | Post Quantum</b></p>
+  <p><b>High-Performance PoW DAG | Web5 Native | Sovereign Infrastructure | High TPS | Account Based Model | 21 Million Fixed Supply | Post Quantum</b></p>
 </div>
 
 ---
@@ -78,6 +78,7 @@ We welcome contributions to the Sahyadri core! Whether it's optimizing the Rust 
 ## 🔗 Official Links
  * **Website:** https://sahyadri.io
  * **Docs:** https://docs.sahyadri.io
+ * **API:** https://api.sahyadri.io
  * **Article:** https://blog.sahyadri.io
  * **Explorer:** explorer.sahyadri.io (upcoming)
  * **Wallet:** wallet.sahyadri.io (upcoming)
