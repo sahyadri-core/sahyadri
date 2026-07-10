@@ -17,6 +17,8 @@ pub enum TxRuleError {
 
     #[error("Transaction payload is invalid")]
     InvalidPayload,
+    #[error("{0}")]
+    Message(String),
 
     #[error("transaction has no inputs")]
     NoTxInputs,
