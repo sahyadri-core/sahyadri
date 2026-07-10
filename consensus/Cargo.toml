@@ -20,6 +20,8 @@ indexmap.workspace = true
 itertools.workspace = true
 sahyadri-addresses.workspace = true
 sahyadri-consensus-core.workspace = true
+sahyadri-dilithium.workspace = true
+sha2.workspace = true
 sahyadri-consensus-notify.workspace = true
 sahyadri-consensusmanager.workspace = true
 sahyadri-core.workspace = true
@@ -54,8 +56,6 @@ serde_json.workspace = true
 flate2.workspace = true
 rand_distr.workspace = true
 sahyadri-txscript-errors.workspace = true
-sahyadri-dilithium.workspace = true
-sha2.workspace = true
 sahyadri-addresses.workspace = true
 
 [[bench]]
