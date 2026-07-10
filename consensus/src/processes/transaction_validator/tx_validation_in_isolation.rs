@@ -2,6 +2,8 @@ use crate::constants::{MAX_KANA, TX_VERSION};
 use sahyadri_consensus_core::tx::Transaction;
 use std::collections::HashSet;
 
+use sahyadri_dilithium::{DilithiumSignature, DilithiumKeyPair, PUBKEY_SIZE, SIG_SIZE, SAHYADRI_MODE};
+use sha2::{Sha256, Digest};
 use super::{
     TransactionValidator,
     errors::{TxResult, TxRuleError},
@@ -14,9 +16,11 @@ impl TransactionValidator {
     /// on checks here to be truly independent and avoid calling it multiple times wherever possible
     /// (e.g., BBT relies on mempool in isolation checks even though virtual daa score might have changed)   
     pub fn validate_tx_in_isolation(&self, tx: &Transaction) -> TxResult<()> {
-        // SAHYADRI ACCOUNT MODEL: Skip isolation checks for account transactions
+        // SAHYADRI ACCOUNT MODEL: Verify signature for account transactions
+        // Payload: [sender_pubkey:PUBKEY_SIZE][nonce:8][signature:SIG_SIZE]
         if tx.inputs.is_empty() && !tx.payload.is_empty() && !tx.is_coinbase() {
             check_transaction_output_value_ranges(tx)?;
+            verify_account_tx_signature(tx)?;
             return Ok(());
         }
 
@@ -166,4 +170,50 @@ fn check_transaction_subnetwork(tx: &Transaction) -> TxResult<()> {
     } else {
         Err(TxRuleError::SubnetworksDisabled(tx.subnetwork_id.clone()))
     }
+}
+
+const ACCOUNT_TX_MIN_PAYLOAD: usize = PUBKEY_SIZE + 8 + SIG_SIZE;
+
+fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
+    if tx.payload.len() < ACCOUNT_TX_MIN_PAYLOAD {
+        return Err(TxRuleError::Message(format!(
+            "Account tx payload too small: {} bytes, minimum {}", tx.payload.len(), ACCOUNT_TX_MIN_PAYLOAD
+        )));
+    }
+    let sig_start = tx.payload.len() - SIG_SIZE;
+    let nonce_start = sig_start - 8;
+    let sender_pubkey = &tx.payload[..nonce_start];
+    let sig_bytes = &tx.payload[sig_start..];
+    if sender_pubkey.len() != PUBKEY_SIZE {
+        return Err(TxRuleError::Message(format!(
+            "Account tx sender pubkey invalid: {} bytes, expected {}", sender_pubkey.len(), PUBKEY_SIZE
+        )));
+    }
+    let signable_payload = &tx.payload[..sig_start];
+    let sighash = compute_account_tx_sighash(tx, signable_payload);
+    let sig = DilithiumSignature::from_slice(sig_bytes);
+    let valid = DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE);
+    if !valid {
+        return Err(TxRuleError::Message("Account tx Dilithium3 signature verification FAILED".to_string()));
+    }
+    Ok(())
+}
+
+fn compute_account_tx_sighash(tx: &Transaction, signable_payload: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"SAHYADRI_ACCOUNT_TX_V1");
+    hasher.update(&tx.version.to_le_bytes());
+    for output in &tx.outputs {
+        hasher.update(&output.value.to_le_bytes());
+        hasher.update(&output.script_public_key.version.to_le_bytes());
+        let script = output.script_public_key.script();
+        hasher.update(&(script.len() as u64).to_le_bytes());
+        hasher.update(script);
+    }
+    hasher.update(&tx.lock_time.to_le_bytes());
+    hasher.update(tx.subnetwork_id.as_bytes());
+    hasher.update(&tx.gas.to_le_bytes());
+    hasher.update(&(signable_payload.len() as u64).to_le_bytes());
+    hasher.update(signable_payload);
+    hasher.finalize().into()
 }
