@@ -1,5 +1,6 @@
+[![CI](https://github.com/sahyadri-core/sahyadri/actions/workflows/ci.yml/badge.svg)](https://github.com/sahyadri-core/sahyadri/actions/workflows/ci.yml)
 <div align="center">
-  <img src="https://www.sahyadri.io/img/IMG_3277.png" alt="Sahyadri Logo" width="200"/>
+  <img src="https://www.sahyadri.io/img/Sahyadri.PNG" alt="Sahyadri Logo" width="200"/>
   <h1>Sahyadri on Rust</h1>
   <p><b>High-Performance PoW DAG | Web5 Native | Sovereign Infrastructure | High TPS | Account Based Model | 21 Million Fixed Supply | Post Quantum</b></p>
 </div>
