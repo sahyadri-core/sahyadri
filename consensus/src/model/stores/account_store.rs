@@ -113,7 +113,6 @@ impl AccountStore for DbAccountStore {
         script_public_key: &ScriptPublicKey,
         balance_change: i64,
     ) -> StoreResult<()> {
-        println!("SAHYADRI REWARD: Adding {} to account {:?}", balance_change, script_public_key);
 
         let mut state = self.get(script_public_key).unwrap_or(AccountState { balance: 0, nonce: 0 });
 
