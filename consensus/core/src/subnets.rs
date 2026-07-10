@@ -66,6 +66,11 @@ impl SubnetworkId {
     }
 
     /// Returns true if the subnetwork is the native or a built-in subnetwork
+    /// Returns the raw bytes of the subnetwork ID
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8; SUBNETWORK_ID_SIZE] {
+        &self.0
+    }
     #[inline]
     pub fn is_builtin_or_native(&self) -> bool {
         self.is_native() || self.is_builtin()
