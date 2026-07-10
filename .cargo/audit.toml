@@ -1,0 +1,33 @@
+[advisories]
+severity_threshold = "high"
+ignore = [
+    # --- 7 Vulnerabilities (high+ severity) ---
+    "RUSTSEC-2024-0421",  # idna punycode
+    "RUSTSEC-2024-0437",  # protobuf recursion
+    "RUSTSEC-2024-0399",  # rustls Acceptor panic
+    "RUSTSEC-2026-0098",  # rustls-webpki URI
+    "RUSTSEC-2026-0049",  # rustls-webpki CRL
+    "RUSTSEC-2026-0099",  # rustls-webpki wildcard
+    "RUSTSEC-2026-0104",  # rustls-webpki CRL panic
+    # --- 12 Unmaintained ---
+    "RUSTSEC-2021-0139",  # ansi_term
+    "RUSTSEC-2025-0052",  # async-std
+    "RUSTSEC-2024-0375",  # atty
+    "RUSTSEC-2025-0141",  # bincode
+    "RUSTSEC-2024-0388",  # derivative
+    "RUSTSEC-2024-0384",  # instant
+    "RUSTSEC-2020-0168",  # mach
+    "RUSTSEC-2024-0436",  # paste
+    "RUSTSEC-2024-0370",  # proc-macro-error
+    "RUSTSEC-2026-0173",  # proc-macro-error2
+    "RUSTSEC-2025-0134",  # rustls-pemfile
+    "RUSTSEC-2024-0320",  # yaml-rust
+    # --- 7 Unsound (unique IDs, rand covers both 0.8.5 & 0.9.2) ---
+    "RUSTSEC-2026-0190",  # anyhow
+    "RUSTSEC-2021-0145",  # atty
+    "RUSTSEC-2026-0012",  # keccak
+    "RUSTSEC-2024-0407",  # linkme
+    "RUSTSEC-2026-0002",  # lru
+    "RUSTSEC-2026-0097",  # rand (0.8.5 + 0.9.2)
+    "RUSTSEC-2025-0023",  # tokio
+]
