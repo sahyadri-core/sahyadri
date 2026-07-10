@@ -2,12 +2,12 @@ use crate::constants::{MAX_KANA, TX_VERSION};
 use sahyadri_consensus_core::tx::Transaction;
 use std::collections::HashSet;
 
-use sahyadri_dilithium::{DilithiumSignature, DilithiumKeyPair, PUBKEY_SIZE, SIG_SIZE, SAHYADRI_MODE};
-use sha2::{Sha256, Digest};
 use super::{
     TransactionValidator,
     errors::{TxResult, TxRuleError},
 };
+use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHYADRI_MODE, SIG_SIZE};
+use sha2::{Digest, Sha256};
 
 impl TransactionValidator {
     /// Performs a variety of transaction validation checks which are independent of any
@@ -177,7 +177,9 @@ const ACCOUNT_TX_MIN_PAYLOAD: usize = PUBKEY_SIZE + 8 + SIG_SIZE;
 fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
     if tx.payload.len() < ACCOUNT_TX_MIN_PAYLOAD {
         return Err(TxRuleError::Message(format!(
-            "Account tx payload too small: {} bytes, minimum {}", tx.payload.len(), ACCOUNT_TX_MIN_PAYLOAD
+            "Account tx payload too small: {} bytes, minimum {}",
+            tx.payload.len(),
+            ACCOUNT_TX_MIN_PAYLOAD
         )));
     }
     let sig_start = tx.payload.len() - SIG_SIZE;
@@ -186,7 +188,9 @@ fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
     let sig_bytes = &tx.payload[sig_start..];
     if sender_pubkey.len() != PUBKEY_SIZE {
         return Err(TxRuleError::Message(format!(
-            "Account tx sender pubkey invalid: {} bytes, expected {}", sender_pubkey.len(), PUBKEY_SIZE
+            "Account tx sender pubkey invalid: {} bytes, expected {}",
+            sender_pubkey.len(),
+            PUBKEY_SIZE
         )));
     }
     let signable_payload = &tx.payload[..sig_start];

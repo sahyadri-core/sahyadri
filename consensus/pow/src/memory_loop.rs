@@ -38,9 +38,7 @@ impl MemoryLoop {
 
         for round in 0..MEMORY_ROUNDS {
             // Data-dependent position from current state
-            let pos = u64::from_le_bytes(
-                state[0..8].try_into().unwrap()
-            ) as usize % (MEMORY_SIZE - 64);
+            let pos = u64::from_le_bytes(state[0..8].try_into().unwrap()) as usize % (MEMORY_SIZE - 64);
 
             // Read 64 bytes, XOR-mix into state with cycling offset
             let off = round & 31;

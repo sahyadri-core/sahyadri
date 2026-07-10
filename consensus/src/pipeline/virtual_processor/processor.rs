@@ -49,8 +49,6 @@ use crate::{
         window::WindowManager,
     },
 };
-use sahyadri_dilithium::{DilithiumSignature, DilithiumKeyPair, PUBKEY_SIZE, SIG_SIZE, SAHYADRI_MODE};
-use sha2::{Sha256, Digest};
 use once_cell::unsync::Lazy;
 use sahyadri_consensus_core::{
     BlockHashSet, ChainPath,
@@ -77,9 +75,11 @@ use sahyadri_consensus_notify::{
 use sahyadri_consensusmanager::SessionLock;
 use sahyadri_core::{debug, info, time::unix_now, trace, warn};
 use sahyadri_database::prelude::{StoreError, StoreResultExt, StoreResultUnitExt};
+use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHYADRI_MODE, SIG_SIZE};
 use sahyadri_hashes::{Hash, ZERO_HASH};
 use sahyadri_muhash::MuHash;
 use sahyadri_notify::{events::EventType, notifier::Notify};
+use sha2::{Digest, Sha256};
 
 use super::errors::{PruningImportError, PruningImportResult};
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
@@ -588,7 +588,8 @@ impl VirtualStateProcessor {
                     // Reverse the outputs (Deduct what was wrongly added)
                     for output in tx.outputs.iter() {
                         let amount = -(output.value as i64); // Negative to deduct
-                        self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount)
+                        self.account_store
+                            .update_balance_batch(&mut batch, &output.script_public_key, amount)
                             .expect("SAHYADRI: CRITICAL — failed to reverse balance during reorg, state may be inconsistent");
                     }
 
@@ -617,12 +618,9 @@ impl VirtualStateProcessor {
                                 let miner_reward = total_reward - dev_fee;
 
                                 // 3. Miner ka balance update kar
-                                self.account_store.update_balance_batch(
-                                    &mut batch,
-                                    &coinbase_data.miner_data.script_public_key,
-                                    miner_reward as i64,
-                                )
-                                .expect("SAHYADRI: CRITICAL — failed to credit miner reward, state may be inconsistent");
+                                self.account_store
+                                    .update_balance_batch(&mut batch, &coinbase_data.miner_data.script_public_key, miner_reward as i64)
+                                    .expect("SAHYADRI: CRITICAL — failed to credit miner reward, state may be inconsistent");
 
                                 // TODO: Treasury address ko string se ScriptPublicKey me convert karke dev_fee bhi add karni hai
 
@@ -638,7 +636,10 @@ impl VirtualStateProcessor {
                     else {
                         let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
                         if tx.payload.len() < min_payload {
-                            panic!("SAHYADRI: CRITICAL — account tx undersized payload ({}) in commit_virtual_state", tx.payload.len());
+                            panic!(
+                                "SAHYADRI: CRITICAL — account tx undersized payload ({}) in commit_virtual_state",
+                                tx.payload.len()
+                            );
                         }
 
                         let sig_start = tx.payload.len() - SIG_SIZE;
@@ -670,34 +671,48 @@ impl VirtualStateProcessor {
                                 h.finalize()
                             };
                             let sig = DilithiumSignature::from_slice(sig_bytes);
-                            assert!(DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE),
-                                "SAHYADRI: CRITICAL — invalid sig in commit_virtual_state");
+                            assert!(
+                                DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE),
+                                "SAHYADRI: CRITICAL — invalid sig in commit_virtual_state"
+                            );
                         }
 
                         // Verify nonce
-                        let current_nonce = self.account_store.get_nonce(&sender_spk)
-                            .expect("SAHYADRI: CRITICAL — failed to read nonce");
-                        assert_eq!(expected_nonce, current_nonce,
-                            "SAHYADRI: CRITICAL — nonce mismatch (have {}, tx claims {})", current_nonce, expected_nonce);
+                        let current_nonce =
+                            self.account_store.get_nonce(&sender_spk).expect("SAHYADRI: CRITICAL — failed to read nonce");
+                        assert_eq!(
+                            expected_nonce, current_nonce,
+                            "SAHYADRI: CRITICAL — nonce mismatch (have {}, tx claims {})",
+                            current_nonce, expected_nonce
+                        );
 
                         // Verify balance
                         let mut total_spent: u64 = 0;
-                        for output in tx.outputs.iter() { total_spent += output.value; }
+                        for output in tx.outputs.iter() {
+                            total_spent += output.value;
+                        }
                         total_spent += tx.gas;
-                        let balance = self.account_store.get_balance(&sender_spk)
-                            .expect("SAHYADRI: CRITICAL — failed to read balance");
-                        assert!((balance as u64) >= total_spent,
-                            "SAHYADRI: CRITICAL — insufficient balance (have {}, need {})", balance, total_spent);
+                        let balance =
+                            self.account_store.get_balance(&sender_spk).expect("SAHYADRI: CRITICAL — failed to read balance");
+                        assert!(
+                            (balance as u64) >= total_spent,
+                            "SAHYADRI: CRITICAL — insufficient balance (have {}, need {})",
+                            balance,
+                            total_spent
+                        );
 
                         // All checks passed — apply state changes
                         for output in tx.outputs.iter() {
                             let amount = output.value as i64;
-                            self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount)
+                            self.account_store
+                                .update_balance_batch(&mut batch, &output.script_public_key, amount)
                                 .expect("SAHYADRI: CRITICAL — failed to credit receiver");
                         }
-                        self.account_store.update_balance_batch(&mut batch, &sender_spk, -(total_spent as i64))
+                        self.account_store
+                            .update_balance_batch(&mut batch, &sender_spk, -(total_spent as i64))
                             .expect("SAHYADRI: CRITICAL — failed to deduct sender");
-                        self.account_store.increment_nonce_batch(&mut batch, &sender_spk)
+                        self.account_store
+                            .increment_nonce_batch(&mut batch, &sender_spk)
                             .expect("SAHYADRI: CRITICAL — failed to increment nonce");
                     }
                 }

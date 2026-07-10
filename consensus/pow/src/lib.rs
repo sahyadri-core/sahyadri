@@ -1,9 +1,9 @@
 // public for benchmarks
 #[doc(hidden)]
 pub mod matrix;
+pub mod memory_loop;
 #[cfg(feature = "wasm32-sdk")]
 pub mod wasm;
-pub mod memory_loop;
 #[doc(hidden)]
 pub mod xoshiro;
 

@@ -1,11 +1,9 @@
 #![allow(dead_code, unused_imports, unused_variables)]
-use criterion::{black_box, criterion_group, criterion_main, Criterion, SamplingMode, Throughput};
+use criterion::{Criterion, SamplingMode, Throughput, black_box, criterion_group, criterion_main};
 use sahyadri_consensus::model::stores::account_store::{AccountStore, DbAccountStore};
 use sahyadri_consensus::processes::transaction_validator::TransactionValidator;
 use sahyadri_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
-use sahyadri_consensus_core::tx::{
-    ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput,
-};
+use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput};
 use sahyadri_database::create_temp_db;
 use sahyadri_database::prelude::ConnBuilder;
 use smallvec::smallvec;
@@ -15,10 +13,7 @@ fn mock_account_tx(payload_size: usize) -> Transaction {
     Transaction::new(
         0,
         vec![],
-        vec![TransactionOutput {
-            value: 1000,
-            script_public_key: ScriptPublicKey::new(0, smallvec![0x14; 22]),
-        }],
+        vec![TransactionOutput { value: 1000, script_public_key: ScriptPublicKey::new(0, smallvec![0x14; 22]) }],
         0,
         SUBNETWORK_ID_NATIVE,
         0,
@@ -33,18 +28,12 @@ fn mock_payment_tx(payload_size: usize) -> Transaction {
     Transaction::new(
         0,
         vec![TransactionInput {
-            previous_outpoint: TransactionOutpoint::new(
-                sahyadri_consensus_core::tx::TransactionId::from_bytes([0u8; 32]),
-                0,
-            ),
+            previous_outpoint: TransactionOutpoint::new(sahyadri_consensus_core::tx::TransactionId::from_bytes([0u8; 32]), 0),
             signature_script: vec![0u8; 2420],
             sequence: 0,
             sig_op_count: 1,
         }],
-        vec![TransactionOutput {
-            value: 500,
-            script_public_key: ScriptPublicKey::new(0, smallvec![0x14; 22]),
-        }],
+        vec![TransactionOutput { value: 500, script_public_key: ScriptPublicKey::new(0, smallvec![0x14; 22]) }],
         1615462089000,
         SUBNETWORK_ID_NATIVE,
         1000,
@@ -56,7 +45,12 @@ fn benchmark_all(c: &mut Criterion) {
     let (lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let account_store = Arc::new(DbAccountStore::new(db.clone(), 10000));
     let validator = TransactionValidator::new_for_tests(
-        1000, 1000, 1650, 1000, 100, 1000,
+        1000,
+        1000,
+        1650,
+        1000,
+        100,
+        1000,
         sahyadri_consensus_core::KType::from(10u16),
         Default::default(),
         account_store.clone(),
