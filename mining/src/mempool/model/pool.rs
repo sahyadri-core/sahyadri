@@ -37,7 +37,7 @@ pub(crate) trait Pool {
     // =====================================================================
     fn count_txs_by_sender(&self, target_address: &str) -> usize {
         let mut count = 0;
-        for (_, tx) in self.all().iter() {
+        for tx in self.all().values() {
             if let Some(Some(entry)) = tx.mtx.entries.first() {
                 let script = entry.script_public_key.script();
                 let version = entry.script_public_key.version();
