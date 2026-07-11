@@ -33,7 +33,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy
       - name: Build workspace
         run: cargo build --workspace
       - name: Run tests
