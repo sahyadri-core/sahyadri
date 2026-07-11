@@ -655,18 +655,18 @@ impl VirtualStateProcessor {
                             let sighash = {
                                 let mut h = Sha256::new();
                                 h.update(b"SAHYADRI_ACCOUNT_TX_V1");
-                                h.update(&tx.version.to_le_bytes());
+                                h.update(tx.version.to_le_bytes());
                                 for output in &tx.outputs {
-                                    h.update(&output.value.to_le_bytes());
-                                    h.update(&output.script_public_key.version.to_le_bytes());
+                                    h.update(output.value.to_le_bytes());
+                                    h.update(output.script_public_key.version.to_le_bytes());
                                     let s = output.script_public_key.script();
-                                    h.update(&(s.len() as u64).to_le_bytes());
+                                    h.update((s.len() as u64).to_le_bytes());
                                     h.update(s);
                                 }
-                                h.update(&tx.lock_time.to_le_bytes());
-                                h.update(&tx.subnetwork_id.as_bytes());
-                                h.update(&tx.gas.to_le_bytes());
-                                h.update(&(signable_payload.len() as u64).to_le_bytes());
+                                h.update(tx.lock_time.to_le_bytes());
+                                h.update(tx.subnetwork_id.as_bytes());
+                                h.update(tx.gas.to_le_bytes());
+                                h.update((signable_payload.len() as u64).to_le_bytes());
                                 h.update(signable_payload);
                                 h.finalize()
                             };
@@ -695,7 +695,7 @@ impl VirtualStateProcessor {
                         let balance =
                             self.account_store.get_balance(&sender_spk).expect("SAHYADRI: CRITICAL — failed to read balance");
                         assert!(
-                            (balance as u64) >= total_spent,
+                            balance >= total_spent,
                             "SAHYADRI: CRITICAL — insufficient balance (have {}, need {})",
                             balance,
                             total_spent

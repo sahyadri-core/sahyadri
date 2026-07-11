@@ -206,18 +206,18 @@ fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
 fn compute_account_tx_sighash(tx: &Transaction, signable_payload: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(b"SAHYADRI_ACCOUNT_TX_V1");
-    hasher.update(&tx.version.to_le_bytes());
+    hasher.update(tx.version.to_le_bytes());
     for output in &tx.outputs {
-        hasher.update(&output.value.to_le_bytes());
-        hasher.update(&output.script_public_key.version.to_le_bytes());
+        hasher.update(output.value.to_le_bytes());
+        hasher.update(output.script_public_key.version.to_le_bytes());
         let script = output.script_public_key.script();
-        hasher.update(&(script.len() as u64).to_le_bytes());
+        hasher.update((script.len() as u64).to_le_bytes());
         hasher.update(script);
     }
-    hasher.update(&tx.lock_time.to_le_bytes());
+    hasher.update(tx.lock_time.to_le_bytes());
     hasher.update(tx.subnetwork_id.as_bytes());
-    hasher.update(&tx.gas.to_le_bytes());
-    hasher.update(&(signable_payload.len() as u64).to_le_bytes());
+    hasher.update(tx.gas.to_le_bytes());
+    hasher.update((signable_payload.len() as u64).to_le_bytes());
     hasher.update(signable_payload);
     hasher.finalize().into()
 }
