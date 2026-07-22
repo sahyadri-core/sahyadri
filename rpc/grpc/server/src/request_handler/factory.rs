@@ -94,6 +94,9 @@ impl Factory {
                 StopNotifyingUtxosChanged,
                 StopNotifyingPruningPointUtxoSetOverride,
                 SubmitAccountTransaction,
+                SubmitDidCreate,
+                SubmitDidUpdate,
+                SubmitDidDeactivate,
             ]
         );
 
@@ -158,6 +161,65 @@ impl Factory {
             })
         });
         interface.replace_method(SahyadridPayloadOps::SubmitAccountTransaction, method);
+
+        // DID custom handlers
+        let _did_create_method: SahyadridMethod = Method::new(|server_ctx: ServerContext, _connection: Connection, request: SahyadridRequest| {
+            Box::pin(async move {
+                let mut response: SahyadridResponse = match request.payload {
+                    Some(Payload::SubmitDidCreateRequest(ref req)) => {
+                        match sahyadri_rpc_core::SubmitDidCreateRequest::try_from(req) {
+                            Ok(rpc_req) => match server_ctx.core_service.submit_did_create(rpc_req).await {
+                                Ok(res) => SubmitDidCreateResponseMessage::from(res).into(),
+                                Err(e) => SubmitDidCreateResponseMessage::from(e).into(),
+                            },
+                            Err(e) => SubmitDidCreateResponseMessage::from(e).into(),
+                        }
+                    }
+                    _ => return Err(GrpcServerError::InvalidRequestPayload),
+                };
+                response.id = request.id;
+                Ok(response)
+            })
+        });
+
+        let _did_update_method: SahyadridMethod = Method::new(|server_ctx: ServerContext, _connection: Connection, request: SahyadridRequest| {
+            Box::pin(async move {
+                let mut response: SahyadridResponse = match request.payload {
+                    Some(Payload::SubmitDidUpdateRequest(ref req)) => {
+                        match sahyadri_rpc_core::SubmitDidUpdateRequest::try_from(req) {
+                            Ok(rpc_req) => match server_ctx.core_service.submit_did_update(rpc_req).await {
+                                Ok(res) => SubmitDidUpdateResponseMessage::from(res).into(),
+                                Err(e) => SubmitDidUpdateResponseMessage::from(e).into(),
+                            },
+                            Err(e) => SubmitDidUpdateResponseMessage::from(e).into(),
+                        }
+                    }
+                    _ => return Err(GrpcServerError::InvalidRequestPayload),
+                };
+                response.id = request.id;
+                Ok(response)
+            })
+        });
+
+        let _did_deactivate_method: SahyadridMethod = Method::new(|server_ctx: ServerContext, _connection: Connection, request: SahyadridRequest| {
+            Box::pin(async move {
+                let mut response: SahyadridResponse = match request.payload {
+                    Some(Payload::SubmitDidDeactivateRequest(ref req)) => {
+                        match sahyadri_rpc_core::SubmitDidDeactivateRequest::try_from(req) {
+                            Ok(rpc_req) => match server_ctx.core_service.submit_did_deactivate(rpc_req).await {
+                                Ok(res) => SubmitDidDeactivateResponseMessage::from(res).into(),
+                                Err(e) => SubmitDidDeactivateResponseMessage::from(e).into(),
+                            },
+                            Err(e) => SubmitDidDeactivateResponseMessage::from(e).into(),
+                        }
+                    }
+                    _ => return Err(GrpcServerError::InvalidRequestPayload),
+                };
+                response.id = request.id;
+                Ok(response)
+            })
+        });
+
 
         // SubmitAccountTransactionResponseMessage -> SahyadridResponse impl
 

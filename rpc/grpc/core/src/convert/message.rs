@@ -261,6 +261,33 @@ from!(item: &sahyadri_rpc_core::SubmitAccountTransactionRequest, protowire::Subm
     Self { sender: item.sender.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
 });
 from!(item: RpcResult<&sahyadri_rpc_core::SubmitAccountTransactionResponse>, protowire::SubmitAccountTransactionResponseMessage, {
+from!(item: &sahyadri_rpc_core::SubmitDidCreateRequest, protowire::SubmitDidCreateRequestMessage, {
+    Self { sender: item.sender.clone(), did: item.did.clone(), document: item.document.clone(), public_key_hex: item.public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, purposes: item.purposes.clone(), services: item.services.clone(), timestamp: item.timestamp }
+});
+from!(item: RpcResult<&sahyadri_rpc_core::SubmitDidCreateResponse>, protowire::SubmitDidCreateResponseMessage, {
+    Self { transaction_id: item.transaction_id.clone(), error: None }
+});
+from!(item: sahyadri_rpc_core::SubmitDidCreateResponse, protowire::SubmitDidCreateResponseMessage, {
+    Self { transaction_id: item.transaction_id.clone(), error: None }
+});
+from!(item: &sahyadri_rpc_core::SubmitDidUpdateRequest, protowire::SubmitDidUpdateRequestMessage, {
+    Self { sender: item.sender.clone(), did: item.did.clone(), current_public_key_hex: item.current_public_key_hex.clone(), new_public_key_hex: item.new_public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, add_services: item.add_services.clone(), remove_services: item.remove_services.clone(), purposes: item.purposes.clone(), timestamp: item.timestamp }
+});
+from!(item: RpcResult<&sahyadri_rpc_core::SubmitDidUpdateResponse>, protowire::SubmitDidUpdateResponseMessage, {
+    Self { transaction_id: item.transaction_id.clone(), error: None }
+});
+from!(item: sahyadri_rpc_core::SubmitDidUpdateResponse, protowire::SubmitDidUpdateResponseMessage, {
+    Self { transaction_id: item.transaction_id.clone(), error: None }
+});
+from!(item: &sahyadri_rpc_core::SubmitDidDeactivateRequest, protowire::SubmitDidDeactivateRequestMessage, {
+    Self { sender: item.sender.clone(), did: item.did.clone(), public_key_hex: item.public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, reason: item.reason.clone(), timestamp: item.timestamp }
+});
+from!(item: RpcResult<&sahyadri_rpc_core::SubmitDidDeactivateResponse>, protowire::SubmitDidDeactivateResponseMessage, {
+    Self { transaction_id: item.transaction_id.clone(), error: None }
+});
+from!(item: sahyadri_rpc_core::SubmitDidDeactivateResponse, protowire::SubmitDidDeactivateResponseMessage, {
+    Self { transaction_id: item.transaction_id.clone(), error: None }
+});
     Self { transaction_id: item.transaction_id.clone(), error: None }
 });
 from!(item: sahyadri_rpc_core::SubmitAccountTransactionResponse, protowire::SubmitAccountTransactionResponseMessage, {
@@ -777,6 +804,24 @@ try_from!(item: &protowire::SubmitAccountTransactionRequestMessage, sahyadri_rpc
     Self { sender: item.sender.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
 });
 try_from!(item: &protowire::SubmitAccountTransactionResponseMessage, RpcResult<sahyadri_rpc_core::SubmitAccountTransactionResponse>, {
+try_from!(item: &protowire::SubmitDidCreateRequestMessage, sahyadri_rpc_core::SubmitDidCreateRequest, {
+    Self { sender: item.sender.clone(), did: item.did.clone(), document: item.document.clone(), public_key_hex: item.public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, purposes: item.purposes.clone(), services: item.services.clone(), timestamp: item.timestamp }
+});
+try_from!(item: &protowire::SubmitDidCreateResponseMessage, RpcResult<sahyadri_rpc_core::SubmitDidCreateResponse>, {
+    Self { transaction_id: item.transaction_id.clone(), error: item.error.as_ref().map(|e| e.message.clone()) }
+});
+try_from!(item: &protowire::SubmitDidUpdateRequestMessage, sahyadri_rpc_core::SubmitDidUpdateRequest, {
+    Self { sender: item.sender.clone(), did: item.did.clone(), current_public_key_hex: item.current_public_key_hex.clone(), new_public_key_hex: item.new_public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, add_services: item.add_services.clone(), remove_services: item.remove_services.clone(), purposes: item.purposes.clone(), timestamp: item.timestamp }
+});
+try_from!(item: &protowire::SubmitDidUpdateResponseMessage, RpcResult<sahyadri_rpc_core::SubmitDidUpdateResponse>, {
+    Self { transaction_id: item.transaction_id.clone(), error: item.error.as_ref().map(|e| e.message.clone()) }
+});
+try_from!(item: &protowire::SubmitDidDeactivateRequestMessage, sahyadri_rpc_core::SubmitDidDeactivateRequest, {
+    Self { sender: item.sender.clone(), did: item.did.clone(), public_key_hex: item.public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, reason: item.reason.clone(), timestamp: item.timestamp }
+});
+try_from!(item: &protowire::SubmitDidDeactivateResponseMessage, RpcResult<sahyadri_rpc_core::SubmitDidDeactivateResponse>, {
+    Self { transaction_id: item.transaction_id.clone(), error: item.error.as_ref().map(|e| e.message.clone()) }
+});
     Self { transaction_id: item.transaction_id.clone(), error: item.error.as_ref().map(|e| e.message.clone()) }
 });
 

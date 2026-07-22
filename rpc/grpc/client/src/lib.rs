@@ -310,10 +310,24 @@ impl RpcApi for GrpcClient {
 
     async fn submit_account_transaction(
         &self,
-        _request: SubmitAccountTransactionRequest,
+        request: SubmitAccountTransactionRequest,
     ) -> RpcResult<SubmitAccountTransactionResponse> {
-        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+        self.submit_account_transaction_call(None, request).await
     }
+
+    async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
+        self.inner.call(SahyadridPayloadOps::SubmitDidCreate, request).await?.as_ref().try_into()
+    }
+    async fn submit_did_update(&self, request: SubmitDidUpdateRequest) -> RpcResult<SubmitDidUpdateResponse> {
+        self.inner.call(SahyadridPayloadOps::SubmitDidUpdate, request).await?.as_ref().try_into()
+    }
+    async fn submit_did_deactivate(&self, request: SubmitDidDeactivateRequest) -> RpcResult<SubmitDidDeactivateResponse> {
+        self.inner.call(SahyadridPayloadOps::SubmitDidDeactivate, request).await?.as_ref().try_into()
+    }
+
+    route!(submit_did_create_call, SubmitDidCreate);
+    route!(submit_did_update_call, SubmitDidUpdate);
+    route!(submit_did_deactivate_call, SubmitDidDeactivate);
 
     /// Start sending notifications of some type to a listener.
     async fn start_notify(&self, id: ListenerId, scope: Scope) -> RpcResult<()> {
