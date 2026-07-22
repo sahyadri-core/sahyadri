@@ -666,7 +666,45 @@ impl RpcApi for SahyadriRpcClient {
             Unban,
         ]
     );
+    // ── DID Operations (Web5 Decentralized Identifiers) ──
+    async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
+        let response: ClientResult<SubmitDidCreateResponse> = self.inner.rpc_client.call(RpcApiOps::SubmitDidCreate, Serializable(request)).await;
+        Ok(response.map_err(|e| e.to_string())?)
+    }
 
+    async fn submit_did_update(&self, request: SubmitDidUpdateRequest) -> RpcResult<SubmitDidUpdateResponse> {
+        let response: ClientResult<SubmitDidUpdateResponse> = self.inner.rpc_client.call(RpcApiOps::SubmitDidUpdate, Serializable(request)).await;
+        Ok(response.map_err(|e| e.to_string())?)
+    }
+
+    async fn submit_did_deactivate(&self, request: SubmitDidDeactivateRequest) -> RpcResult<SubmitDidDeactivateResponse> {
+        let response: ClientResult<SubmitDidDeactivateResponse> = self.inner.rpc_client.call(RpcApiOps::SubmitDidDeactivate, Serializable(request)).await;
+        Ok(response.map_err(|e| e.to_string())?)
+    }
+
+    async fn submit_did_create_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        request: SubmitDidCreateRequest,
+    ) -> RpcResult<SubmitDidCreateResponse> {
+        self.submit_did_create(request).await
+    }
+
+    async fn submit_did_update_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        request: SubmitDidUpdateRequest,
+    ) -> RpcResult<SubmitDidUpdateResponse> {
+        self.submit_did_update(request).await
+    }
+
+    async fn submit_did_deactivate_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        request: SubmitDidDeactivateRequest,
+    ) -> RpcResult<SubmitDidDeactivateResponse> {
+        self.submit_did_deactivate(request).await
+    }
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Notification API
 
