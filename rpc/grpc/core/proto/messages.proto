@@ -68,6 +68,9 @@ message SahyadridRequest {
     GetCurrentBlockColorRequestMessage getCurrentBlockColorRequest = 1110;
     GetUtxoReturnAddressRequestMessage getUtxoReturnAddressRequest = 1112;
     GetVirtualChainFromBlockV2RequestMessage getVirtualChainFromBlockV2Request = 1114;
+    SubmitDidCreateRequestMessage submitDidCreateRequest = 1300;
+    SubmitDidUpdateRequestMessage submitDidUpdateRequest = 1301;
+    SubmitDidDeactivateRequestMessage submitDidDeactivateRequest = 1302;
   }
 }
 
@@ -136,6 +139,9 @@ message SahyadridResponse {
     GetCurrentBlockColorResponseMessage getCurrentBlockColorResponse = 1111;
     GetUtxoReturnAddressResponseMessage getUtxoReturnAddressResponse = 1113;
     GetVirtualChainFromBlockV2ResponseMessage getVirtualChainFromBlockV2Response = 1115;
+    SubmitDidCreateResponseMessage submitDidCreateResponse = 1303;
+    SubmitDidUpdateResponseMessage submitDidUpdateResponse = 1304;
+    SubmitDidDeactivateResponseMessage submitDidDeactivateResponse = 1305;
   }
 }
 
@@ -154,4 +160,54 @@ message SubmitAccountTransactionRequestMessage {
 message SubmitAccountTransactionResponseMessage {
     string transactionId = 1;
     RPCError error = 1000;
+}
+
+message SubmitDidCreateRequestMessage {
+  string sender = 1;
+  string did = 2;
+  string document = 3;
+  string public_key_hex = 4;
+  string signature = 5;
+  uint64 nonce = 6;
+  string purposes = 7;
+  string services = 8;
+  uint64 timestamp = 9;
+}
+
+message SubmitDidCreateResponseMessage {
+  string transaction_id = 1;
+  RPCError error = 1000;
+}
+
+message SubmitDidUpdateRequestMessage {
+  string sender = 1;
+  string did = 2;
+  string current_public_key_hex = 3;
+  string new_public_key_hex = 4;
+  string signature = 5;
+  uint64 nonce = 6;
+  string add_services = 7;
+  string remove_services = 8;
+  string purposes = 9;
+  uint64 timestamp = 10;
+}
+
+message SubmitDidUpdateResponseMessage {
+  string transaction_id = 1;
+  RPCError error = 1000;
+}
+
+message SubmitDidDeactivateRequestMessage {
+  string sender = 1;
+  string did = 2;
+  string public_key_hex = 3;
+  string signature = 4;
+  uint64 nonce = 5;
+  string reason = 6;
+  uint64 timestamp = 7;
+}
+
+message SubmitDidDeactivateResponseMessage {
+  string transaction_id = 1;
+  RPCError error = 1000;
 }

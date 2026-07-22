@@ -141,6 +141,9 @@ pub enum RpcApiOps {
     /// Get Virtual Chain from Block V2
     GetVirtualChainFromBlockV2 = 151,
     SubmitAccountTransaction,
+    SubmitDidCreate,
+    SubmitDidUpdate,
+    SubmitDidDeactivate,
 }
 
 impl RpcApiOps {

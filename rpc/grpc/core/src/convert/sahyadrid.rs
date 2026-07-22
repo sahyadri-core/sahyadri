@@ -38,6 +38,9 @@ pub mod sahyadrid_request_convert {
     impl_into_sahyadrid_request!(SubmitTransaction);
     impl_into_sahyadrid_request!(SubmitTransactionReplacement);
     impl_into_sahyadrid_request!(SubmitAccountTransaction);
+    impl_into_sahyadrid_request!(SubmitDidCreate);
+    impl_into_sahyadrid_request!(SubmitDidUpdate);
+    impl_into_sahyadrid_request!(SubmitDidDeactivate);
     impl_into_sahyadrid_request!(GetSubnetwork);
     impl_into_sahyadrid_request!(GetVirtualChainFromBlock);
     impl_into_sahyadrid_request!(GetBlocks);
@@ -178,6 +181,9 @@ pub mod sahyadrid_response_convert {
     impl_into_sahyadrid_response!(SubmitTransaction);
     impl_into_sahyadrid_response!(SubmitTransactionReplacement);
     impl_into_sahyadrid_response!(SubmitAccountTransaction);
+    impl_into_sahyadrid_response!(SubmitDidCreate);
+    impl_into_sahyadrid_response!(SubmitDidUpdate);
+    impl_into_sahyadrid_response!(SubmitDidDeactivate);
     impl_into_sahyadrid_response!(GetSubnetwork);
     impl_into_sahyadrid_response!(GetVirtualChainFromBlock);
     impl_into_sahyadrid_response!(GetBlocks);

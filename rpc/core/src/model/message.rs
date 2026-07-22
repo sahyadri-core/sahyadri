@@ -3651,3 +3651,211 @@ impl Deserializer for SubmitAccountTransactionResponse {
         Ok(Self { transaction_id, error })
     }
 }
+
+// ============================================================
+// DID Operations
+// ============================================================
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitDidCreateRequest {
+    pub sender: String,
+    pub did: String,
+    pub document: String,
+    pub public_key_hex: String,
+    pub signature: String,
+    pub nonce: u64,
+    pub purposes: String,
+    pub services: String,
+    pub timestamp: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitDidCreateResponse {
+    pub transaction_id: String,
+    pub error: Option<String>,
+}
+
+impl Serializer for SubmitDidCreateRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.sender, writer)?;
+        store!(String, &self.did, writer)?;
+        store!(String, &self.document, writer)?;
+        store!(String, &self.public_key_hex, writer)?;
+        store!(String, &self.signature, writer)?;
+        store!(u64, &self.nonce, writer)?;
+        store!(String, &self.purposes, writer)?;
+        store!(String, &self.services, writer)?;
+        store!(u64, &self.timestamp, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitDidCreateRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let sender = load!(String, reader)?;
+        let did = load!(String, reader)?;
+        let document = load!(String, reader)?;
+        let public_key_hex = load!(String, reader)?;
+        let signature = load!(String, reader)?;
+        let nonce = load!(u64, reader)?;
+        let purposes = load!(String, reader)?;
+        let services = load!(String, reader)?;
+        let timestamp = load!(u64, reader)?;
+        Ok(Self { sender, did, document, public_key_hex, signature, nonce, purposes, services, timestamp })
+    }
+}
+
+impl Serializer for SubmitDidCreateResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.transaction_id, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitDidCreateResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let transaction_id = load!(String, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { transaction_id, error })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitDidUpdateRequest {
+    pub sender: String,
+    pub did: String,
+    pub current_public_key_hex: String,
+    pub new_public_key_hex: String,
+    pub signature: String,
+    pub nonce: u64,
+    pub add_services: String,
+    pub remove_services: String,
+    pub purposes: String,
+    pub timestamp: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitDidUpdateResponse {
+    pub transaction_id: String,
+    pub error: Option<String>,
+}
+
+impl Serializer for SubmitDidUpdateRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.sender, writer)?;
+        store!(String, &self.did, writer)?;
+        store!(String, &self.current_public_key_hex, writer)?;
+        store!(String, &self.new_public_key_hex, writer)?;
+        store!(String, &self.signature, writer)?;
+        store!(u64, &self.nonce, writer)?;
+        store!(String, &self.add_services, writer)?;
+        store!(String, &self.remove_services, writer)?;
+        store!(String, &self.purposes, writer)?;
+        store!(u64, &self.timestamp, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitDidUpdateRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let sender = load!(String, reader)?;
+        let did = load!(String, reader)?;
+        let current_public_key_hex = load!(String, reader)?;
+        let new_public_key_hex = load!(String, reader)?;
+        let signature = load!(String, reader)?;
+        let nonce = load!(u64, reader)?;
+        let add_services = load!(String, reader)?;
+        let remove_services = load!(String, reader)?;
+        let purposes = load!(String, reader)?;
+        let timestamp = load!(u64, reader)?;
+        Ok(Self { sender, did, current_public_key_hex, new_public_key_hex, signature, nonce, add_services, remove_services, purposes, timestamp })
+    }
+}
+
+impl Serializer for SubmitDidUpdateResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.transaction_id, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitDidUpdateResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let transaction_id = load!(String, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { transaction_id, error })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitDidDeactivateRequest {
+    pub sender: String,
+    pub did: String,
+    pub public_key_hex: String,
+    pub signature: String,
+    pub nonce: u64,
+    pub reason: String,
+    pub timestamp: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitDidDeactivateResponse {
+    pub transaction_id: String,
+    pub error: Option<String>,
+}
+
+impl Serializer for SubmitDidDeactivateRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.sender, writer)?;
+        store!(String, &self.did, writer)?;
+        store!(String, &self.public_key_hex, writer)?;
+        store!(String, &self.signature, writer)?;
+        store!(u64, &self.nonce, writer)?;
+        store!(String, &self.reason, writer)?;
+        store!(u64, &self.timestamp, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitDidDeactivateRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let sender = load!(String, reader)?;
+        let did = load!(String, reader)?;
+        let public_key_hex = load!(String, reader)?;
+        let signature = load!(String, reader)?;
+        let nonce = load!(u64, reader)?;
+        let reason = load!(String, reader)?;
+        let timestamp = load!(u64, reader)?;
+        Ok(Self { sender, did, public_key_hex, signature, nonce, reason, timestamp })
+    }
+}
+
+impl Serializer for SubmitDidDeactivateResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.transaction_id, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitDidDeactivateResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let transaction_id = load!(String, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { transaction_id, error })
+    }
+}
