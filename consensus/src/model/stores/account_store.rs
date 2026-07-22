@@ -69,6 +69,7 @@ pub trait AccountStore: AccountStoreReader {
         balance_change: i64,
     ) -> StoreResult<()>;
     fn increment_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()>;
+    fn decrement_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()>;
 }
 
 const STORE_PREFIX: &[u8] = b"accounts-store";
@@ -128,6 +129,12 @@ impl AccountStore for DbAccountStore {
     fn increment_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()> {
         let mut state = self.get(script_public_key).unwrap_or(AccountState { balance: 0, nonce: 0 });
         state.nonce = state.nonce.saturating_add(1);
+        self.set_batch(batch, script_public_key, state)
+    }
+
+    fn decrement_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()> {
+        let mut state = self.get(script_public_key).unwrap_or(AccountState { balance: 0, nonce: 0 });
+        state.nonce = state.nonce.saturating_sub(1);
         self.set_batch(batch, script_public_key, state)
     }
 }

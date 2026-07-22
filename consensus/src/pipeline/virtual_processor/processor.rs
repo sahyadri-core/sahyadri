@@ -76,6 +76,10 @@ use sahyadri_consensusmanager::SessionLock;
 use sahyadri_core::{debug, info, time::unix_now, trace, warn};
 use sahyadri_database::prelude::{StoreError, StoreResultExt, StoreResultUnitExt};
 use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHYADRI_MODE, SIG_SIZE};
+
+// TODO: Replace with treasury Dilithium pubkey hex (1952 bytes = 3904 hex chars)
+// Until set, 100% reward goes to miner
+const SAHYADRI_TREASURY_PUBKEY_HEX: &str = "";
 use sahyadri_hashes::{Hash, ZERO_HASH};
 use sahyadri_muhash::MuHash;
 use sahyadri_notify::{events::EventType, notifier::Notify};
@@ -594,7 +598,30 @@ impl VirtualStateProcessor {
                     }
 
                     if i > 0 {
-                        // TODO: Reverse the Sender's deduction (Refund the sender)
+                        // Refund the sender and roll back their nonce, mirroring the apply path
+                        let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
+                        if tx.payload.len() >= min_payload {
+                            let sig_start = tx.payload.len() - SIG_SIZE;
+                            let sender_pubkey = &tx.payload[..sig_start - 8];
+                            let sender_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, sender_pubkey.to_vec());
+
+                            let mut total_spent: u64 = tx.gas;
+                            for output in tx.outputs.iter() {
+                                total_spent += output.value;
+                            }
+
+                            self.account_store
+                                .update_balance_batch(&mut batch, &sender_spk, total_spent as i64)
+                                .expect("SAHYADRI: CRITICAL — failed to refund sender during reorg");
+                            self.account_store
+                                .decrement_nonce_batch(&mut batch, &sender_spk)
+                                .expect("SAHYADRI: CRITICAL — failed to roll back sender nonce during reorg");
+                        } else {
+                            log::error!(
+                                "SAHYADRI: reorg refund skipped — undersized payload ({} bytes) for tx in removed block",
+                                tx.payload.len()
+                            );
+                        }
                     }
                 }
             }
@@ -614,17 +641,25 @@ impl VirtualStateProcessor {
 
                             if total_reward > 0 {
                                 // 2. Dev Fee Split (2% for Treasury)
-                                let dev_fee = total_reward / 50;
+                                let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 50 };
                                 let miner_reward = total_reward - dev_fee;
 
                                 // 3. Miner ka balance update kar
-                                self.account_store
+                               self.account_store
                                     .update_balance_batch(&mut batch, &coinbase_data.miner_data.script_public_key, miner_reward as i64)
                                     .expect("SAHYADRI: CRITICAL — failed to credit miner reward, state may be inconsistent");
 
-                                // TODO: Treasury address ko string se ScriptPublicKey me convert karke dev_fee bhi add karni hai
+                                let mut treasury_pubkey_bytes = vec![0u8; PUBKEY_SIZE];
+                                if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut treasury_pubkey_bytes).is_ok() {
+                                    let treasury_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, treasury_pubkey_bytes);
+                                    self.account_store
+                                        .update_balance_batch(&mut batch, &treasury_spk, dev_fee as i64)
+                                        .expect("SAHYADRI: CRITICAL — failed to credit treasury");
+                                } else {
+                                    log::error!("SAHYADRI: failed to decode treasury pubkey hex — dev_fee {} NOT credited this block", dev_fee);
+                                }
 
-                                println!("SAHYADRI REWARD: Added {} Kana to Miner! (Dev Fee: {})", miner_reward, dev_fee);
+                                log::debug!("SAHYADRI REWARD: Added {} Kana to Miner! (Dev Fee: {})", miner_reward, dev_fee);
                             }
                         } else {
                             println!("SAHYADRI REWARD ERROR: Failed to decode coinbase payload!");
@@ -636,10 +671,11 @@ impl VirtualStateProcessor {
                     else {
                         let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
                         if tx.payload.len() < min_payload {
-                            panic!(
-                                "SAHYADRI: CRITICAL — account tx undersized payload ({}) in commit_virtual_state",
+                            log::warn!(
+                                "SAHYADRI: skipping account tx — undersized payload ({} bytes) in commit_virtual_state",
                                 tx.payload.len()
                             );
+                            continue;
                         }
 
                         let sig_start = tx.payload.len() - SIG_SIZE;
@@ -671,20 +707,27 @@ impl VirtualStateProcessor {
                                 h.finalize()
                             };
                             let sig = DilithiumSignature::from_slice(sig_bytes);
-                            assert!(
-                                DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE),
-                                "SAHYADRI: CRITICAL — invalid sig in commit_virtual_state"
-                            );
+                            if !DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE) {
+                                log::warn!("SAHYADRI: skipping account tx — invalid signature in commit_virtual_state");
+                                continue;
+                            }
                         }
 
                         // Verify nonce
-                        let current_nonce =
-                            self.account_store.get_nonce(&sender_spk).expect("SAHYADRI: CRITICAL — failed to read nonce");
-                        assert_eq!(
-                            expected_nonce, current_nonce,
-                            "SAHYADRI: CRITICAL — nonce mismatch (have {}, tx claims {})",
-                            current_nonce, expected_nonce
-                        );
+                        let current_nonce = match self.account_store.get_nonce(&sender_spk) {
+                            Ok(n) => n,
+                            Err(e) => {
+                                log::warn!("SAHYADRI: skipping account tx — failed to read nonce: {:?}", e);
+                                continue;
+                            }
+                        };
+                        if expected_nonce != current_nonce {
+                            log::warn!(
+                                "SAHYADRI: skipping invalid account tx — nonce mismatch (have {}, tx claims {})",
+                                current_nonce, expected_nonce
+                            );
+                            continue;
+                        }
 
                         // Verify balance
                         let mut total_spent: u64 = 0;
@@ -692,14 +735,20 @@ impl VirtualStateProcessor {
                             total_spent += output.value;
                         }
                         total_spent += tx.gas;
-                        let balance =
-                            self.account_store.get_balance(&sender_spk).expect("SAHYADRI: CRITICAL — failed to read balance");
-                        assert!(
-                            balance >= total_spent,
-                            "SAHYADRI: CRITICAL — insufficient balance (have {}, need {})",
-                            balance,
-                            total_spent
-                        );
+                        let balance = match self.account_store.get_balance(&sender_spk) {
+                            Ok(b) => b,
+                            Err(e) => {
+                                log::warn!("SAHYADRI: skipping account tx — failed to read balance: {:?}", e);
+                                continue;
+                            }
+                        };
+                        if balance < total_spent {
+                            log::warn!(
+                                "SAHYADRI: skipping invalid account tx — insufficient balance (have {}, need {})",
+                                balance, total_spent
+                            );
+                            continue;
+                        }
 
                         // All checks passed — apply state changes
                         for output in tx.outputs.iter() {

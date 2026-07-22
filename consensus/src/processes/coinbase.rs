@@ -14,7 +14,7 @@ const LENGTH_OF_BLUE_SCORE: usize = size_of::<u64>();
 const LENGTH_OF_SUBSIDY: usize = size_of::<u64>();
 const LENGTH_OF_SCRIPT_PUB_KEY_VERSION: usize = size_of::<u16>();
 const LENGTH_OF_SCRIPT_PUB_KEY_LENGTH: usize = size_of::<u8>();
-const SAHYADRI_TREASURY_ADDRESS: &str = "csm1sr5hjpvqf2gftk3cpfyzn4u7je779248lcw8ceglsgxxr3yp5gjrwph0etepr";
+pub const SAHYADRI_TREASURY_ADDRESS: &str = "csm1s9cz32g4a58xwaym3fpyq0pj6v3cew8a9qxmxe336u";
 
 const MIN_PAYLOAD_LENGTH: usize =
     LENGTH_OF_BLUE_SCORE + LENGTH_OF_SUBSIDY + LENGTH_OF_SCRIPT_PUB_KEY_VERSION + LENGTH_OF_SCRIPT_PUB_KEY_LENGTH;
