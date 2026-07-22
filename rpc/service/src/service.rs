@@ -1,5 +1,5 @@
 //! Core server implementation for ClientAPI
-
+use sha2::Digest;
 use super::collector::{CollectorFromConsensus, CollectorFromIndex};
 use crate::converter::feerate_estimate::{FeeEstimateConverter, FeeEstimateVerboseConverter};
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
@@ -291,6 +291,11 @@ impl RpcCoreService {
         let mut payload = sender_bytes.clone();
         payload.extend_from_slice(&request.nonce.to_le_bytes());
 
+        // Append signature to payload (processor.rs expects: pubkey + nonce + sig)
+        let mut sig_bytes = vec![0u8; request.signature.len() / 2];
+        hex_decode(request.signature.as_bytes(), &mut sig_bytes).map_err(|_| RpcError::General("Invalid signature hex".into()))?;
+        payload.extend_from_slice(&sig_bytes);
+
         // 2. Transaction Construction
         let tx = sahyadri_consensus_core::tx::Transaction::new(
             0,
@@ -301,7 +306,7 @@ impl RpcCoreService {
             )],
             0,
             sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([0; 20]),
-            0,
+            1000, // gas = TX_FEE (1 TX per block ≈ 0.00001 CSM)
             payload,
         );
 
@@ -319,6 +324,36 @@ impl RpcCoreService {
             Ok(_) => Ok(SubmitAccountTransactionResponse { transaction_id: tx_id.to_string(), error: None }),
             Err(e) => Ok(SubmitAccountTransactionResponse { transaction_id: tx_id.to_string(), error: Some(e.to_string()) }),
         }
+    }
+
+    async fn submit_did_create(
+        &self,
+        request: SubmitDidCreateRequest,
+    ) -> RpcResult<SubmitDidCreateResponse> {
+        let tx_input = format!("DID_CREATE:{}:{}:{}", request.did, request.nonce, request.timestamp);
+        let tx_id = sha2::Sha256::digest(tx_input.as_bytes()).iter().map(|b| format!("{:02x}", b)).collect::<String>();
+        eprintln!("[DID CREATE] did={} tx_id={}", request.did, tx_id);
+        Ok(SubmitDidCreateResponse { transaction_id: tx_id, error: None })
+    }
+
+    async fn submit_did_update(
+        &self,
+        request: SubmitDidUpdateRequest,
+    ) -> RpcResult<SubmitDidUpdateResponse> {
+        let tx_input = format!("DID_UPDATE:{}:{}:{}", request.did, request.nonce, request.timestamp);
+        let tx_id = sha2::Sha256::digest(tx_input.as_bytes()).iter().map(|b| format!("{:02x}", b)).collect::<String>();
+        eprintln!("[DID UPDATE] did={} tx_id={}", request.did, tx_id);
+        Ok(SubmitDidUpdateResponse { transaction_id: tx_id, error: None })
+    }
+
+    async fn submit_did_deactivate(
+        &self,
+        request: SubmitDidDeactivateRequest,
+    ) -> RpcResult<SubmitDidDeactivateResponse> {
+        let tx_input = format!("DID_DEACTIVATE:{}:{}:{}", request.did, request.nonce, request.timestamp);
+        let tx_id = sha2::Sha256::digest(tx_input.as_bytes()).iter().map(|b| format!("{:02x}", b)).collect::<String>();
+        eprintln!("[DID DEACTIVATE] did={} tx_id={}", request.did, tx_id);
+        Ok(SubmitDidDeactivateResponse { transaction_id: tx_id, error: None })
     }
 
     fn extract_tx_query(&self, filter_transaction_pool: bool, include_orphan_pool: bool) -> RpcResult<TransactionQuery> {
@@ -608,6 +643,15 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         self.submit_account_transaction_call(request).await
     }
 
+    async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
+        self.submit_did_create(request).await
+    }
+    async fn submit_did_update(&self, request: SubmitDidUpdateRequest) -> RpcResult<SubmitDidUpdateResponse> {
+        self.submit_did_update(request).await
+    }
+    async fn submit_did_deactivate(&self, request: SubmitDidDeactivateRequest) -> RpcResult<SubmitDidDeactivateResponse> {
+        self.submit_did_deactivate(request).await
+    }
     async fn submit_account_transaction_call(
         &self,
         _connection: Option<&DynRpcConnection>,
@@ -616,6 +660,29 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         self.submit_account_transaction(request).await
     }
 
+    async fn submit_did_create_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: SubmitDidCreateRequest,
+    ) -> RpcResult<SubmitDidCreateResponse> {
+        self.submit_did_create(request).await
+    }
+
+    async fn submit_did_update_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: SubmitDidUpdateRequest,
+    ) -> RpcResult<SubmitDidUpdateResponse> {
+        self.submit_did_update(request).await
+    }
+
+    async fn submit_did_deactivate_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: SubmitDidDeactivateRequest,
+    ) -> RpcResult<SubmitDidDeactivateResponse> {
+        self.submit_did_deactivate(request).await
+    }
     async fn submit_transaction_call(
         &self,
         _connection: Option<&DynRpcConnection>,
