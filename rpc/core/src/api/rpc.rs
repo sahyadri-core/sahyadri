@@ -28,11 +28,46 @@ pub trait RpcApi: Sync + Send + AnySync {
         request: SubmitAccountTransactionRequest,
     ) -> RpcResult<SubmitAccountTransactionResponse>;
 
+
+    async fn submit_did_create(
+        &self,
+        request: SubmitDidCreateRequest,
+    ) -> RpcResult<SubmitDidCreateResponse>;
+
+    async fn submit_did_update(
+        &self,
+        request: SubmitDidUpdateRequest,
+    ) -> RpcResult<SubmitDidUpdateResponse>;
+
+    async fn submit_did_deactivate(
+        &self,
+        request: SubmitDidDeactivateRequest,
+    ) -> RpcResult<SubmitDidDeactivateResponse>;
+
+    async fn submit_did_create_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: SubmitDidCreateRequest,
+    ) -> RpcResult<SubmitDidCreateResponse>;
+
+    async fn submit_did_update_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: SubmitDidUpdateRequest,
+    ) -> RpcResult<SubmitDidUpdateResponse>;
+
+    async fn submit_did_deactivate_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: SubmitDidDeactivateRequest,
+    ) -> RpcResult<SubmitDidDeactivateResponse>;
     async fn ping(&self) -> RpcResult<()> {
         self.ping_call(None, PingRequest {}).await?;
         Ok(())
     }
+
     async fn ping_call(&self, connection: Option<&DynRpcConnection>, request: PingRequest) -> RpcResult<PingResponse>;
+
 
     // ---
 
