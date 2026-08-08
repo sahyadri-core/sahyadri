@@ -146,6 +146,7 @@ impl Factory {
             Box::pin(async move {
                 let mut response: SahyadridResponse = match request.payload {
                     Some(Payload::SubmitAccountTransactionRequest(ref req)) => {
+                        eprintln!("[FACTORY] SubmitAccountTransaction handler REACHED, sender_len={} receiver_len={} sig_len={}", req.sender.len(), req.receiver.len(), req.signature.len());
                         match sahyadri_rpc_core::SubmitAccountTransactionRequest::try_from(req) {
                             Ok(rpc_req) => match server_ctx.core_service.submit_account_transaction(rpc_req).await {
                                 Ok(res) => SubmitAccountTransactionResponseMessage::from(res).into(),

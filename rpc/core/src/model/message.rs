@@ -3859,3 +3859,124 @@ impl Deserializer for SubmitDidDeactivateResponse {
         Ok(Self { transaction_id, error })
     }
 }
+
+// ==========================================
+// ResolveDid RPC Types
+// ==========================================
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct ResolveDidRequest {
+    pub did: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct ResolveDidResponse {
+    pub found: bool,
+    pub active: bool,
+    pub did: Option<String>,
+    pub document: Option<String>,
+    pub public_key: Option<String>,
+    pub csm_address: Option<String>,
+    pub version: Option<u64>,
+    pub created_at: Option<u64>,
+    pub error: Option<String>,
+}
+
+impl Serializer for ResolveDidRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.did, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for ResolveDidRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let did = load!(String, reader)?;
+        Ok(Self { did })
+    }
+}
+
+impl Serializer for ResolveDidResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(bool, &self.found, writer)?;
+        store!(bool, &self.active, writer)?;
+        store!(Option<String>, &self.did, writer)?;
+        store!(Option<String>, &self.document, writer)?;
+        store!(Option<String>, &self.public_key, writer)?;
+        store!(Option<String>, &self.csm_address, writer)?;
+        store!(Option<u64>, &self.version, writer)?;
+        store!(Option<u64>, &self.created_at, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for ResolveDidResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let found = load!(bool, reader)?;
+        let active = load!(bool, reader)?;
+        let did = load!(Option<String>, reader)?;
+        let document = load!(Option<String>, reader)?;
+        let public_key = load!(Option<String>, reader)?;
+        let csm_address = load!(Option<String>, reader)?;
+        let version = load!(Option<u64>, reader)?;
+        let created_at = load!(Option<u64>, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { found, active, did, document, public_key, csm_address, version, created_at, error })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct ResolveDidByAddressRequest {
+    pub address: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct ResolveDidByAddressResponse {
+    pub found: bool,
+    pub did: Option<String>,
+    pub document: Option<String>,
+    pub error: Option<String>,
+}
+
+impl Serializer for ResolveDidByAddressRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.address, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for ResolveDidByAddressRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let address = load!(String, reader)?;
+        Ok(Self { address })
+    }
+}
+
+impl Serializer for ResolveDidByAddressResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(bool, &self.found, writer)?;
+        store!(Option<String>, &self.did, writer)?;
+        store!(Option<String>, &self.document, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for ResolveDidByAddressResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let found = load!(bool, reader)?;
+        let did = load!(Option<String>, reader)?;
+        let document = load!(Option<String>, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { found, did, document, error })
+    }
+}

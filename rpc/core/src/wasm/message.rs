@@ -1855,4 +1855,260 @@ try_from!(args: GetUtxoReturnAddressResponse, IGetUtxoReturnAddressResponse, {
     Ok(to_value(&args)?.into())
 });
 
-// ---
+// ============================================
+// ACCOUNT TRANSACTION TYPES
+// ============================================
+
+declare! {
+    ISubmitAccountTransactionRequest,
+    r#"
+    /**
+     * Submit an account-based transaction (CSM transfer) to the node.
+     *
+     * @category Node RPC
+     * @category Account
+     */
+    export interface ISubmitAccountTransactionRequest {
+        /** The sender's address */
+        sender : string;
+        /** The receiver's address */
+        receiver : string;
+        /** Amount in Sompi units (1 CSM = 100,000,000 Sompi) */
+        amount : number;
+        /** The nonce for this account */
+        nonce : number;
+        /** The signature of the transaction (hex string) */
+        signature : string;
+    }
+    "#,
+}
+
+try_from!(args: ISubmitAccountTransactionRequest, SubmitAccountTransactionRequest, {
+    Ok(from_value(args.into())?)
+});
+
+declare! {
+    ISubmitAccountTransactionResponse,
+    r#"
+    /**
+     * Response for account transaction submission.
+     *
+     * @category Node RPC
+     * @category Account
+     */
+    export interface ISubmitAccountTransactionResponse {
+        /** The transaction ID of the submitted transaction */
+        transaction_id : string;
+        /** Error message if something went wrong */
+        error? : string;
+    }
+    "#,
+}
+
+try_from!(args: SubmitAccountTransactionResponse, ISubmitAccountTransactionResponse, {
+    let response = ISubmitAccountTransactionResponse::default();
+    response.set("transaction_id", &args.transaction_id.into())?;
+    if let Some(ref error) = args.error {
+        response.set("error", &error.into())?;
+    }
+    Ok(response)
+});
+
+// ============================================
+// DID CREATE TYPES
+// ============================================
+
+declare! {
+    ISubmitDidCreateRequest,
+    r#"
+    /**
+     * Create a new DID (Decentralized Identifier) on Sahyadri.
+     *
+     * @category Node RPC
+     * @category DID
+     */
+    export interface ISubmitDidCreateRequest {
+        /** The sender's address creating the DID */
+        sender : string;
+        /** The DID identifier (e.g., did:sahyadri:...) */
+        did : string;
+        /** The DID document JSON */
+        document : string;
+        /** Public key in hex format */
+        public_key_hex : string;
+        /** Signature of the DID creation request */
+        signature : string;
+        /** Current account nonce */
+        nonce : number;
+        /** Purposes for this DID (JSON array as string) */
+        purposes : string;
+        /** Services endpoints (JSON array as string) */
+        services : string;
+        /** Unix timestamp of creation */
+        timestamp : number;
+    }
+    "#,
+}
+
+try_from!(args: ISubmitDidCreateRequest, SubmitDidCreateRequest, {
+    Ok(from_value(args.into())?)
+});
+
+declare! {
+    ISubmitDidCreateResponse,
+    r#"
+    /**
+     * Response for DID creation.
+     *
+     * @category Node RPC
+     * @category DID
+     */
+    export interface ISubmitDidCreateResponse {
+        /** The transaction ID of the DID creation */
+        transaction_id : string;
+        /** Error message if something went wrong */
+        error? : string;
+    }
+    "#,
+}
+
+try_from!(args: SubmitDidCreateResponse, ISubmitDidCreateResponse, {
+    let response = ISubmitDidCreateResponse::default();
+    response.set("transaction_id", &args.transaction_id.into())?;
+    if let Some(ref error) = args.error {
+        response.set("error", &error.into())?;
+    }
+    Ok(response)
+});
+
+// ============================================
+// DID UPDATE TYPES
+// ============================================
+
+declare! {
+    ISubmitDidUpdateRequest,
+    r#"
+    /**
+     * Update an existing DID document on Sahyadri.
+     *
+     * @category Node RPC
+     * @category DID
+     */
+    export interface ISubmitDidUpdateRequest {
+        /** The sender's address (DID owner) */
+        sender : string;
+        /** The DID identifier to update */
+        did : string;
+        /** Current public key in hex (for verification) */
+        current_public_key_hex : string;
+        /** New public key in hex */
+        new_public_key_hex : string;
+        /** Signature of the update request */
+        signature : string;
+        /** Current account nonce */
+        nonce : number;
+        /** Services to add (JSON array as string) */
+        add_services : string;
+        /** Services to remove (JSON array as string) */
+        remove_services : string;
+        /** Updated purposes (JSON array as string) */
+        purposes : string;
+        /** Unix timestamp of update */
+        timestamp : number;
+    }
+    "#,
+}
+
+try_from!(args: ISubmitDidUpdateRequest, SubmitDidUpdateRequest, {
+    Ok(from_value(args.into())?)
+});
+
+declare! {
+    ISubmitDidUpdateResponse,
+    r#"
+    /**
+     * Response for DID update.
+     *
+     * @category Node RPC
+     * @category DID
+     */
+    export interface ISubmitDidUpdateResponse {
+        /** The transaction ID of the DID update */
+        transaction_id : string;
+        /** Error message if something went wrong */
+        error? : string;
+    }
+    "#,
+}
+
+try_from!(args: SubmitDidUpdateResponse, ISubmitDidUpdateResponse, {
+    let response = ISubmitDidUpdateResponse::default();
+    response.set("transaction_id", &args.transaction_id.into())?;
+    if let Some(ref error) = args.error {
+        response.set("error", &error.into())?;
+    }
+    Ok(response)
+});
+
+// ============================================
+// DID DEACTIVATE TYPES
+// ============================================
+
+declare! {
+    ISubmitDidDeactivateRequest,
+    r#"
+    /**
+     * Deactivate an existing DID on Sahyadri.
+     *
+     * @category Node RPC
+     * @category DID
+     */
+    export interface ISubmitDidDeactivateRequest {
+        /** The sender's address (DID owner) */
+        sender : string;
+        /** The DID identifier to deactivate */
+        did : string;
+        /** Current public key in hex (for verification) */
+        public_key_hex : string;
+        /** Signature of the deactivation request */
+        signature : string;
+        /** Current account nonce */
+        nonce : number;
+        /** Reason for deactivation */
+        reason : string;
+        /** Unix timestamp of deactivation */
+        timestamp : number;
+    }
+    "#,
+}
+
+try_from!(args: ISubmitDidDeactivateRequest, SubmitDidDeactivateRequest, {
+    Ok(from_value(args.into())?)
+});
+
+declare! {
+    ISubmitDidDeactivateResponse,
+    r#"
+    /**
+     * Response for DID deactivation.
+     *
+     * @category Node RPC
+     * @category DID
+     */
+    export interface ISubmitDidDeactivateResponse {
+        /** The transaction ID of the DID deactivation */
+        transaction_id : string;
+        /** Error message if something went wrong */
+        error? : string;
+    }
+    "#,
+}
+
+try_from!(args: SubmitDidDeactivateResponse, ISubmitDidDeactivateResponse, {
+    let response = ISubmitDidDeactivateResponse::default();
+    response.set("transaction_id", &args.transaction_id.into())?;
+    if let Some(ref error) = args.error {
+        response.set("error", &error.into())?;
+    }
+    Ok(response)
+});

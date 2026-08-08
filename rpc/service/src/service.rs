@@ -1,5 +1,4 @@
 //! Core server implementation for ClientAPI
-use sha2::Digest;
 use super::collector::{CollectorFromConsensus, CollectorFromIndex};
 use crate::converter::feerate_estimate::{FeeEstimateConverter, FeeEstimateVerboseConverter};
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
@@ -330,37 +329,162 @@ impl RpcCoreService {
         &self,
         request: SubmitDidCreateRequest,
     ) -> RpcResult<SubmitDidCreateResponse> {
-        let tx_input = format!("DID_CREATE:{}:{}:{}", request.did, request.nonce, request.timestamp);
-        let tx_id = sha2::Sha256::digest(tx_input.as_bytes()).iter().map(|b| format!("{:02x}", b)).collect::<String>();
-        eprintln!("[DID CREATE] did={} tx_id={}", request.did, tx_id);
-        Ok(SubmitDidCreateResponse { transaction_id: tx_id, error: None })
+        eprintln!("[DID CREATE] Creating DID transaction for did={}", request.did);
+        
+        let mut payload = Vec::new();
+        payload.extend_from_slice(b"DCRT");
+        
+        // DID string
+        let did_bytes = request.did.as_bytes();
+        payload.extend_from_slice(&(did_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(did_bytes);
+        
+        // Public key hex
+        let pubkey_bytes = request.public_key_hex.as_bytes().to_vec();
+        payload.extend_from_slice(&(pubkey_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&pubkey_bytes);
+        
+        // Address/sender
+        let addr_bytes = request.sender.as_bytes();
+        payload.extend_from_slice(&(addr_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(addr_bytes);
+        
+        // Document JSON
+        let doc_bytes = request.document.as_bytes();
+        payload.extend_from_slice(&(doc_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(doc_bytes);
+        
+        // Signature (hex string to bytes)
+        let sig_bytes = request.signature.as_bytes().to_vec();
+        payload.extend_from_slice(&(sig_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&sig_bytes);
+        
+        // Create transaction
+        let tx = sahyadri_consensus_core::tx::Transaction::new(
+            0,
+            vec![],
+            vec![sahyadri_consensus_core::tx::TransactionOutput {
+                value: 0,
+                script_public_key: sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, vec![]),
+            }],
+            0,
+            sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([b'D', b'I', b'D', b'_', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            0,
+            payload,
+        );
+        
+        let transaction_id = tx.id();
+        let session = self.consensus_manager.consensus().unguarded_session();
+        self.flow_context.submit_rpc_transaction(&session, tx, Orphan::Forbidden).await.map_err(|err| {
+            let err = RpcError::RejectedTransaction(transaction_id, err.to_string());
+            debug!("{err}");
+            err
+        })?;
+        
+        Ok(SubmitDidCreateResponse { transaction_id: transaction_id.to_string(), error: None })
     }
 
     async fn submit_did_update(
         &self,
         request: SubmitDidUpdateRequest,
     ) -> RpcResult<SubmitDidUpdateResponse> {
-        let tx_input = format!("DID_UPDATE:{}:{}:{}", request.did, request.nonce, request.timestamp);
-        let tx_id = sha2::Sha256::digest(tx_input.as_bytes()).iter().map(|b| format!("{:02x}", b)).collect::<String>();
-        eprintln!("[DID UPDATE] did={} tx_id={}", request.did, tx_id);
-        Ok(SubmitDidUpdateResponse { transaction_id: tx_id, error: None })
+        eprintln!("[DID UPDATE] Updating DID transaction for did={}", request.did);
+        
+        let mut payload = Vec::new();
+        payload.extend_from_slice(b"DUPD");
+        
+        // DID string
+        let did_bytes = request.did.as_bytes();
+        payload.extend_from_slice(&(did_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(did_bytes);
+        
+        // New public key hex
+        let new_pk_bytes = request.new_public_key_hex.as_bytes().to_vec();
+        payload.extend_from_slice(&(new_pk_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&new_pk_bytes);
+        
+        // Purposes/services update
+        let purposes_bytes = request.purposes.as_bytes();
+        payload.extend_from_slice(&(purposes_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(purposes_bytes);
+        
+        // Signature
+        let sig_bytes = request.signature.as_bytes().to_vec();
+        payload.extend_from_slice(&(sig_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&sig_bytes);
+        
+        // Create transaction
+        let tx = sahyadri_consensus_core::tx::Transaction::new(
+            0,
+            vec![],
+            vec![sahyadri_consensus_core::tx::TransactionOutput {
+                value: 0,
+                script_public_key: sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, vec![]),
+            }],
+            0,
+            sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([b'D', b'I', b'D', b'_', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            1000,
+            payload,
+        );
+        
+        let transaction_id = tx.id();
+        let session = self.consensus_manager.consensus().unguarded_session();
+        self.flow_context.submit_rpc_transaction(&session, tx, Orphan::Forbidden).await.map_err(|err| {
+            let err = RpcError::RejectedTransaction(transaction_id, err.to_string());
+            debug!("{err}");
+            err
+        })?;
+        
+        Ok(SubmitDidUpdateResponse { transaction_id: transaction_id.to_string(), error: None })
     }
 
     async fn submit_did_deactivate(
         &self,
         request: SubmitDidDeactivateRequest,
     ) -> RpcResult<SubmitDidDeactivateResponse> {
-        let tx_input = format!("DID_DEACTIVATE:{}:{}:{}", request.did, request.nonce, request.timestamp);
-        let tx_id = sha2::Sha256::digest(tx_input.as_bytes()).iter().map(|b| format!("{:02x}", b)).collect::<String>();
-        eprintln!("[DID DEACTIVATE] did={} tx_id={}", request.did, tx_id);
-        Ok(SubmitDidDeactivateResponse { transaction_id: tx_id, error: None })
+        eprintln!("[DID DEACTIVATE] Deactivating DID for did={}", request.did);
+        
+        let mut payload = Vec::new();
+        payload.extend_from_slice(b"DDEC");
+        
+        // DID string
+        let did_bytes = request.did.as_bytes();
+        payload.extend_from_slice(&(did_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(did_bytes);
+        
+        // Signature
+        let sig_bytes = request.signature.as_bytes().to_vec();
+        payload.extend_from_slice(&(sig_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&sig_bytes);
+        
+        // Create transaction
+        let tx = sahyadri_consensus_core::tx::Transaction::new(
+            0,
+            vec![],
+            vec![sahyadri_consensus_core::tx::TransactionOutput {
+                value: 0,
+                script_public_key: sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, vec![]),
+            }],
+            0,
+            sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([b'D', b'I', b'D', b'_', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            1000,
+            payload,
+        );
+        
+        let transaction_id = tx.id();
+        let session = self.consensus_manager.consensus().unguarded_session();
+        self.flow_context.submit_rpc_transaction(&session, tx, Orphan::Forbidden).await.map_err(|err| {
+            let err = RpcError::RejectedTransaction(transaction_id, err.to_string());
+            debug!("{err}");
+            err
+        })?;
+        
+        Ok(SubmitDidDeactivateResponse { transaction_id: transaction_id.to_string(), error: None })
     }
 
     fn extract_tx_query(&self, filter_transaction_pool: bool, include_orphan_pool: bool) -> RpcResult<TransactionQuery> {
         match (filter_transaction_pool, include_orphan_pool) {
             (true, true) => Ok(TransactionQuery::OrphansOnly),
-            // Note that the first `true` indicates *filtering* transactions and the second `false` indicates not including
-            // orphan txs -- hence the query would be empty by definition and is thus useless
             (true, false) => Err(RpcError::InconsistentMempoolTxQuery),
             (false, true) => Ok(TransactionQuery::All),
             (false, false) => Ok(TransactionQuery::TransactionsOnly),
@@ -370,6 +494,15 @@ impl RpcCoreService {
 
 #[async_trait]
 impl RpcApi for RpcCoreService {
+    async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
+        self.submit_did_create(request).await
+    }
+    async fn submit_did_update(&self, request: SubmitDidUpdateRequest) -> RpcResult<SubmitDidUpdateResponse> {
+        self.submit_did_update(request).await
+    }
+    async fn submit_did_deactivate(&self, request: SubmitDidDeactivateRequest) -> RpcResult<SubmitDidDeactivateResponse> {
+        self.submit_did_deactivate(request).await
+    }
     async fn submit_block_call(
         &self,
         _connection: Option<&DynRpcConnection>,
@@ -643,15 +776,6 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         self.submit_account_transaction_call(request).await
     }
 
-    async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
-        self.submit_did_create(request).await
-    }
-    async fn submit_did_update(&self, request: SubmitDidUpdateRequest) -> RpcResult<SubmitDidUpdateResponse> {
-        self.submit_did_update(request).await
-    }
-    async fn submit_did_deactivate(&self, request: SubmitDidDeactivateRequest) -> RpcResult<SubmitDidDeactivateResponse> {
-        self.submit_did_deactivate(request).await
-    }
     async fn submit_account_transaction_call(
         &self,
         _connection: Option<&DynRpcConnection>,
@@ -854,6 +978,45 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         println!("WALLET CHECK: Address {} asked for balance, DB returned: {}", address, real_balance);
 
         Ok(GetBalanceByAddressResponse::new(real_balance))
+    }
+
+    async fn resolve_did_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: ResolveDidRequest,
+    ) -> RpcResult<ResolveDidResponse> {
+        eprintln!("[RESOLVE DID] Looking up: {}", request.did);
+        
+        // TODO: Implement when ConsensusInstance exposes DID methods via session
+        // For now return pending response
+        Ok(ResolveDidResponse {
+            found: false,
+            active: false,
+            did: Some(request.did.clone()),
+            document: None,
+            public_key: None,
+            csm_address: None,
+            version: None,
+            created_at: None,
+            error: Some("DID resolution pending - requires ConsensusInstance API extension".to_string()),
+        })
+    }
+
+    async fn resolve_did_by_address_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: ResolveDidByAddressRequest,
+    ) -> RpcResult<ResolveDidByAddressResponse> {
+        eprintln!("[RESOLVE BY ADDRESS] Looking up: {}", request.address);
+        
+        // TODO: Implement when ConsensusInstance exposes DID methods via session
+        // For now return pending response
+        Ok(ResolveDidByAddressResponse {
+            found: false,
+            did: None,
+            document: None,
+            error: Some("DID resolution by address pending - requires ConsensusInstance API extension".to_string()),
+        })
     }
 
     async fn get_balances_by_addresses_call(

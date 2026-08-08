@@ -61,6 +61,19 @@ pub trait RpcApi: Sync + Send + AnySync {
         connection: Option<&DynRpcConnection>,
         request: SubmitDidDeactivateRequest,
     ) -> RpcResult<SubmitDidDeactivateResponse>;
+
+    // ============= SAHYADRI DID RESOLVE METHODS =============
+    async fn resolve_did_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: ResolveDidRequest,
+    ) -> RpcResult<ResolveDidResponse>;
+
+    async fn resolve_did_by_address_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: ResolveDidByAddressRequest,
+    ) -> RpcResult<ResolveDidByAddressResponse>;
     async fn ping(&self) -> RpcResult<()> {
         self.ping_call(None, PingRequest {}).await?;
         Ok(())

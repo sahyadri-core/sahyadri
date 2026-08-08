@@ -325,6 +325,24 @@ impl RpcApi for GrpcClient {
         self.inner.call(SahyadridPayloadOps::SubmitDidDeactivate, request).await?.as_ref().try_into()
     }
 
+
+    async fn resolve_did_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: ResolveDidRequest,
+    ) -> RpcResult<ResolveDidResponse> {
+        // TODO: Implement via gRPC call to node
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
+    async fn resolve_did_by_address_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: ResolveDidByAddressRequest,
+    ) -> RpcResult<ResolveDidByAddressResponse> {
+        // TODO: Implement via gRPC call to node
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
     route!(submit_did_create_call, SubmitDidCreate);
     route!(submit_did_update_call, SubmitDidUpdate);
     route!(submit_did_deactivate_call, SubmitDidDeactivate);
