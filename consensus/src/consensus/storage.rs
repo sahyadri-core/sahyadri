@@ -4,6 +4,7 @@ use crate::{
         DB,
         acceptance_data::DbAcceptanceDataStore,
         account_store::DbAccountStore, // <--- 1. IMPORT SAHYADRI BANK
+            did_store::DbDidStore,
         block_transactions::DbBlockTransactionsStore,
         block_window_cache::BlockWindowCacheStore,
         daa::DbDaaStore,
@@ -66,6 +67,7 @@ pub struct ConsensusStorage {
 
     // Account Store (Sahyadri Bank)
     pub account_store: Arc<DbAccountStore>, // <--- 2. DECLARE BANK IN STRUCT
+    pub did_store: Arc<DbDidStore>, // SAHYADRI: DID Store
 
     // Block window caches
     pub block_window_cache_for_difficulty: Arc<BlockWindowCacheStore>,
@@ -233,7 +235,7 @@ impl ConsensusStorage {
         relations::init(reachability_relations_store.write().deref_mut());
 
         Arc::new(Self {
-            _db: db,
+            _db: db.clone(),
             statuses_store,
             relations_store,
             reachability_relations_store,
@@ -258,6 +260,7 @@ impl ConsensusStorage {
             block_window_cache_for_difficulty,
             block_window_cache_for_past_median_time,
             lkg_virtual_state,
+            did_store: Arc::new(DbDidStore::new(db.clone(), perf_params.utxo_set_cache_size as u64)),
         })
     }
 }

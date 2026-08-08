@@ -1,5 +1,6 @@
 pub mod acceptance_data;
 pub mod account_store;
+pub mod did_store;
 pub mod block_transactions;
 pub mod block_window_cache;
 pub mod children;
