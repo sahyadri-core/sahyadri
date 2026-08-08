@@ -14,7 +14,7 @@ const LENGTH_OF_BLUE_SCORE: usize = size_of::<u64>();
 const LENGTH_OF_SUBSIDY: usize = size_of::<u64>();
 const LENGTH_OF_SCRIPT_PUB_KEY_VERSION: usize = size_of::<u16>();
 const LENGTH_OF_SCRIPT_PUB_KEY_LENGTH: usize = size_of::<u8>();
-pub const SAHYADRI_TREASURY_ADDRESS: &str = "csm1s9cz32g4a58xwaym3fpyq0pj6v3cew8a9qxmxe336u";
+pub const SAHYADRI_TREASURY_ADDRESS: &str = "csm1sxh5at56p0c6s9gwtj0mumwcly258gexk5zxp0xvj6";
 
 const MIN_PAYLOAD_LENGTH: usize =
     LENGTH_OF_BLUE_SCORE + LENGTH_OF_SUBSIDY + LENGTH_OF_SCRIPT_PUB_KEY_VERSION + LENGTH_OF_SCRIPT_PUB_KEY_LENGTH;
@@ -254,13 +254,13 @@ impl CoinbaseManager {
         Ok(CoinbaseData { blue_score, subsidy, miner_data: MinerData { script_public_key, extra_data } })
     }
 
-    pub fn calc_block_subsidy(&self, blue_score: u64) -> u64 {
+        pub fn calc_block_subsidy(&self, blue_score: u64) -> u64 {
         // 1. Sahyadri Base Reward: 8,318,123 Kana (0.08318123 CSM)
         let base_reward: u64 = 8_318_123;
-
-        // 2. Halving Interval: 126,230,400 rewarded blocks (~4 years at ~1 block/sec)
-        // Sahyadri math: 1 block/sec * 60 * 60 * 24 * 365.25 * 4
-        let halving_interval: u64 = 126_230_400;
+        // 2. Halving Interval: ~4 years wall-clock time, scaled by actual network BPS.
+        // Base math assumes 1 bps: 60*60*24*365.25*4 = 126,230,400 blocks.
+        // At 10 bps, we need 10x more blocks to cover the same 4 real-world years.
+        let halving_interval: u64 = 126_230_400 * self._bps_history.after();
 
         // 3. Check kitne 4-saal (halvings) beet chuke hain
         let halvings = blue_score / halving_interval;

@@ -1,3 +1,4 @@
+// SAHYADRI: DID support
 use crate::{
     consensus::{
         services::{
@@ -17,6 +18,7 @@ use crate::{
             DB,
             acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
             account_store::{AccountStore, AccountStoreReader, DbAccountStore},
+            did_store::{DidDocument, DidStore, DidStoreReader, DbDidStore},
             block_transactions::{BlockTransactionsStoreReader, DbBlockTransactionsStore},
             block_window_cache::{BlockWindowCacheStore, BlockWindowCacheWriter},
             daa::DbDaaStore,
@@ -79,7 +81,7 @@ use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHY
 
 // TODO: Replace with treasury Dilithium pubkey hex (1952 bytes = 3904 hex chars)
 // Until set, 100% reward goes to miner
-const SAHYADRI_TREASURY_PUBKEY_HEX: &str = "";
+const SAHYADRI_TREASURY_PUBKEY_HEX: &str = "2d980235b2e054a227bed91b20bad2592859ec1581c1b3fa9c494c5138f058195202e59335416cf6c650dd1dc5e53479e1f7d815c147ab0990bee8bb7a57dd43ef87484d656760888f68ca40d220d3256bc76a0acb109e47056976c45bfbc80992e0a6f6626f9318cf0b940cdbcb38f9850ad60e345f968fd0229099adc4e4d12abc40762f2ad711f4edcd1daa4e144a9f5b3275ea97c0d64d3fb607d2868cceb91fa1bcacf981e29051f63811eed7ca941a3e0e00dca6892608f8bb8ceeed22c5839adeac8b856cd942b2f0ec0e3b88c4fbbb40ce581c0ef3dde590081b970f7d952de92a4fa80fa5ae92f31ca69b6d8c51b70cfa453083516ed8df8e50ff60a7fa88fd092be563fd3b1bd239e5e0a85bb18039b6350d27b2665684aad09faa7f3703e9d49fa658a3b338aadb43755c5f4322acd27f314ff59bd3fbaad0c0e4b3231a04ddeabd7165f4609a63af2e69f84df36c6a56a50cc93b4d9d6579315ef11dc297b96923daf177262981821429c4296a2f9d8d79ad06ba866ca95b2b51e0b766402e4619387ea770e2a67d725df18aa552bf84dbf2ea3aaf567df880041e01257e81855fff92afd48c5cba600703ceaf25bccf5f2b487a8cb46ac721bfc157910e39e5d4579b7a03daf1cb0b91a20f15306dfd7730d9c9e86e4805d11545d912e388fb533368cc0877a719791033929d9020e35bc11bd7cd4837cdb6b75437235fb65c7e0c6759c51d25c2d12ff56cc2603d393bbe71198f1b48cff60dc7d263fc5cc2a39f2c446cb4548ae42956fdd1aa787ce7515f5050d6a46c29aae3d053caa63b3faf2fe6e25b6b0d004520be02629ff93c9252dbda7f086c1316a7d6a3f08fd2fbfbae7d658120864395fcd76dd37c88ec9fdfc464117fdffec3fff90c17c81f3f43dcf94cb08cc30116c8b1748affd4648530609e2db1092684990f4391ad7f4623b22d86061959ff624a1c0d25a09b2e90052a59a4cce059861f4dae7651cd5abf0921e8aff1035eb62792e1df3388bebc24ebd290df0629907c1f4a39b6464369b785960d41568103b615e612d5eacf589f6aa856de4721a1870baae1e17d0224f3c584a1e971f54c54f48725399bac72cf77beda2a09e1ebb94dd718188f4adeeb3706c12245fe196f15dfae8c2b399bbc336cebaefe2829ae2bba13ef00cdb3d2ccfdc683a71e80696fd94b2ab4b670c49ca1d0138fece2d66a30f90fcdd79d16506846a4b24a49e5d02a04ddc9c6e5417083d911443c2b7a3f27f20a16702806598a6894571b9bbddd29b084210b31b7d1dbb6cab1153b926d524ec11d962bc2bfd52ba5876ff12520db879e938fd637fc4d85e1b793ead8c441f5b7b1cf8999aa434e1126844e593a59d301405ac55020c3832e0b7cdf0ea59e9d5025b6c2b63b7664246ee0237c6b3f1a8b704e41257fc37e5c883cf354e994d45b5e18443219df5eb853009a9c2ca179536d5fc668560a6bc0d840fd7e14caf8740c27894c52be062d8b9a8f8d836c472405b891101bb16e04d36d64acdf6919a8261d56ffd161717725ba28ff86e718d87e68a6d1f8f7876eee50e7a3d6a80e3a6a2829cf92a600f6915db9cf528693c24927283d40974ded9a5782203e4b84c15e1a4172066ed013780bceaf1007a4fcb1bd2e9b962ee1868968f6a45057d5bb6d2b46d61ccd914a63cbc4f3e92452566c97902e9ab7c10fcb15074f339eb55251f9299b39630c4a945399704846e3a997efa7f8e05595cec9285c4db39b2d8f7b552eb305a5db339e962ff319072f3878874d589f6ee81c8f23bc888738801317adec5930266ab609d6bed62fb195a7a3c199c367258e4fed5a32a6b3a96f5bb0945908871983a8fae8e2a0438a462043ca21a524d09f1ee763e8a98d48ae74125059cef889ab7b0a406c1823be6c5bca56e26e951588ee3e91497fb12ec50b2a8ed0444d219790628c5abcea0275884e39c943305b596cabfac5b5c81fbd393165ed89b0affb61d95051784943f7b944ea199eebc5e3d83bf67a873762a37812ccdbc82cfdca1c1fe29d8bbde8d67a44d10168600105c3b9c2726c158070b4a9fedbb4aa9dd3993e2f0e72ce78422636b32089d3e3d68cd23dbcc7388f3a3ab2b9bd8d75628a2ad568f08e51b0115fa9d954cd4268e5e693dcd3145400aaa1514e4a45d3672c18a07712c97ffde07c81c2de29e046bfdbfcd37c719eb02ed656dea808c885c61c0f822685f965283f9cdc4609f00b1e05ed7ae7e65d89d16772da4ce4b177d0c7ae6d81550f33c580b4c94a9911f17de4449068903ad9f2738fcd686967e9c2ac647ff46d376a6ce0fdef8dbb7dae4ddfcd9c6cefd106b1f3ff76ecac2aee84c7c8b5be663dee91766d60253732e156993b9d24a3a36c30fb596ffa1dcf8a728662f5b51dacf69e0c03d74aed62a9ffb76f8c55c772249b22ca904d8efddc122fa5f822c258e5e4b3cff7e0574dd2cedf5e8c78708b69e9e78518ce2f04b0fcc1e537902126f41ec8f636b7dff9158327819658d1d8a82d6b13127d1abbaa17b5b85cfb1218ca68bf939bf8354869ddd68a088cafca0a3a0a1c377fd6692bbfd792eb5d39f33226ab87a4f67d548191bb8e57c66f2ae2ea09673441fb2e27b68226382da98314facfca9d1313939acdc98271c2faec100b02ba5b05a63a44cf03ec8b4f12a5aa7d78c438d3f87bfa60e7231b2baf2adb7ddf32cfdb3c0788acc468780134e5727471fe07f870a682633f3fbae7";
 use sahyadri_hashes::{Hash, ZERO_HASH};
 use sahyadri_muhash::MuHash;
 use sahyadri_notify::{events::EventType, notifier::Notify};
@@ -138,6 +140,7 @@ pub struct VirtualStateProcessor {
     pub(super) utxo_multisets_store: Arc<DbUtxoMultisetsStore>,
     pub(super) acceptance_data_store: Arc<DbAcceptanceDataStore>,
     pub(super) account_store: Arc<DbAccountStore>,
+    pub(super) did_store: Arc<DbDidStore>,
     pub(super) virtual_stores: Arc<RwLock<VirtualStores>>,
     pub(super) pruning_meta_stores: Arc<RwLock<PruningMetaStores>>,
 
@@ -216,6 +219,7 @@ impl VirtualStateProcessor {
             utxo_multisets_store: storage.utxo_multisets_store.clone(),
             acceptance_data_store: storage.acceptance_data_store.clone(),
             account_store: storage.account_store.clone(),
+            did_store: storage.did_store.clone(),
             virtual_stores: storage.virtual_stores.clone(),
             pruning_meta_stores: storage.pruning_meta_stores.clone(),
             lkg_virtual_state: storage.lkg_virtual_state.clone(),
@@ -669,6 +673,175 @@ impl VirtualStateProcessor {
                     // FIX 2: USER TRANSACTIONS
                     // ==========================================
                     else {
+                        // SAHYADRI: DID transaction check — must come first
+                        let is_did_tx = tx.payload.len() > 4 && (
+                            &tx.payload[..4] == b"DCRT" ||
+                            &tx.payload[..4] == b"DUPD" ||
+                            &tx.payload[..4] == b"DDEC"
+                        );
+
+                        if is_did_tx && tx.payload.len() >= 20 {
+                            let did_tx_type = &tx.payload[..4];
+
+                            match did_tx_type {
+                                b"DCRT" => {
+                                    log::info!("SAHYADRI: Processing DID_CREATE transaction");
+                                    if tx.payload.len() < 100 { continue; }
+
+                                    let mut offset = 4;
+                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    offset += 4;
+                                    if offset + did_len > tx.payload.len() { continue; }
+                                    let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
+                                    offset += did_len;
+
+                                    const DILITHIUM_PUBKEY_SIZE: usize = 1952;
+                                    if offset + DILITHIUM_PUBKEY_SIZE > tx.payload.len() { continue; }
+                                    let did_pubkey = &tx.payload[offset..offset+DILITHIUM_PUBKEY_SIZE];
+                                    offset += DILITHIUM_PUBKEY_SIZE;
+
+                                    let addr_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    offset += 4;
+                                    if offset + addr_len > tx.payload.len() { continue; }
+                                    let csm_address = String::from_utf8_lossy(&tx.payload[offset..offset+addr_len]).to_string();
+                                    offset += addr_len;
+
+                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    offset += 4;
+                                    if offset + doc_len > tx.payload.len() { continue; }
+                                    let document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
+
+                                    const DILITHIUM_SIG_SIZE: usize = 3904;
+                                    let sig_start = tx.payload.len() - DILITHIUM_SIG_SIZE;
+                                    let sig_bytes = &tx.payload[sig_start..];
+
+                                    let sighash = {
+                                        let mut h = Sha256::new();
+                                        h.update(b"SAHYADRI_DID_CREATE_V1");
+                                        h.update(&tx.payload[..sig_start]);
+                                        h.finalize()
+                                    };
+
+                                    let sig = DilithiumSignature::from_slice(sig_bytes);
+
+                                    if !DilithiumKeyPair::verify(did_pubkey, &sig, &sighash, b"", SAHYADRI_MODE) {
+                                        log::warn!("SAHYADRI: DID_CREATE invalid signature");
+                                        continue;
+                                    }
+
+                                    if self.did_store.is_active(&did).unwrap_or(false) {
+                                        log::warn!("SAHYADRI: DID already exists: {}", did);
+                                        continue;
+                                    }
+
+                                    let now = unix_now();
+                                    let did_doc = DidDocument {
+                                        did: did.clone(),
+                                        csm_address,
+                                        public_key: faster_hex::hex_string(did_pubkey),
+                                        document,
+                                        purposes: vec!["authentication".to_string()],
+                                        services: vec![],
+                                        active: true,
+                                        created_at: now,
+                                        updated_at: now,
+                                        version: 1,
+                                    };
+
+                                    self.did_store.set_batch(&mut batch, &did_doc)
+                                        .expect("SAHYADRI: CRITICAL — failed to store DID");
+
+                                    log::info!("SAHYADRI: DID created: {}", did);
+                                }
+
+                                b"DUPD" => {
+                                    log::info!("SAHYADRI: Processing DID_UPDATE");
+                                    if tx.payload.len() < 100 { continue; }
+
+                                    let mut offset = 4;
+                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    offset += 4;
+                                    if offset + did_len > tx.payload.len() { continue; }
+                                    let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
+
+                                    let existing_doc = match self.did_store.get_by_did(&did) {
+                                        Ok(Some(doc)) => doc,
+                                        _ => { continue; }
+                                    };
+
+                                    offset += did_len;
+                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    offset += 4;
+                                    if offset + doc_len > tx.payload.len() { continue; }
+                                    let new_document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
+
+                                    const DILITHIUM_SIG_SIZE: usize = 3904;
+                                    let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
+                                    let orig_pk = existing_doc.public_key.as_bytes().to_vec();
+
+                                    let sig = DilithiumSignature::from_slice(sig_bytes);
+
+                                    let sighash = {
+                                        let mut h = Sha256::new();
+                                        h.update(b"SAHYADRI_DID_UPDATE_V1");
+                                        h.update(&did);
+                                        h.update(&new_document);
+                                        h.finalize()
+                                    };
+
+                                    if !DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE) {
+                                        continue;
+                                    }
+
+                                    let mut updated = existing_doc;
+                                    updated.document = new_document;
+                                    updated.updated_at = unix_now();
+                                    updated.version += 1;
+
+                                    self.did_store.update_batch(&mut batch, &updated).ok();
+                                    log::info!("SAHYADRI: DID updated: {}", did);
+                                }
+
+                                b"DDEC" => {
+                                    log::info!("SAHYADRI: Processing DID_DEACTIVATE");
+                                    if tx.payload.len() < 50 { continue; }
+
+                                    let mut offset = 4;
+                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    offset += 4;
+                                    if offset + did_len > tx.payload.len() { continue; }
+                                    let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
+
+                                    let existing = match self.did_store.get_by_did(&did) {
+                                        Ok(Some(d)) => d,
+                                        _ => { continue; }
+                                    };
+
+                                    const DILITHIUM_SIG_SIZE: usize = 3904;
+                                    let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
+                                    let orig_pk = existing.public_key.as_bytes().to_vec();
+                                    let sig = DilithiumSignature::from_slice(sig_bytes);
+
+                                    let sighash = {
+                                        let mut h = Sha256::new();
+                                        h.update(b"SAHYADRI_DID_DEACTIVATE_V1");
+                                        h.update(&did);
+                                        h.finalize()
+                                    };
+
+                                    if !DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE) {
+                                        continue;
+                                    }
+
+                                    self.did_store.deactivate_batch(&mut batch, &did).ok();
+                                    log::info!("SAHYADRI: DID deactivated: {}", did);
+                                }
+
+                                _ => {}
+                            }
+                            continue;
+                        }
+
                         let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
                         if tx.payload.len() < min_payload {
                             log::warn!(
@@ -768,6 +941,7 @@ impl VirtualStateProcessor {
             }
         }
 
+                    
         // ==========================================
 
         // Update virtual state
