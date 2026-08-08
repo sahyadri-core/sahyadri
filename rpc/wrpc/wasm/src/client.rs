@@ -412,6 +412,22 @@ impl RpcClient {
         Ok(())
     }
 
+    /// Resolve a DID
+    #[wasm_bindgen(js_name = resolveDid)]
+    pub async fn resolve_did(&self, did: String) -> Result<JsValue> {
+        let request = sahyadri_rpc_core::ResolveDidRequest { did };
+        let response = self.inner.client.resolve_did_call(None, request).await?;
+        Ok(serde_wasm_bindgen::to_value(&response)?)
+    }
+
+    /// Resolve a DID by address
+    #[wasm_bindgen(js_name = resolveDidByAddress)]
+    pub async fn resolve_did_by_address(&self, address: String) -> Result<JsValue> {
+        let request = sahyadri_rpc_core::ResolveDidByAddressRequest { address };
+        let response = self.inner.client.resolve_did_by_address_call(None, request).await?;
+        Ok(serde_wasm_bindgen::to_value(&response)?)
+    }
+    
     /// Triggers a disconnection on the underlying WebSocket
     /// if the WebSocket is in connected state.
     /// This is intended for debug purposes only.
@@ -1057,6 +1073,18 @@ build_wrpc_wasm_bindgen_interface!(
         /// Returned information: None.
         Unban,
         /// Get UTXO Return Addresses.
+        /// Submits an account-based transaction (CSM transfer).
+        /// Returned information: Transaction ID.
+        SubmitAccountTransaction,
+        /// Creates a new DID (Decentralized Identifier) on Sahyadri.
+        /// Returned information: Transaction ID.
+        SubmitDidCreate,
+        /// Updates an existing DID document on Sahyadri.
+        /// Returned information: Transaction ID.
+        SubmitDidUpdate,
+        /// Deactivates an existing DID on Sahyadri.
+        /// Returned information: Transaction ID.
+        SubmitDidDeactivate,
         GetUtxoReturnAddress,
         /// Retrieves the virtual chain corresponding to a specified block hash.
         /// Returned information: Virtual chain information. (Version 2)

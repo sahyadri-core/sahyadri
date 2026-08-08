@@ -666,6 +666,13 @@ impl RpcApi for SahyadriRpcClient {
             Unban,
         ]
     );
+
+    async fn submit_account_transaction(
+        &self,
+        request: sahyadri_rpc_core::SubmitAccountTransactionRequest,
+    ) -> RpcResult<sahyadri_rpc_core::SubmitAccountTransactionResponse> {
+        self.submit_account_transaction_call(None, request).await
+    }
     // ── DID Operations (Web5 Decentralized Identifiers) ──
     async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
         let response: ClientResult<SubmitDidCreateResponse> = self.inner.rpc_client.call(RpcApiOps::SubmitDidCreate, Serializable(request)).await;
@@ -705,6 +712,24 @@ impl RpcApi for SahyadriRpcClient {
     ) -> RpcResult<SubmitDidDeactivateResponse> {
         self.submit_did_deactivate(request).await
     }
+
+    async fn resolve_did_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: ResolveDidRequest,
+    ) -> RpcResult<ResolveDidResponse> {
+        // TODO: Implement via RPC call to node
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
+    async fn resolve_did_by_address_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: ResolveDidByAddressRequest,
+    ) -> RpcResult<ResolveDidByAddressResponse> {
+        // TODO: Implement via RPC call to node
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Notification API
 
@@ -737,11 +762,5 @@ impl RpcApi for SahyadriRpcClient {
     async fn stop_notify(&self, id: ListenerId, scope: Scope) -> RpcResult<()> {
         self.notifier().try_stop_notify(id, scope)?;
         Ok(())
-    }
-    async fn submit_account_transaction(
-        &self,
-        _request: sahyadri_rpc_core::SubmitAccountTransactionRequest,
-    ) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitAccountTransactionResponse> {
-        unimplemented!("Feature not yet implemented in client")
     }
 }
