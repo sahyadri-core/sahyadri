@@ -7,5 +7,9 @@ cfg_if! {
         pub mod result;
         mod utils;
         pub use utils::*;
+
+        // Account transaction bindings
+        mod transaction;
+        pub use transaction::*;
     }
 }
