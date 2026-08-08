@@ -1,5 +1,5 @@
 pub use super::{
-    bps::{Bps, TenBps},
+    bps::Bps,
     constants::consensus::*,
     genesis::{DEVNET_GENESIS, GENESIS, GenesisBlock, SIMNET_GENESIS, TESTNET_GENESIS, TESTNET11_GENESIS},
 };
@@ -640,8 +640,8 @@ pub const SIMNET_PARAMS: Params = Params {
     difficulty_window_size: DIFFICULTY_SAMPLED_WINDOW_SIZE as usize,
     min_difficulty_window_size: MIN_DIFFICULTY_WINDOW_SIZE,
 
-    deflationary_phase_daa_score: TenBps::deflationary_phase_daa_score(),
-    pre_deflationary_phase_base_subsidy: TenBps::pre_deflationary_phase_base_subsidy(),
+    deflationary_phase_daa_score: Bps::<1>::deflationary_phase_daa_score(),
+    pre_deflationary_phase_base_subsidy: Bps::<1>::pre_deflationary_phase_base_subsidy(),
     coinbase_payload_script_public_key_max_len: 150,
     max_coinbase_payload_len: 204,
 
