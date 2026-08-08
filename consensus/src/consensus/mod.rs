@@ -4,7 +4,7 @@ pub mod factory;
 pub mod services;
 pub mod storage;
 pub mod test_consensus;
-
+use crate::model::stores::did_store::DidStoreReader;
 use crate::model::stores::account_store::AccountStoreReader;
 
 #[cfg(feature = "devnet-prealloc")]
@@ -609,6 +609,36 @@ impl ConsensusApi for Consensus {
         self.storage.account_store.get(&script_public_key).ok().map(|state| state.balance)
     }
 
+    // ============= SAHYADRI DID IMPLEMENTATIONS =============
+    fn get_did_document(&self, did: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> {
+        self.storage.did_store.get_by_did(did).ok().flatten().map(|doc| {
+            sahyadri_consensus_core::api::DidDocumentDto {
+                did: doc.did,
+                csm_address: doc.csm_address,
+                public_key: doc.public_key,
+                document: doc.document,
+                active: doc.active,
+                version: doc.version,
+                created_at: doc.created_at,
+                updated_at: doc.updated_at,
+            }
+        })
+    }
+
+    fn get_did_by_address(&self, address: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> {
+        self.storage.did_store.get_by_address(address).ok().flatten().map(|doc| {
+            sahyadri_consensus_core::api::DidDocumentDto {
+                did: doc.did,
+                csm_address: doc.csm_address,
+                public_key: doc.public_key,
+                document: doc.document,
+                active: doc.active,
+                version: doc.version,
+                created_at: doc.created_at,
+                updated_at: doc.updated_at,
+            }
+        })
+    }
     fn validate_and_insert_block(&self, block: Block) -> BlockValidationFutures {
         let (block_task, virtual_state_task) = self.validate_and_insert_block_impl(BlockTask::Ordinary { block });
         BlockValidationFutures { block_task: Box::pin(block_task), virtual_state_task: Box::pin(virtual_state_task) }
