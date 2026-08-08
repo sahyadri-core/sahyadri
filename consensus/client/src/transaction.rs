@@ -153,6 +153,22 @@ impl Transaction {
         self.inner().id = tx.id();
         Ok(self.inner().id)
     }
+    
+    // FOOLPROOF HEX & JSVALUE FUNCTION
+    #[wasm_bindgen(js_name = "computeAccountTxSighash")]
+    pub fn compute_account_tx_sighash(&self, js_payload: JsValue) -> String {
+        // 1. Safely extract bytes from JS Uint8Array
+        let payload_bytes = js_payload.try_as_vec_u8().unwrap_or_default();
+        
+        // 2. Convert to core Transaction
+        let tx: cctx::Transaction = self.into();
+        
+        // 3. Compute Sighash
+        let sighash = tx.compute_account_tx_sighash(&payload_bytes);
+        
+        // 4. Return as Hex String (Guaranteed to cross WASM boundary)
+        sighash.to_vec().to_hex()
+    }
 
     /// Returns the transaction ID
     #[wasm_bindgen(getter, js_name = id)]

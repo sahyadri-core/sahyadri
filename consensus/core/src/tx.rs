@@ -7,7 +7,7 @@
 #![allow(non_snake_case)]
 
 mod script_public_key;
-
+use sha2::{Sha256, Digest};
 use borsh::{BorshDeserialize, BorshSerialize};
 use sahyadri_utils::hex::ToHex;
 use sahyadri_utils::mem_size::MemSizeEstimator;
@@ -232,6 +232,25 @@ impl Transaction {
     /// transaction is a special transaction created by miners that distributes fees and block subsidy
     /// to the previous blocks' miners, and specifies the script_pub_key that will be used to pay the current
     /// miner in future blocks.
+    /// Computes the exact SHA-256 sighash for an Account-based transaction
+    pub fn compute_account_tx_sighash(&self, signable_payload: &[u8]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(b"SAHYADRI_ACCOUNT_TX_V1");
+        hasher.update(self.version.to_le_bytes());
+        for output in &self.outputs {
+            hasher.update(output.value.to_le_bytes());
+            hasher.update(output.script_public_key.version.to_le_bytes());
+            let script = output.script_public_key.script();
+            hasher.update((script.len() as u64).to_le_bytes());
+            hasher.update(script);
+        }
+        hasher.update(self.lock_time.to_le_bytes());
+        hasher.update(self.subnetwork_id.as_bytes());
+        hasher.update(self.gas.to_le_bytes());
+        hasher.update((signable_payload.len() as u64).to_le_bytes());
+        hasher.update(signable_payload);
+        hasher.finalize().into()
+    }
     pub fn is_coinbase(&self) -> bool {
         self.subnetwork_id == subnets::SUBNETWORK_ID_COINBASE
     }

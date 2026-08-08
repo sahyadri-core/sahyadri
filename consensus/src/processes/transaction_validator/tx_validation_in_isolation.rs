@@ -7,7 +7,6 @@ use super::{
     errors::{TxResult, TxRuleError},
 };
 use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHYADRI_MODE, SIG_SIZE};
-use sha2::{Digest, Sha256};
 
 impl TransactionValidator {
     /// Performs a variety of transaction validation checks which are independent of any
@@ -194,30 +193,13 @@ fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
         )));
     }
     let signable_payload = &tx.payload[..sig_start];
-    let sighash = compute_account_tx_sighash(tx, signable_payload);
+    
+    let sighash = tx.compute_account_tx_sighash(signable_payload);
+    
     let sig = DilithiumSignature::from_slice(sig_bytes);
     let valid = DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE);
     if !valid {
         return Err(TxRuleError::Message("Account tx Dilithium3 signature verification FAILED".to_string()));
     }
     Ok(())
-}
-
-fn compute_account_tx_sighash(tx: &Transaction, signable_payload: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(b"SAHYADRI_ACCOUNT_TX_V1");
-    hasher.update(tx.version.to_le_bytes());
-    for output in &tx.outputs {
-        hasher.update(output.value.to_le_bytes());
-        hasher.update(output.script_public_key.version.to_le_bytes());
-        let script = output.script_public_key.script();
-        hasher.update((script.len() as u64).to_le_bytes());
-        hasher.update(script);
-    }
-    hasher.update(tx.lock_time.to_le_bytes());
-    hasher.update(tx.subnetwork_id.as_bytes());
-    hasher.update(tx.gas.to_le_bytes());
-    hasher.update((signable_payload.len() as u64).to_le_bytes());
-    hasher.update(signable_payload);
-    hasher.finalize().into()
 }
