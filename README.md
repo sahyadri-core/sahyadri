@@ -60,7 +60,7 @@ For developers looking to test integrations or mining setups:
 Sahyadri uses a memory-hard, ASIC-resistant PoW algorithm. To start mining with your CSM address:
 ```bash
 cd sahyadri-miner
-./target/release/sahyadri-miner -s 127.0.0.1 -p 26110 -a <YOUR_CSM_ADDRESS> --mine-when-not-synced
+./target/release/sahyadri-miner -s 127.0.0.1 -p 26113 -a <YOUR_CSM_ADDRESS> --mine-when-not-synced
 
 ```
 ## wRPC & Integration
