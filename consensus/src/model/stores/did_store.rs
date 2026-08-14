@@ -64,6 +64,16 @@ impl MemSizeEstimator for DidDocument {
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct DidKey(Vec<u8>);
 
+// Implement ToString for DidKey
+impl std::fmt::Display for DidKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match String::from_utf8(self.0.clone()) {
+            Ok(s) => write!(f, "{}", s),
+            Err(_) => write!(f, "DidKey({} bytes)", self.0.len()),
+        }
+    }
+}
+
 impl DidKey {
     pub fn new(did: &str) -> Self {
         Self(did.as_bytes().to_vec())
@@ -82,12 +92,13 @@ impl AsRef<[u8]> for DidKey {
     }
 }
 
-impl std::fmt::Display for DidKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match String::from_utf8(self.0.clone()) {
-            Ok(s) => write!(f, "DidKey({})", s),
-            Err(_) => write!(f, "DidKey({} bytes)", self.0.len()),
-        }
+/// Wrapper for String to implement MemSizeEstimator
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DidIndexEntry(pub String);
+
+impl MemSizeEstimator for DidIndexEntry {
+    fn estimate_mem_bytes(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -122,14 +133,14 @@ pub trait DidStore: DidStoreReader {
 }
 
 const DID_STORE_PREFIX: &[u8] = b"dids-store";
+const DID_ADDRESS_INDEX_PREFIX: &[u8] = b"dids-addr-index";
 
 #[derive(Clone)]
 pub struct DbDidStore {
     /// Main storage: DID → DidDocument
     did_access: CachedDbAccess<DidKey, DidDocument>,
-    // Note: We'll use a simple approach without address index for now,
-    // or implement it differently. For now, comment out or remove:
-    // address_index: CachedDbAccess<DidKey, String>,
+    /// Address index: CSM address → DID string
+    address_index: CachedDbAccess<DidKey, DidIndexEntry>,
 }
 
 impl DbDidStore {
@@ -139,6 +150,11 @@ impl DbDidStore {
                 db.clone(),
                 sahyadri_database::prelude::CachePolicy::Count(cache_size as usize),
                 DID_STORE_PREFIX.to_vec(),
+            ),
+            address_index: CachedDbAccess::new(
+                db.clone(),
+                sahyadri_database::prelude::CachePolicy::Count(cache_size as usize),
+                DID_ADDRESS_INDEX_PREFIX.to_vec(),
             ),
         }
     }
@@ -153,9 +169,12 @@ impl DidStoreReader for DbDidStore {
         }
     }
 
-    fn get_by_address(&self, _address: &str) -> StoreResult<Option<DidDocument>> {
-        // TODO: Implement address-based lookup when address_index is added
-        Ok(None)
+    fn get_by_address(&self, address: &str) -> StoreResult<Option<DidDocument>> {
+        match self.address_index.read(DidKey::from_address(address)) {
+            Ok(did_entry) => self.get_by_did(&did_entry.0),
+            Err(StoreError::KeyNotFound(_)) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     fn is_active(&self, did: &str) -> StoreResult<bool> {
@@ -183,14 +202,16 @@ impl DidStore for DbDidStore {
             DidKey::new(&doc.did),
             doc.clone(),
         )?;
-        
-        // TODO: Update address index when address_index field is re-added
-        // self.address_index.write(
-        //     BatchDbWriter::new(batch),
-        //     DidKey::from_address(&doc.csm_address),
-        //     doc.did.clone(),
-        // )?;
-        
+    
+        // Write address index
+        if !doc.csm_address.is_empty() {
+            self.address_index.write(
+                BatchDbWriter::new(batch),
+                DidKey::from_address(&doc.csm_address),
+                DidIndexEntry(doc.did.clone()),  // Wrapped in DidIndexEntry
+            )?;
+        }
+    
         Ok(())
     }
 
@@ -224,12 +245,15 @@ impl DidStore for DbDidStore {
 
     fn delete_batch(&self, batch: &mut WriteBatch, did: &str) -> StoreResult<()> {
         // Get document to clean up address index
-       // if let Some(doc) = self.get_by_did(did)? {
-            // Remove from address index
-            // TODO: Remove from address index when field is re-added
-         //   self.address_index.delete(BatchDbWriter::new(batch), DidKey::from_address(&doc.csm_address))?;
-        // }
-        
+        if let Some(doc) = self.get_by_did(did)? {
+            if !doc.csm_address.is_empty() {
+                self.address_index.delete(
+                    BatchDbWriter::new(batch),
+                    DidKey::from_address(&doc.csm_address),
+                )?;
+            }
+        }
+    
         // Remove main DID entry
         self.did_access.delete(BatchDbWriter::new(batch), DidKey::new(did))
     }
