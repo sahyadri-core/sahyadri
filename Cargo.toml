@@ -332,9 +332,17 @@ workflow-wasm = { version = "0.18.0" }
 # nw-sys = { path = "../nw-sys" }
 
 [profile.release]
+# ════════════════════════════════════════════════════════════
+# ⚡ AVX2 + RAYON OPTIMIZED FOR HIGH TPS
+# ════════════════════════════════════════════════════════════
+opt-level = 3               # ← Maximum optimization for AVX2
 lto = "thin"
 strip = true
-overflow-checks = true
+overflow-checks = false     # ← Disable for speed (was true)
+codegen-units = 1           # ← Single unit for better inlining
+                            #   Use "znver3" for AMD EPYC Milan
+                            #   Use "native" for max performance on build machine
+panic = "abort"             # ← Faster panics (no unwinding)
 
 [profile.heap]
 inherits = "release"

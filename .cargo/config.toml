@@ -1,4 +1,2 @@
-# Static link CRT on Windows to avoid VCRedist dependency
-# (similar to how we use musl on Linux for portable binaries)
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]
+[build]
+rustflags = ["-C", "target-cpu=skylake"]

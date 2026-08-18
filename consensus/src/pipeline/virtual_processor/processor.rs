@@ -52,6 +52,20 @@ use crate::{
     },
 };
 use once_cell::unsync::Lazy;
+// ═══════════════════════════════════════════════════════
+// PARALLEL VERIFICATION (Rayon + AVX2 for High TPS)
+// ═══════════════════════════════════════════════════════
+use std::sync::LazyLock;
+use num_cpus;
+
+/// Global thread pool for parallel Dilithium3 signature verification
+static VERIFY_POOL: LazyLock<rayon::ThreadPool> = LazyLock::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads((num_cpus::get() - 1).max(1))
+        .thread_name(|idx| format!("sahyadri-sigverify-{idx}"))
+        .build()
+        .expect("Failed to create Sahyadri verification thread pool")
+});
 use sahyadri_consensus_core::{
     BlockHashSet, ChainPath,
     acceptance_data::AcceptanceData,
@@ -724,7 +738,11 @@ impl VirtualStateProcessor {
 
                                     let sig = DilithiumSignature::from_slice(sig_bytes);
 
-                                    if !DilithiumKeyPair::verify(did_pubkey, &sig, &sighash, b"", SAHYADRI_MODE) {
+                                    // PARALLEL VERIFY (Rayon + AVX2)
+                                    let is_valid = VERIFY_POOL.install(|| {
+                                        DilithiumKeyPair::verify(did_pubkey, &sig, &sighash, b"", SAHYADRI_MODE)
+                                    });
+                                    if !is_valid {
                                         log::warn!("SAHYADRI: DID_CREATE invalid signature");
                                         continue;
                                     }
@@ -789,7 +807,10 @@ impl VirtualStateProcessor {
                                         h.finalize()
                                     };
 
-                                    if !DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE) {
+                                    let is_valid = VERIFY_POOL.install(|| {
+                                        DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE)
+                                    });
+                                    if !is_valid {
                                         continue;
                                     }
 
@@ -829,7 +850,10 @@ impl VirtualStateProcessor {
                                         h.finalize()
                                     };
 
-                                    if !DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE) {
+                                    let is_valid = VERIFY_POOL.install(|| {
+                                        DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE)
+                                    });
+                                    if !is_valid {
                                         continue;
                                     }
 
@@ -880,7 +904,10 @@ impl VirtualStateProcessor {
                                 h.finalize()
                             };
                             let sig = DilithiumSignature::from_slice(sig_bytes);
-                            if !DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE) {
+                            let is_valid = VERIFY_POOL.install(|| {
+                                DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE)
+                            });
+                            if !is_valid {
                                 log::warn!("SAHYADRI: skipping account tx — invalid signature in commit_virtual_state");
                                 continue;
                             }

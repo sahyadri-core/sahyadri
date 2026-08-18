@@ -5,7 +5,101 @@ use sahyadri_utils::mem_size::MemSizeEstimator;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+// ============================================================================
+// SAHYADRI OBJECT-MODEL LAYER — Decentralized Identity (DID)
+// ============================================================================
+//
+// This module implements the "Object Model" layer of Sahyadri blockchain,
+// distinct from the "Account Model" layer (see account_store.rs).
+//
+// ## Architecture Overview
+//
+// ### Account Model (account_store.rs)
+// - Purpose: Simple balance/nonce tracking for CSM (native token)
+// - Structure: Flat { balance: u64, nonce: u64 }
+// - Operations: Balance debit/credit, nonce increment/decrement
+// - Analogy: Like a bank account ledger
+//
+// ### Object Model (THIS FILE — did_store.rs)  ⭐
+// - Purpose: Rich, versioned identity objects with ownership semantics
+// - Structure: Complex nested document with metadata, keys, services
+// - Operations: Create, Update, Deactivate, Resolve (CRUD + lifecycle)
+// - Analogy: Like a digital passport or identity card
+//
+// ## Key Differences from Account Model
+//
+// | Aspect | Account Model | Object Model (DID) |
+// |--------|---------------|-------------------|
+// | Primary Key | ScriptPublicKey (address) | DID string (did:sahyadri:...) |
+// | Data Shape | Flat (balance + nonce) | Structured (document + metadata) |
+// | Ownership | Implicit (who can sign) | Explicit (controller field) |
+// | Versioning | None (state is current) | Yes (version field for OCC) |
+// | Lifecycle | Permanent while balance > 0 | Can be deactivated |
+// | Query Methods | By address only | By DID + By address (reverse lookup) |
+// | Use Case | Token transfers | Identity, auth, Web5, credentials |
+//
+// ## Design Patterns Used
+//
+// 1. **Repository Pattern**: DbDidStore implements DidStore trait (abstract interface)
+// 2. **Index Pattern**: Secondary index (address → DID) for reverse lookups
+// 3. **Unit of Work**: All writes use WriteBatch for atomicity
+// 4. **Optimistic Concurrency**: Version field prevents lost updates
+//
+// ## Integration Points
+//
+// - RPC Layer: rpc/service/src/service.rs (submit_did_create/update/deactivate)
+// - Consensus: consensus/src/pipeline/virtual_processor/processor.rs (TX validation)
+// - WASM Wallet: wasm/pkg/ (client-side DID operations)
+// - Web5: Future integration point for DWN (Decentralized Web Node)
+//
+// ## Standards Compliance
+//
+// This implementation follows W3C DID Core specification:
+// - https://www.w3.org/TR/did-core/
+// - Method name: "sahyadri"
+// - DID format: did:sahyadri:{base58check-encoded-hash}
+//
+// ============================================================================
+
 /// Represents a DID Document stored on-chain
+///
+/// This is the core data structure of Sahyadri's Object Model layer.
+/// Unlike AccountState (which tracks simple balance/nonce), DidDocument
+/// is a rich, versioned identity object with:
+///
+/// - **Unique Identification**: Globally unique DID string
+/// - **Ownership**: Linked to a CSM blockchain address (controller)
+/// - **Cryptographic Identity**: Dilithium3 post-quantum public key
+/// - **Structured Data**: JSON-LD document conforming to W3C DID spec
+/// - **Lifecycle Management**: Active/inactive state, version tracking
+///
+/// # Example
+///
+/// ```ignore
+/// let doc = DidDocument {
+///     did: "did:sahyadri:ABC123...".to_string(),
+///     csm_address: "sahyadri:qxyz...".to_string(),
+///     public_key: "dilithium3_pubkey_hex...".to_string(),
+///     document: r#"{"@context": ["https://w3id.org/did/v1"]}"#.to_string(),
+///     purposes: vec!["authentication".to_string()],
+///     services: vec![],
+///     active: true,
+///     created_at: 1700000000,
+///     updated_at: 1700000000,
+///     version: 1,
+/// };
+/// ```
+///
+/// # On-Chain Storage
+///
+/// - Primary key: `DidKey(did)` → `DidDocument` (in "dids-store" prefix)
+/// - Secondary index: `DidKey(addr:csm_address)` → `DidIndexEntry(did)` (in "dids-addr-index" prefix)
+///
+/// # Type Safety
+///
+/// This struct derives Serialize/Deserialize for RocksDB persistence
+/// and network serialization. It also implements MemSizeEstimator
+/// for cache size tracking.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DidDocument {
     /// Full DID identifier (e.g., "did:sahyadri:abc123...")
@@ -92,7 +186,24 @@ impl AsRef<[u8]> for DidKey {
     }
 }
 
-/// Wrapper for String to implement MemSizeEstimator
+/// Wrapper type for address→DID mapping in secondary index
+///
+/// # Purpose
+///
+/// RocksDB's CachedDbAccess requires values to implement MemSizeEstimator.
+/// Since std::String doesn't implement this trait, we wrap it in DidIndexEntry.
+///
+/// # Usage
+///
+/// ```ignore
+/// // In address_index store:
+/// // Key: DidKey("addr:sahyadri:qxyz...")
+/// // Value: DidIndexEntry("did:sahyadri:abc123...")
+/// ```
+///
+/// # Memory Estimation
+///
+/// Estimates memory as length of inner string (accurate enough for caching).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DidIndexEntry(pub String);
 
@@ -102,7 +213,17 @@ impl MemSizeEstimator for DidIndexEntry {
     }
 }
 
-/// Trait defining read operations for DID Store
+/// Read operations for DID Object Model Store
+///
+/// This trait defines the query interface for Sahyadri's DID system.
+/// Implementations must support both direct and reverse lookups.
+///
+/// # Design Note
+///
+/// Separating reader/writer traits allows:
+/// - Read-only references (for validation/logging)
+/// - Write-only transaction contexts (for consensus)
+/// - Clear API boundaries
 pub trait DidStoreReader {
     /// Get full DID document by DID identifier
     fn get_by_did(&self, did: &str) -> StoreResult<Option<DidDocument>>;
@@ -117,7 +238,20 @@ pub trait DidStoreReader {
     fn get_version(&self, did: &str) -> StoreResult<u64>;
 }
 
-/// Trait defining write operations for DID Store
+/// Write operations for DID Object Model Store (extends Reader)
+///
+/// All write operations use WriteBatch for atomicity.
+/// Callers should commit the batch after multiple operations.
+///
+/// # Concurrency Safety
+///
+/// These methods are safe to call within a single WriteBatch.
+/// The batch ensures atomic commit — either all changes persist or none do.
+///
+/// # Version Management
+///
+/// Callers are responsible for incrementing `version` field on updates.
+/// This enables Optimistic Concurrency Control (OCC) to prevent lost updates.
 pub trait DidStore: DidStoreReader {
     /// Create/insert a new DID document (batch operation)
     fn set_batch(&self, batch: &mut WriteBatch, doc: &DidDocument) -> StoreResult<()>;
@@ -135,11 +269,58 @@ pub trait DidStore: DidStoreReader {
 const DID_STORE_PREFIX: &[u8] = b"dids-store";
 const DID_ADDRESS_INDEX_PREFIX: &[u8] = b"dids-addr-index";
 
+/// RocksDB-backed DID Document Store — Core of Object Model Layer
+///
+/// # Architecture
+///
+/// This store maintains TWO indexes:
+///
+/// 1. **Primary Index** (`did_access`):
+///    - Key: Full DID identifier (e.g., "did:sahyadri:abc123")
+///    - Value: Complete DidDocument object
+///    - Prefix: "dids-store"
+///    - Use case: Direct DID resolution
+///
+/// 2. **Secondary Index** (`address_index`):
+///    - Key: Prefixed CSM address (e.g., "addr:sahyadri:qxyz...")
+///    - Value: DID string wrapped in DidIndexEntry
+///    - Prefix: "dids-addr-index"
+///    - Use case: Reverse lookup (find DID by owner's address)
+///
+/// # Thread Safety
+///
+/// Both indexes use CachedDbAccess which provides:
+/// - Concurrent read access (Arc-based cloning)
+/// - Write batching via WriteBatch
+/// - LRU cache with configurable size
+///
+/// # Performance Characteristics
+///
+/// - `get_by_did()`: O(1) primary index lookup
+/// - `get_by_address()`: O(1) secondary index lookup + O(1) primary lookup = O(1) total
+/// - `set_batch()`: 2 writes (primary + secondary index)
+/// - `delete_batch()`: 2 deletes (primary + secondary index cleanup)
+///
+/// # Example Flow
+///
+/// ```ignore
+/// // Create DID
+/// let doc = DidDocument { did: "did:sahyadri:abc", csm_address: "sahyadri:qxyz", ... };
+/// store.set_batch(&mut batch, &doc)?;
+/// // Result: 
+/// //   did_access["did:sahyadri:abc"] = doc
+/// //   address_index["addr:sahyadri:qxyz"] = DidIndexEntry("did:sahyadri:abc")
+///
+/// // Reverse lookup
+/// let found = store.get_by_address("sahyadri:qxyz")?;
+/// assert_eq!(found.unwrap().did, "did:sahyadri:abc");
+/// ```
 #[derive(Clone)]
 pub struct DbDidStore {
-    /// Main storage: DID → DidDocument
+    /// Primary storage: DID identifier → Full document
     did_access: CachedDbAccess<DidKey, DidDocument>,
-    /// Address index: CSM address → DID string
+    
+    /// Secondary index: CSM address → DID identifier (for reverse lookup)
     address_index: CachedDbAccess<DidKey, DidIndexEntry>,
 }
 

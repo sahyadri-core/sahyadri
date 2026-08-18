@@ -1,7 +1,7 @@
 pub mod errors;
 pub mod tx_validation_in_account_context;
 pub mod tx_validation_in_header_context;
-pub mod tx_validation_in_isolation; // <--- RENAMED FROM UTXO!
+pub mod tx_validation_in_isolation;
 
 use crate::model::stores::account_store::DbAccountStore;
 use std::sync::Arc; // <--- IMPORT BANK
