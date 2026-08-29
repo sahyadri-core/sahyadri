@@ -338,7 +338,9 @@ workflow-wasm = { version = "0.18.0" }
 opt-level = 3               # ← Maximum optimization for AVX2
 lto = "thin"
 strip = true
-overflow-checks = false     # ← Disable for speed (was true)
+overflow-checks = false     # Intentional: consensus uses saturating arithmetic throughout.
+                             # All critical ops use checked_add/checked_sub explicitly.
+                             # Re-enable only after auditing all arithmetic paths.
 codegen-units = 1           # ← Single unit for better inlining
                             #   Use "znver3" for AMD EPYC Milan
                             #   Use "native" for max performance on build machine

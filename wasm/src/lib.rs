@@ -35,8 +35,6 @@ The APIs are currently separated into the following groups (this will be expande
 For JavaScript / TypeScript environments, there are two
 available NPM modules:
 
-- <https://www.npmjs.com/package/sahyadri>
-- <https://www.npmjs.com/package/sahyadri-wasm>
 
 The `sahyadri-wasm` module is a pure WASM32 module that includes
 the entire wallet framework, but does not support RPC due to an absence

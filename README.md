@@ -2,7 +2,7 @@
 <div align="center">
   <img src="https://www.sahyadri.io/img/Sahyadri.PNG" alt="Sahyadri Logo" width="200"/>
   <h1>Sahyadri on Rust</h1>
-  <p><b>High-Performance PoW DAG | Web5 Native | Sovereign Infrastructure | High TPS | Crest & Account Model | 21 Million Fixed Supply | Post Quantum</b></p>
+  <p><b>High-Performance PoW DAG | Web5 Native | Sovereign Infrastructure | High TPS | Crest & Account Model | 21 Million Fixed Supply | Post Quantum Signing</b></p>
 </div>
 
 ---
@@ -15,7 +15,7 @@ This repository contains the full-node software, designed for maximum throughput
  * **High Throughput:** Engineered to handle up to 10,000+ TPS.
  * **Web5 Native:** Built-in support for Decentralized Identifiers (DIDs) and DWN synchronization.
  * **Sovereign Infrastructure:** 21 Million hard-capped supply with a fair-launch, no-premine model.
- * **Quantum Ready:** Future-proof architecture designed for post-quantum security transitions.
+  * **Quantum Ready:** SHA3-256 hashing + Dilithium3 signatures + cSHAKE256 PoW — full post-quantum security stack.
 ## The Genesis Phase
 The Sahyadri network is currently in its **Bootstrap/Genesis Phase**. We invite developers, miners, and visionaries to join us in securing the world’s first Web5-native DAG.
 > **Note:** Our network architecture is designed for 1-second finality. We are constantly optimizing the DAG topology to reach our 10,000 TPS milestone on consumer-grade hardware.
@@ -65,7 +65,7 @@ cd sahyadri-miner
 ```
 ## wRPC & Integration
 Sahyadri provides a high-performance **wRPC (WebSocket RPC)** interface for exchanges, wallets, and explorers.
- * **Default Port:** 26110
+ * **Default Port:** 27110
  * **Documentation:** Visit sahyadri.io/documentation for the full API reference.
 
 ## Contributing

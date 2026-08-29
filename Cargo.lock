@@ -273,7 +273,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff6e472cdea888a4bd64f342f09b3f50e1886d32afe8df3d663c01140b811b18"
 dependencies = [
- "event-listener 5.3.1",
+ "event-listener 5.4.2",
  "event-listener-strategy",
  "pin-project-lite",
 ]
@@ -1525,11 +1525,10 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
 name = "event-listener"
-version = "5.3.1"
+version = "5.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6032be9bd27023a771701cc49f9f053c751055f71efb2e0ae5c15809093675ba"
+checksum = "5a23add41df1562121a9393cb065eab5146a1242410f23a644851e90cfd669d2"
 dependencies = [
- "concurrent-queue",
  "parking",
  "pin-project-lite",
 ]
@@ -1540,7 +1539,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f214dc438f977e6d4e3500aaa277f5ad94ca83fbbd9b1a15713ce2344ccc5a1"
 dependencies = [
- "event-listener 5.3.1",
+ "event-listener 5.4.2",
  "pin-project-lite",
 ]
 
@@ -1873,9 +1872,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.6"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "524e8ac6999421f49a846c2d4411f337e53497d8ec55d67753beffa43c5d9205"
+checksum = "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -2126,7 +2125,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-util",
- "h2 0.4.6",
+ "h2 0.4.16",
  "http 1.1.0",
  "http-body 1.0.1",
  "httparse",
@@ -4055,7 +4054,7 @@ dependencies = [
  "encoding_rs",
  "futures-core",
  "futures-util",
- "h2 0.4.6",
+ "h2 0.4.16",
  "http 1.1.0",
  "http-body 1.0.1",
  "http-body-util",
@@ -4643,7 +4642,7 @@ dependencies = [
  "faster-hex 0.9.0",
  "futures",
  "futures-util",
- "h2 0.4.6",
+ "h2 0.4.16",
  "itertools 0.13.0",
  "log",
  "parking_lot",
@@ -4674,7 +4673,7 @@ dependencies = [
  "async-trait",
  "faster-hex 0.9.0",
  "futures",
- "h2 0.4.6",
+ "h2 0.4.16",
  "itertools 0.13.0",
  "log",
  "paste",
@@ -4705,7 +4704,7 @@ dependencies = [
  "async-trait",
  "faster-hex 0.9.0",
  "futures",
- "h2 0.4.6",
+ "h2 0.4.16",
  "itertools 0.13.0",
  "log",
  "once_cell",
@@ -4746,7 +4745,6 @@ dependencies = [
 name = "sahyadri-hashes"
 version = "1.1.0"
 dependencies = [
- "blake2b_simd",
  "blake3",
  "borsh",
  "cc",
@@ -4981,7 +4979,7 @@ dependencies = [
  "borsh",
  "ctrlc",
  "futures",
- "h2 0.4.6",
+ "h2 0.4.16",
  "hex",
  "itertools 0.13.0",
  "log",
@@ -6595,7 +6593,7 @@ dependencies = [
  "base64",
  "bytes",
  "flate2",
- "h2 0.4.6",
+ "h2 0.4.16",
  "http 1.1.0",
  "http-body 1.0.1",
  "http-body-util",

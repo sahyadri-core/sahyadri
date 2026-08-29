@@ -46,8 +46,7 @@
 //!
 //! For NodeJS JavaScript and TypeScript environments, there are two
 //! available NPM modules:
-//! - <https://www.npmjs.com/package/sahyadri>
-//! - <https://www.npmjs.com/package/sahyadri-wasm>
+//! - NPM packages (coming soon — pure JS SDK in development)
 //!
 //! NOTE: for security reasons (to mitigate potential upstream vendor
 //! attacks) it is always recommended to build WASM SDK from source or
