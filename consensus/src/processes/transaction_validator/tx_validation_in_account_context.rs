@@ -34,12 +34,13 @@ impl TransactionValidator {
         let total_out: u64 = tx.outputs().iter().map(|out| out.value).sum();
         let gas = tx.tx().gas;
 
-        // --- SAHYADRI FIXED FEE ENFORCEMENT ---
-        const FIXED_FEE_KANA: u64 = 1000; // 0.00001 CSM
-        if gas < FIXED_FEE_KANA {
-            return Err(TxRuleError::ZeroFee); // any valid TxRuleError
+        // --- SAHYADRI MINIMUM FEE ENFORCEMENT ---
+        // Mass-based fee is enforced at mempool level (check_transaction_standard.rs)
+        const MIN_FEE_KANA: u64 = 1000; // 0.00001 CSM
+        if gas < MIN_FEE_KANA {
+            return Err(TxRuleError::ZeroFee);
         }
-        // --------------------------------------
+        // -------------------------------------------
 
         let total_required = total_out.checked_add(gas).ok_or(TxRuleError::InputAmountOverflow)?;
 

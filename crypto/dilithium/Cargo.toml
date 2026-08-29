@@ -10,7 +10,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-dilithium-rs.workspace = true
+dilithium-rs = { path = "../dilithium-rs-vendor", features = ["simd"] }
 sha2.workspace = true
 hex.workspace = true
 serde.workspace = true

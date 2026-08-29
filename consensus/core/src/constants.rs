@@ -21,7 +21,7 @@ pub const STORAGE_MASS_PARAMETER: u64 = 0; // Set to 0 for Account Model & Fixed
 pub const TRANSIENT_BYTE_TO_MASS_FACTOR: u64 = 4;
 
 /// MaxKana is the maximum transaction amount allowed in kana.
-pub const MAX_KANA: u64 = 29_000_000_000 * KANA_PER_SAHYADRI;
+pub const MAX_KANA: u64 = 21_000_000 * KANA_PER_SAHYADRI;
 
 // MAX_TX_IN_SEQUENCE_NUM is the maximum sequence number the sequence field
 // of a transaction input can be.

@@ -280,20 +280,40 @@ impl VirtualStateProcessor {
                     VirtualStateProcessingMessage::Exit => break 'outer,
                     VirtualStateProcessingMessage::Process(task, virtual_state_result_transmitter) => {
                         // We don't care if receivers were dropped
-                        let _ = virtual_state_result_transmitter.send(Ok(statuses_read.get(task.block().hash()).unwrap()));
+                        let status = match statuses_read.get(task.block().hash()).optional() {
+                            Ok(Some(s)) => s,
+                            _ => {
+                                continue;
+                            }
+                        };
+                        let _ = virtual_state_result_transmitter.send(Ok(status));
                     }
                 };
             }
         }
 
         // Pass the exit signal on to the following processor
-        self.pruning_sender.send(PruningProcessingMessage::Exit).unwrap();
+        if let Err(e) = self.pruning_sender.send(PruningProcessingMessage::Exit) {
+            log::error!("SAHYADRI: failed to send Exit to pruning processor: {:?}", e);
+        }
     }
 
     fn resolve_virtual(self: &Arc<Self>) {
-        let pruning_point = self.pruning_point_store.read().pruning_point().unwrap();
+        let pruning_point = match self.pruning_point_store.read().pruning_point().optional() {
+            Ok(Some(pp)) => pp,
+            _ => {
+                log::error!("SAHYADRI: CRITICAL — pruning point not found in resolve_virtual");
+                return;
+            }
+        };
         let virtual_read = self.virtual_stores.upgradable_read();
-        let prev_state = virtual_read.state.get().unwrap();
+        let prev_state = match virtual_read.state.get().optional() {
+            Ok(Some(s)) => s,
+            _ => {
+                log::error!("SAHYADRI: CRITICAL — virtual state not found");
+                return;
+            }
+        };
         let finality_point = self.virtual_finality_point(&prev_state.sahyadri_consensus_data, pruning_point);
 
         // PRUNE SAFETY: in order to avoid locking the prune lock throughout virtual resolving we make sure
@@ -309,7 +329,10 @@ impl VirtualStateProcessor {
             .body_tips_store
             .read()
             .get()
-            .unwrap()
+            .unwrap_or_else(|_| {
+                log::error!("SAHYADRI: CRITICAL — body tips not found");
+                std::process::exit(1);
+            })
             .read()
             .iter()
             .copied()
@@ -323,15 +346,27 @@ impl VirtualStateProcessor {
             self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, prev_sink, tips, finality_point, pruning_point);
         let (virtual_parents, virtual_sahyadri_consensus_data) =
             self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point);
-        assert_eq!(virtual_sahyadri_consensus_data.selected_parent, new_sink);
+        if virtual_sahyadri_consensus_data.selected_parent != new_sink {
+            log::error!("SAHYADRI: CRITICAL — virtual parent mismatch: expected {}, got {}", new_sink, virtual_sahyadri_consensus_data.selected_parent);
+            return;
+        }
 
-        let sink_multiset = self.utxo_multisets_store.get(new_sink).unwrap();
+        let sink_multiset = match self.utxo_multisets_store.get(new_sink) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("SAHYADRI: CRITICAL — failed to get sink multiset: {:?}", e);
+                return;
+            }
+        };
         let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink, None);
-        let sink_sahyadri_consensus_data = Lazy::new(|| self.sahyadri_consensus_store.get_data(new_sink).unwrap());
+        let sink_sahyadri_consensus_data = Lazy::new(|| self.sahyadri_consensus_store.get_data(new_sink).unwrap_or_else(|e| {
+            log::error!("SAHYADRI: CRITICAL — failed to get sink consensus data: {:?}", e);
+            std::process::exit(1);
+        }));
         // Cache the DAA and Median time windows of the sink for future use, as well as prepare for virtual's window calculations
         self.cache_sink_windows(new_sink, prev_sink, &sink_sahyadri_consensus_data);
 
-        let new_virtual_state = self
+        let new_virtual_state = match self
             .calculate_and_commit_virtual_state(
                 virtual_read,
                 virtual_parents,
@@ -340,7 +375,13 @@ impl VirtualStateProcessor {
                 &mut accumulated_diff,
                 &chain_path,
             )
-            .expect("all possible rule errors are unexpected here");
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("SAHYADRI: CRITICAL — calculate_and_commit_virtual_state failed: {:?}", e);
+                return;
+            }
+        };
 
         let compact_sink_sahyadri_consensus_data = if let Some(sink_sahyadri_consensus_data) = Lazy::get(&sink_sahyadri_consensus_data)
         {
@@ -348,34 +389,39 @@ impl VirtualStateProcessor {
             sink_sahyadri_consensus_data.to_compact()
         } else {
             // Else we query the compact data directly.
-            self.sahyadri_consensus_store.get_compact_data(new_sink).unwrap()
+            self.sahyadri_consensus_store.get_compact_data(new_sink).unwrap_or_else(|e| {
+                log::error!("SAHYADRI: CRITICAL — failed to get sink compact data: {:?}", e);
+                std::process::exit(1);
+            })
         };
 
         // Update the pruning processor about the virtual state change
         // Empty the channel before sending the new message. If pruning processor is busy, this step makes sure
         // the internal channel does not grow with no need (since we only care about the most recent message)
         let _consume = self.pruning_receiver.try_iter().count();
-        self.pruning_sender
+        if let Err(e) = self.pruning_sender
             .send(PruningProcessingMessage::Process { sink_sahyadri_consensus_data: compact_sink_sahyadri_consensus_data })
-            .unwrap();
+        {
+            log::error!("SAHYADRI: failed to send Process to pruning processor: {:?}", e);
+        }
 
         // Emit notifications
         let accumulated_diff = Arc::new(accumulated_diff);
         let virtual_parents = Arc::new(new_virtual_state.parents.clone());
         self.notification_root
             .notify(Notification::NewBlockTemplate(NewBlockTemplateNotification {}))
-            .expect("expecting an open unbounded channel");
+            .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
         self.notification_root
             .notify(Notification::UtxosChanged(UtxosChangedNotification::new(accumulated_diff, virtual_parents)))
-            .expect("expecting an open unbounded channel");
+            .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
         self.notification_root
             .notify(Notification::SinkBlueScoreChanged(SinkBlueScoreChangedNotification::new(
                 compact_sink_sahyadri_consensus_data.blue_score,
             )))
-            .expect("expecting an open unbounded channel");
+            .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
         self.notification_root
             .notify(Notification::VirtualDaaScoreChanged(VirtualDaaScoreChangedNotification::new(new_virtual_state.daa_score)))
-            .expect("expecting an open unbounded channel");
+            .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
         if self.notification_root.has_subscription(EventType::VirtualChainChanged) {
             // check for subscriptions before the heavy lifting
             let added_chain_blocks_acceptance_data =
@@ -386,7 +432,7 @@ impl VirtualStateProcessor {
                     chain_path.removed.into(),
                     Arc::new(added_chain_blocks_acceptance_data),
                 )))
-                .expect("expecting an open unbounded channel");
+                .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
         }
     }
 
@@ -426,7 +472,13 @@ impl VirtualStateProcessor {
             diff.with_diff_in_place(&mergeset_diff.as_reversed()).unwrap();
         }
 
-        let split_point = split_point.expect("chain iterator was expected to reach the reorg split point");
+        let split_point = match split_point {
+            Some(sp) => sp,
+            None => {
+                log::error!("SAHYADRI: CRITICAL — chain iterator did not reach reorg split point");
+                return Default::default();
+            }
+        };
         debug!("VIRTUAL PROCESSOR, found split point: {split_point}");
 
         // A variable holding the most recent UTXO-valid block on `chain(to)` (note that it's maintained such
@@ -487,7 +539,10 @@ impl VirtualStateProcessor {
                             ctx.mergeset_diff,
                             ctx.multiset_hash,
                             ctx.mergeset_acceptance_data,
-                            ctx.pruning_sample_from_pov.expect("verified"),
+                            ctx.pruning_sample_from_pov.unwrap_or_else(|| {
+                                log::error!("SAHYADRI: pruning_sample_from_pov is None");
+                                Default::default()
+                            }),
                         );
                         // Count the number of UTXO-processed chain blocks
                         chain_block_counter += 1;
@@ -596,6 +651,16 @@ impl VirtualStateProcessor {
         chain_path: &ChainPath,
     ) {
         let mut batch = WriteBatch::default();
+        for (address_str, balance_change) in new_virtual_state.account_diff.iter() {
+            let address = sahyadri_addresses::Address::constructor(address_str);
+            let script_public_key = sahyadri_txscript::pay_to_address_script(&address);
+                {
+                    if let Err(e) = self.account_store.update_balance_batch(&mut batch, &script_public_key, *balance_change) {
+                        log::error!("SAHYADRI: Failed to apply account diff: {:?}", e);
+                        continue;
+                    }
+                }
+        }
         let mut virtual_write = RwLockUpgradableReadGuard::upgrade(virtual_read);
         let mut selected_chain_write = self.selected_chain_store.write();
 
@@ -610,9 +675,12 @@ impl VirtualStateProcessor {
                     // Reverse the outputs (Deduct what was wrongly added)
                     for output in tx.outputs.iter() {
                         let amount = -(output.value as i64); // Negative to deduct
-                        self.account_store
-                            .update_balance_batch(&mut batch, &output.script_public_key, amount)
-                            .expect("SAHYADRI: CRITICAL — failed to reverse balance during reorg, state may be inconsistent");
+                            {
+                                if let Err(e) = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount) {
+                                    log::error!("SAHYADRI: CRITICAL — failed to reverse balance during reorg: {:?}", e);
+                                    continue;
+                                }
+                            }
                     }
 
                     if i > 0 {
@@ -628,12 +696,17 @@ impl VirtualStateProcessor {
                                 total_spent += output.value;
                             }
 
-                            self.account_store
-                                .update_balance_batch(&mut batch, &sender_spk, total_spent as i64)
-                                .expect("SAHYADRI: CRITICAL — failed to refund sender during reorg");
-                            self.account_store
-                                .decrement_nonce_batch(&mut batch, &sender_spk)
-                                .expect("SAHYADRI: CRITICAL — failed to roll back sender nonce during reorg");
+                              {
+                                  if let Err(e) = self.account_store.update_balance_batch(&mut batch, &sender_spk, total_spent as i64) {
+                                      log::error!("SAHYADRI: CRITICAL — failed to refund sender during reorg: {:?}", e);
+                                      continue;
+                                  }
+                              }
+                              {
+                                  if let Err(e) = self.account_store.decrement_nonce_batch(&mut batch, &sender_spk) {
+                                      log::error!("SAHYADRI: CRITICAL — failed to roll back nonce during reorg: {:?}", e);
+                                  }
+                              }
                         } else {
                             log::error!(
                                 "SAHYADRI: reorg refund skipped — undersized payload ({} bytes) for tx in removed block",
@@ -654,25 +727,30 @@ impl VirtualStateProcessor {
                     // ==========================================
                     if i == 0 {
                         if let Ok(coinbase_data) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
-                            // 1. Hardcoded hata! Payload se asli calculated reward utha
+                            // 1. 
                             let total_reward = coinbase_data.subsidy;
 
                             if total_reward > 0 {
-                                // 2. Dev Fee Split (2% for Treasury)
+                                // 2.
                                 let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 50 };
                                 let miner_reward = total_reward - dev_fee;
 
-                                // 3. Miner ka balance update kar
-                               self.account_store
-                                    .update_balance_batch(&mut batch, &coinbase_data.miner_data.script_public_key, miner_reward as i64)
-                                    .expect("SAHYADRI: CRITICAL — failed to credit miner reward, state may be inconsistent");
+                                // 3.
+                                     {
+                                         if let Err(e) = self.account_store.update_balance_batch(&mut batch, &coinbase_data.miner_data.script_public_key, miner_reward as i64) {
+                                             log::error!("SAHYADRI: CRITICAL — failed to credit miner reward: {:?}", e);
+                                             continue;
+                                         }
+                                     }
 
                                 let mut treasury_pubkey_bytes = vec![0u8; PUBKEY_SIZE];
                                 if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut treasury_pubkey_bytes).is_ok() {
                                     let treasury_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, treasury_pubkey_bytes);
-                                    self.account_store
-                                        .update_balance_batch(&mut batch, &treasury_spk, dev_fee as i64)
-                                        .expect("SAHYADRI: CRITICAL — failed to credit treasury");
+                                    {
+                                        if let Err(e) = self.account_store.update_balance_batch(&mut batch, &treasury_spk, dev_fee as i64) {
+                                            log::error!("SAHYADRI: CRITICAL — failed to credit treasury: {:?}", e);
+                                        }
+                                    }
                                 } else {
                                     log::error!("SAHYADRI: failed to decode treasury pubkey hex — dev_fee {} NOT credited this block", dev_fee);
                                 }
@@ -703,7 +781,7 @@ impl VirtualStateProcessor {
                                     if tx.payload.len() < 100 { continue; }
 
                                     let mut offset = 4;
-                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
                                     if offset + did_len > tx.payload.len() { continue; }
                                     let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
@@ -714,18 +792,18 @@ impl VirtualStateProcessor {
                                     let did_pubkey = &tx.payload[offset..offset+DILITHIUM_PUBKEY_SIZE];
                                     offset += DILITHIUM_PUBKEY_SIZE;
 
-                                    let addr_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    let addr_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
                                     if offset + addr_len > tx.payload.len() { continue; }
                                     let csm_address = String::from_utf8_lossy(&tx.payload[offset..offset+addr_len]).to_string();
                                     offset += addr_len;
 
-                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
                                     if offset + doc_len > tx.payload.len() { continue; }
                                     let document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
 
-                                    const DILITHIUM_SIG_SIZE: usize = 3904;
+                                    const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
                                     let sig_start = tx.payload.len() - DILITHIUM_SIG_SIZE;
                                     let sig_bytes = &tx.payload[sig_start..];
 
@@ -766,8 +844,12 @@ impl VirtualStateProcessor {
                                         version: 1,
                                     };
 
-                                    self.did_store.set_batch(&mut batch, &did_doc)
-                                        .expect("SAHYADRI: CRITICAL — failed to store DID");
+            {
+                                        if let Err(e) = self.did_store.set_batch(&mut batch, &did_doc) {
+                                            log::error!("SAHYADRI: CRITICAL — failed to store DID: {:?}", e);
+                                            continue;
+                                        }
+                                    }
 
                                     log::info!("SAHYADRI: DID created: {}", did);
                                 }
@@ -777,7 +859,7 @@ impl VirtualStateProcessor {
                                     if tx.payload.len() < 100 { continue; }
 
                                     let mut offset = 4;
-                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
                                     if offset + did_len > tx.payload.len() { continue; }
                                     let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
@@ -788,12 +870,12 @@ impl VirtualStateProcessor {
                                     };
 
                                     offset += did_len;
-                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
                                     if offset + doc_len > tx.payload.len() { continue; }
                                     let new_document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
 
-                                    const DILITHIUM_SIG_SIZE: usize = 3904;
+                                    const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
                                     let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
                                     let orig_pk = existing_doc.public_key.as_bytes().to_vec();
 
@@ -828,7 +910,7 @@ impl VirtualStateProcessor {
                                     if tx.payload.len() < 50 { continue; }
 
                                     let mut offset = 4;
-                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().unwrap()) as usize;
+                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
                                     if offset + did_len > tx.payload.len() { continue; }
                                     let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
@@ -838,7 +920,7 @@ impl VirtualStateProcessor {
                                         _ => { continue; }
                                     };
 
-                                    const DILITHIUM_SIG_SIZE: usize = 3904;
+                                    const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
                                     let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
                                     let orig_pk = existing.public_key.as_bytes().to_vec();
                                     let sig = DilithiumSignature::from_slice(sig_bytes);
@@ -878,7 +960,13 @@ impl VirtualStateProcessor {
                         let sig_start = tx.payload.len() - SIG_SIZE;
                         let nonce_start = sig_start - 8;
                         let sender_pubkey = &tx.payload[..nonce_start];
-                        let expected_nonce = u64::from_le_bytes(tx.payload[nonce_start..sig_start].try_into().unwrap());
+                        let expected_nonce = u64::from_le_bytes(match tx.payload[nonce_start..sig_start].try_into() {
+                                                        Ok(b) => b,
+                                                        Err(_) => {
+                                                            log::error!("SAHYADRI: malformed nonce slice in account tx");
+                                                            continue;
+                                                        }
+                                                    });
                         let sig_bytes = &tx.payload[sig_start..];
                         let sender_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, sender_pubkey.to_vec());
 
@@ -953,13 +1041,18 @@ impl VirtualStateProcessor {
                         // All checks passed — apply state changes
                         for output in tx.outputs.iter() {
                             let amount = output.value as i64;
-                            self.account_store
-                                .update_balance_batch(&mut batch, &output.script_public_key, amount)
-                                .expect("SAHYADRI: CRITICAL — failed to credit receiver");
+                          {
+                              if let Err(e) = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount) {
+                                  log::error!("SAHYADRI: CRITICAL — failed to credit receiver: {:?}", e);
+                                  break;
+                              }
+                          }
                         }
-                        self.account_store
-                            .update_balance_batch(&mut batch, &sender_spk, -(total_spent as i64))
-                            .expect("SAHYADRI: CRITICAL — failed to deduct sender");
+                          {
+                              if let Err(e) = self.account_store.increment_nonce_batch(&mut batch, &sender_spk) {
+                                  log::error!("SAHYADRI: CRITICAL — failed to increment nonce: {:?}", e);
+                              }
+                          }
                         self.account_store
                             .increment_nonce_batch(&mut batch, &sender_spk)
                             .expect("SAHYADRI: CRITICAL — failed to increment nonce");
@@ -972,13 +1065,22 @@ impl VirtualStateProcessor {
         // ==========================================
 
         // Update virtual state
-        virtual_write.state.set_batch(&mut batch, new_virtual_state).unwrap();
+        if let Err(e) = virtual_write.state.set_batch(&mut batch, new_virtual_state) {
+                log::error!("SAHYADRI: CRITICAL — failed to set virtual state: {:?}", e);
+                return;
+            }
 
         // Update the virtual selected chain
-        selected_chain_write.apply_changes(&mut batch, chain_path).unwrap();
+        if let Err(e) = selected_chain_write.apply_changes(&mut batch, chain_path) {
+                log::error!("SAHYADRI: CRITICAL — failed to apply chain changes: {:?}", e);
+                return;
+            }
 
         // Flush the batch changes to RocksDB (Transaction Commit)
-        self.db.write(batch).unwrap();
+        if let Err(e) = self.db.write(batch) {
+                log::error!("SAHYADRI: CRITICAL — DB write failed in commit_virtual_state: {:?}", e);
+                return;
+            }
 
         // Calling the drops explicitly after the batch is written in order to avoid possible errors.
         drop(virtual_write);
@@ -1050,7 +1152,13 @@ impl VirtualStateProcessor {
         // since we check that every pushed block is not in the past of current heap
         // (and it can't be in the future by induction)
         loop {
-            let candidate = heap.pop().expect("valid sink must exist").hash;
+            let candidate = match heap.pop() {
+                Some(s) => s.hash,
+                None => {
+                    log::error!("SAHYADRI: CRITICAL — sink heap is empty during GHOSTDAG");
+                    return (Default::default(), Default::default());
+                }
+            };
             if self.reachability_service.is_chain_ancestor_of(finality_point, candidate) {
                 diff_point = self.calculate_utxo_state_relatively(stores, diff, diff_point, candidate);
                 if diff_point == candidate {

@@ -333,7 +333,7 @@ workflow-wasm = { version = "0.18.0" }
 
 [profile.release]
 # ════════════════════════════════════════════════════════════
-# ⚡ AVX2 + RAYON OPTIMIZED FOR HIGH TPS
+#  AVX2 + RAYON OPTIMIZED FOR HIGH TPS
 # ════════════════════════════════════════════════════════════
 opt-level = 3               # ← Maximum optimization for AVX2
 lto = "thin"

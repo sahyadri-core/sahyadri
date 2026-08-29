@@ -213,10 +213,13 @@ impl Mempool {
 
     /// minimum_required_transaction_relay_fee returns the minimum transaction fee required
     /// for a transaction with the passed mass to be accepted into the mempool and relayed.
-    fn minimum_required_transaction_relay_fee(&self, _mass: u64) -> u64 {
-        // SAHYADRI FIXED FEE LOGIC
-        // Every transaction fee strictly 1000 Kana (0.00001 CSM).
-        1000
+    fn minimum_required_transaction_relay_fee(&self, mass: u64) -> u64 {
+        // SAHYADRI: mass-based minimum fee (spam-safe, still cheap)
+        // Normal tx (~5K mass): 1000 Kana (0.00001 CSM) — same as before
+        // Larger txs pay proportionally more to prevent mass-spam
+        const MIN_FEE: u64 = 1000;
+        let mass_fee = mass / 10;
+        std::cmp::max(MIN_FEE, mass_fee)
     }
 }
 
