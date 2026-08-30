@@ -1,6 +1,6 @@
 #![allow(clippy::unreadable_literal)]
 use crate::Hash;
-use blake2b_simd::State as Blake2bState;
+use sha3::{Sha3_256, Digest};
 use std::cell::RefCell;
 
 const BLOCK_HASH_DOMAIN: &[u8] = b"BlockHash";
@@ -77,23 +77,29 @@ impl SahyadriXer {
     }
 }
 
-// --- 3. THE HEADER HASHER (Untouched standard config) ---
+// --- 3. THE HEADER HASHER (SHA3-256 domain-separated) ---
 #[derive(Clone)]
-pub struct HeaderHasher(Blake2bState);
+pub struct HeaderHasher(sha3::Sha3_256);
 
 impl HeaderHasher {
     #[inline(always)]
     pub fn new() -> Self {
-        Self(blake2b_simd::Params::new().hash_length(32).key(BLOCK_HASH_DOMAIN).to_state())
+        let mut tmp = Sha3_256::new();
+        Digest::update(&mut tmp, BLOCK_HASH_DOMAIN);
+        let mut out = Self(Sha3_256::new());
+        out.write(tmp.finalize());
+        out
     }
 
     pub fn write<A: AsRef<[u8]>>(&mut self, data: A) {
-        self.0.update(data.as_ref());
+        Digest::update(&mut self.0, data.as_ref());
     }
 
     #[inline(always)]
     pub fn finalize(self) -> Hash {
-        Hash::from_le_bytes(self.0.finalize().as_bytes().try_into().expect("this is 32 bytes"))
+        let mut out = [0u8; 32];
+        out.copy_from_slice(Digest::finalize(self.0).as_slice());
+        Hash::from_le_bytes(out)
     }
 }
 

@@ -376,9 +376,6 @@ opt-level = 2
 opt-level = 2
 
 # External crates used heavily by consensus/crypto
-[profile.dev.package.blake2b_simd]
-opt-level = 2
-
 [profile.dev.package.rand_chacha]
 opt-level = 2
 

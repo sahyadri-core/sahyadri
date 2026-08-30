@@ -6,10 +6,10 @@ use crate::{
     SpkEncoding, TxScriptEngine, TxScriptError,
     data_stack::{DataStack, OpcodeData},
 };
-use blake2b_simd::Params;
+use sha3::{Sha3_256, Digest};
 use sahyadri_consensus_core::hashing::sighash::SigHashReusedValues;
 use sahyadri_consensus_core::tx::VerifiableTransaction;
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::{
     fmt::{Debug, Formatter},
     num::TryFromIntError,
@@ -736,8 +736,8 @@ opcode_list! {
     opcode OpBlake2b<0xaa, 1>(self, vm) {
         let [last] = vm.dstack.pop_raw()?;
         //let hash = blake2b(last.as_slice());
-        let hash = Params::new().hash_length(32).to_state().update(&last).finalize();
-        vm.dstack.push(hash.as_bytes().to_vec());
+        let hash = Sha3_256::digest(&last);
+        vm.dstack.push(hash.as_slice().to_vec());
         Ok(())
     }
 
@@ -2748,12 +2748,12 @@ mod test {
             TestCase {
                 code: opcodes::OpBlake2b::empty().expect("Should accept empty"),
                 init: vec![b"".to_vec()],
-                dstack: vec![b"\x0e\x57\x51\xc0\x26\xe5\x43\xb2\xe8\xab\x2e\xb0\x60\x99\xda\xa1\xd1\xe5\xdf\x47\x77\x8f\x77\x87\xfa\xab\x45\xcd\xf1\x2f\xe3\xa8".to_vec()],
+                dstack: vec![b"\xa7\xff\xc6\xf8\xbf\x1e\xd7\x66\x51\xc1\x47\x56\xa0\x61\xd6\x62\xf5\x80\xff\x4d\xe4\x3b\x49\xfa\x82\xd8\x0a\x4b\x80\xf8\x43\x4a".to_vec()],
             },
             TestCase {
                 code: opcodes::OpBlake2b::empty().expect("Should accept empty"),
                 init: vec![b"abc".to_vec()],
-                dstack: vec![b"\xbd\xdd\x81\x3c\x63\x42\x39\x72\x31\x71\xef\x3f\xee\x98\x57\x9b\x94\x96\x4e\x3b\xb1\xcb\x3e\x42\x72\x62\xc8\xc0\x68\xd5\x23\x19".to_vec()],
+                dstack: vec![b"\x3a\x98\x5d\xa7\x4f\xe2\x25\xb2\x04\x5c\x17\x2d\x6b\xd3\x90\xbd\x85\x5f\x08\x6e\x3e\x9d\x52\x5b\x46\xbf\xe2\x45\x11\x43\x15\x32".to_vec()],
             },
         ]);
 

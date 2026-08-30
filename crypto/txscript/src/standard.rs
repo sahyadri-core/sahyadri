@@ -3,7 +3,7 @@ use crate::{
     script_builder::{ScriptBuilder, ScriptBuilderResult},
     script_class::ScriptClass,
 };
-use blake2b_simd::Params;
+use sha3::{Sha3_256, Digest};
 use sahyadri_addresses::{Address, Prefix, Version};
 use sahyadri_consensus_core::tx::{ScriptPublicKey, ScriptVec};
 use sahyadri_txscript_errors::TxScriptError;
@@ -59,8 +59,8 @@ pub fn pay_to_address_script(address: &Address) -> ScriptPublicKey {
 
 /// Takes a script and returns an equivalent pay-to-script-hash script
 pub fn pay_to_script_hash_script(redeem_script: &[u8]) -> ScriptPublicKey {
-    let redeem_script_hash = Params::new().hash_length(32).to_state().update(redeem_script).finalize();
-    let script = pay_to_script_hash(redeem_script_hash.as_bytes());
+    let redeem_script_hash = Sha3_256::digest(redeem_script);
+    let script = pay_to_script_hash(redeem_script_hash.as_slice());
     ScriptPublicKey::new(ScriptClass::ScriptHash.version(), script)
 }
 

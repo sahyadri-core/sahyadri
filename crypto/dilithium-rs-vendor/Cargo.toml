@@ -122,6 +122,3 @@ version = "0.8"
 
 [dev-dependencies.sha3]
 version = "0.10"
-
-[profile.release]
-opt-level = 3
