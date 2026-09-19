@@ -95,21 +95,6 @@ impl _RaigadLogger {
         if self._steps.compare_exchange(step, step + 1, AtomicOrdering::SeqCst, AtomicOrdering::SeqCst).is_ok() {
             match step {
                 Self::_ACTIVATE => {
-                    info!(target: RAIGAD_KEYWORD,
-                        r#"
-        ____                                  _             
-       / ___|_ __ ___  ___  ___ ___ _ __   __| | ___        
-      | |   | '__/ _ \/ __|/ __/ _ \ '_ \ / _` |/ _ \       
-      | |___| | |  __/\__ \ (_|  __/ | | | (_| | (_) |      
-       \____|_|  \___||___/\___\___|_| |_|\__,_|\___/       
-  _ _                       __      _  ___  _               
- / | |__  _ __  ___         \ \    / |/ _ \| |__  _ __  ___ 
- | | '_ \| '_ \/ __|    _____\ \   | | | | | '_ \| '_ \/ __|
- | | |_) | |_) \__ \   |_____/ /   | | |_| | |_) | |_) \__ \
- |_|_.__/| .__/|___/        /_/    |_|\___/|_.__/| .__/|___/
-         |_|                                     |_|    
-"#
-                    );
                     info!(target: RAIGAD_KEYWORD, "[Raigad] Accelerating block rate 10 fold")
                 }
                 Self::_DYNAMIC => {}

@@ -1,6 +1,6 @@
 use crate::{
     pow,
-    proto::{SahyadridMessage, RpcBlock},
+    proto::{SahyadridRequest, RpcBlock},
     swap_rust::WatchSwap,
     Error, ShutdownHandler,
 };
@@ -9,7 +9,7 @@ use rand::{thread_rng, RngCore};
 use std::{
     num::Wrapping,
     sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
@@ -26,11 +26,10 @@ type MinerHandler = std::thread::JoinHandle<Result<(), Error>>;
 pub struct MinerManager {
     handles: Vec<MinerHandler>,
     block_channel: WatchSwap<pow::State>,
-    send_channel: Sender<SahyadridMessage>,
+    send_channel: Sender<SahyadridRequest>,
     logger_handle: JoinHandle<()>,
     is_synced: bool,
     hashes_tried: Arc<AtomicU64>,
-    current_state_id: AtomicUsize,
 }
 
 impl Drop for MinerManager {
@@ -49,7 +48,7 @@ const LOG_RATE: Duration = Duration::from_secs(10);
 
 impl MinerManager {
     pub fn new(
-        send_channel: Sender<SahyadridMessage>,
+        send_channel: Sender<SahyadridRequest>,
         n_cpus: Option<u16>,
         throttle: Option<Duration>,
         shutdown: ShutdownHandler,
@@ -73,12 +72,11 @@ impl MinerManager {
             logger_handle: task::spawn(Self::log_hashrate(Arc::clone(&hashes_tried))),
             is_synced: true,
             hashes_tried,
-            current_state_id: AtomicUsize::new(0),
         }
     }
 
     fn launch_cpu_threads(
-        send_channel: Sender<SahyadridMessage>,
+        send_channel: Sender<SahyadridRequest>,
         hashes_tried: Arc<AtomicU64>,
         work_channel: WatchSwap<pow::State>,
         shutdown: ShutdownHandler,
@@ -101,9 +99,7 @@ impl MinerManager {
     pub fn process_block(&mut self, block: Option<RpcBlock>) -> Result<(), Error> {
         let state = if let Some(b) = block {
             self.is_synced = true;
-            // Relaxed ordering here means there's no promise that the counter will always go up, but the id will always be unique
-            let id = self.current_state_id.fetch_add(1, Ordering::Relaxed);
-            Some(pow::State::new(id, b)?)
+            Some(pow::State::new(b)?)
         } else {
             if !self.is_synced {
                 return Ok(());
@@ -118,7 +114,7 @@ impl MinerManager {
     }
 
     pub fn launch_cpu_miner(
-        send_channel: Sender<SahyadridMessage>,
+        send_channel: Sender<SahyadridRequest>,
         mut block_channel: WatchSwap<pow::State>,
         hashes_tried: Arc<AtomicU64>,
         throttle: Option<Duration>,
@@ -126,9 +122,9 @@ impl MinerManager {
     ) -> MinerHandler {
         // We mark it cold as the function is not called often, and it's not in the hot path
         #[cold]
-        fn found_block(send_channel: &Sender<SahyadridMessage>, block: RpcBlock) -> Result<(), Error> {
+        fn found_block(send_channel: &Sender<SahyadridRequest>, block: RpcBlock) -> Result<(), Error> {
             let block_hash = block.block_hash().expect("We just got it from the state, we should be able to hash it");
-            send_channel.blocking_send(SahyadridMessage::submit_block(block))?;
+            send_channel.blocking_send(SahyadridRequest::submit_block(0, block))?;
             info!("Found a block: {:x}", block_hash);
             Ok(())
         }

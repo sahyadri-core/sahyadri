@@ -33,6 +33,7 @@ use std::{str::FromStr, sync::Arc};
 macro_rules! from {
     // Response capture
     ($name:ident : RpcResult<&$from_type:ty>, $to_type:ty, $ctor:block) => {
+        #[allow(non_local_definitions)]
         impl From<RpcResult<&$from_type>> for $to_type {
             fn from(item: RpcResult<&$from_type>) -> Self {
                 match item {
@@ -58,6 +59,7 @@ macro_rules! from {
 
     // Request and other capture
     ($name:ident : $from_type:ty, $to_type:ty, $body:block) => {
+        #[allow(non_local_definitions)]
         impl From<$from_type> for $to_type {
             fn from($name: $from_type) -> Self {
                 $body
@@ -75,9 +77,11 @@ macro_rules! from {
     };
 }
 
+#[allow(non_local_definitions)]
 macro_rules! try_from {
     // Response capture
     ($name:ident : $from_type:ty, RpcResult<$to_type:ty>, $ctor:block) => {
+        #[allow(non_local_definitions)]
         impl TryFrom<$from_type> for $to_type {
             type Error = RpcError;
             fn try_from($name: $from_type) -> RpcResult<Self> {
@@ -93,6 +97,7 @@ macro_rules! try_from {
 
     // Response without parameter capture
     ($from_type:ty, RpcResult<$to_type:ty>) => {
+        #[allow(non_local_definitions)]
         impl TryFrom<$from_type> for $to_type {
             type Error = RpcError;
             fn try_from(item: $from_type) -> RpcResult<Self> {

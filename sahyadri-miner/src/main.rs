@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::{
-    cli::Opt, client::SahyadridHandler, miner::MinerManager, proto::NotifyNewBlockTemplateRequestMessage, target::Uint256,
+    cli::Opt, client::SahyadridHandler, miner::MinerManager, target::Uint256,
 };
 
 mod cli;
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Error> {
                 devfund_address
             );
         }
-        client.client_send(NotifyNewBlockTemplateRequestMessage {}).await?;
+        client.client_notify_new_block_template().await?;
         client.client_get_block_template().await?;
 
         let mut miner_manager =

@@ -1,28 +1,46 @@
 use crate::{
     pow::{self, HeaderHasher},
     proto::{
-        sahyadrid_message::Payload, GetBlockTemplateRequestMessage, GetInfoRequestMessage, SahyadridMessage,
-        NotifyBlockAddedRequestMessage, NotifyNewBlockTemplateRequestMessage, RpcBlock, SubmitBlockRequestMessage,
+        sahyadrid_request::Payload as ReqPayload,
+        GetBlockTemplateRequestMessage, GetInfoRequestMessage, NotifyBlockAddedRequestMessage,
+        NotifyNewBlockTemplateRequestMessage, RpcBlock, RpcNotifyCommand, SahyadridRequest,
+        SubmitBlockRequestMessage,
     },
     Hash,
 };
 
-impl SahyadridMessage {
+impl SahyadridRequest {
     #[must_use]
     #[inline(always)]
-    pub fn get_info_request() -> Self {
-        SahyadridMessage { payload: Some(Payload::GetInfoRequest(GetInfoRequestMessage {})) }
+    pub fn get_info_request(id: u64) -> Self {
+        SahyadridRequest { id, payload: Some(ReqPayload::GetInfoRequest(GetInfoRequestMessage {})) }
     }
     #[must_use]
     #[inline(always)]
-    pub fn notify_block_added() -> Self {
-        SahyadridMessage { payload: Some(Payload::NotifyBlockAddedRequest(NotifyBlockAddedRequestMessage {})) }
+    pub fn notify_block_added(id: u64) -> Self {
+        SahyadridRequest {
+            id,
+            payload: Some(ReqPayload::NotifyBlockAddedRequest(NotifyBlockAddedRequestMessage {
+                command: RpcNotifyCommand::NotifyStart as i32,
+            })),
+        }
     }
     #[must_use]
     #[inline(always)]
-    pub fn submit_block(block: RpcBlock) -> Self {
-        SahyadridMessage {
-            payload: Some(Payload::SubmitBlockRequest(SubmitBlockRequestMessage {
+    pub fn notify_new_block_template(id: u64) -> Self {
+        SahyadridRequest {
+            id,
+            payload: Some(ReqPayload::NotifyNewBlockTemplateRequest(NotifyNewBlockTemplateRequestMessage {
+                command: RpcNotifyCommand::NotifyStart as i32,
+            })),
+        }
+    }
+    #[must_use]
+    #[inline(always)]
+    pub fn submit_block(id: u64, block: RpcBlock) -> Self {
+        SahyadridRequest {
+            id,
+            payload: Some(ReqPayload::SubmitBlockRequest(SubmitBlockRequestMessage {
                 block: Some(block),
                 allow_non_daa_blocks: false,
             })),
@@ -30,29 +48,17 @@ impl SahyadridMessage {
     }
 }
 
-impl From<GetInfoRequestMessage> for SahyadridMessage {
+impl From<(u64, GetInfoRequestMessage)> for SahyadridRequest {
     #[inline(always)]
-    fn from(a: GetInfoRequestMessage) -> Self {
-        SahyadridMessage { payload: Some(Payload::GetInfoRequest(a)) }
-    }
-}
-impl From<NotifyBlockAddedRequestMessage> for SahyadridMessage {
-    #[inline(always)]
-    fn from(a: NotifyBlockAddedRequestMessage) -> Self {
-        SahyadridMessage { payload: Some(Payload::NotifyBlockAddedRequest(a)) }
+    fn from((id, a): (u64, GetInfoRequestMessage)) -> Self {
+        SahyadridRequest { id, payload: Some(ReqPayload::GetInfoRequest(a)) }
     }
 }
 
-impl From<GetBlockTemplateRequestMessage> for SahyadridMessage {
+impl From<(u64, GetBlockTemplateRequestMessage)> for SahyadridRequest {
     #[inline(always)]
-    fn from(a: GetBlockTemplateRequestMessage) -> Self {
-        SahyadridMessage { payload: Some(Payload::GetBlockTemplateRequest(a)) }
-    }
-}
-
-impl From<NotifyNewBlockTemplateRequestMessage> for SahyadridMessage {
-    fn from(a: NotifyNewBlockTemplateRequestMessage) -> Self {
-        SahyadridMessage { payload: Some(Payload::NotifyNewBlockTemplateRequest(a)) }
+    fn from((id, a): (u64, GetBlockTemplateRequestMessage)) -> Self {
+        SahyadridRequest { id, payload: Some(ReqPayload::GetBlockTemplateRequest(a)) }
     }
 }
 
