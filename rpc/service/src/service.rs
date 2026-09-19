@@ -280,38 +280,45 @@ impl RpcCoreService {
         &self,
         request: SubmitAccountTransactionRequest,
     ) -> RpcResult<SubmitAccountTransactionResponse> {
-        // 1. Hex Decoding
-        let mut sender_bytes = vec![0u8; request.sender.len() / 2];
-        hex_decode(request.sender.as_bytes(), &mut sender_bytes).map_err(|_| RpcError::General("Invalid sender hex".into()))?;
+        // 1. Parse addresses
+        let _sender_address = sahyadri_addresses::Address::try_from(request.sender.as_str())
+            .map_err(|_| RpcError::General("Invalid sender address".into()))?;
+        let receiver_address = sahyadri_addresses::Address::try_from(request.receiver.as_str())
+            .map_err(|_| RpcError::General("Invalid receiver address".into()))?;
 
-        let mut receiver_bytes = vec![0u8; request.receiver.len() / 2];
-        hex_decode(request.receiver.as_bytes(), &mut receiver_bytes).map_err(|_| RpcError::General("Invalid receiver hex".into()))?;
+        let receiver_spk = sahyadri_txscript::pay_to_address_script(&receiver_address);
 
-        let mut payload = sender_bytes.clone();
-        payload.extend_from_slice(&request.nonce.to_le_bytes());
+        // 2. Sender's FULL pubkey (from request.sender_pubkey)
+        let mut sender_pubkey_bytes = vec![0u8; request.sender_pubkey.len() / 2];
+        hex_decode(request.sender_pubkey.as_bytes(), &mut sender_pubkey_bytes)
+            .map_err(|_| RpcError::General("Invalid sender pubkey hex".into()))?;
 
-        // Append signature to payload (processor.rs expects: pubkey + nonce + sig)
+        // 3. Signature
         let mut sig_bytes = vec![0u8; request.signature.len() / 2];
-        hex_decode(request.signature.as_bytes(), &mut sig_bytes).map_err(|_| RpcError::General("Invalid signature hex".into()))?;
+        hex_decode(request.signature.as_bytes(), &mut sig_bytes)
+            .map_err(|_| RpcError::General("Invalid signature hex".into()))?;
+
+        // 4. Build payload: FULL PUBKEY + NONCE + SIG (matches processor.rs)
+        let mut payload = sender_pubkey_bytes;
+        payload.extend_from_slice(&request.nonce.to_le_bytes());
         payload.extend_from_slice(&sig_bytes);
 
-        // 2. Transaction Construction
+        // 5. Transaction
         let tx = sahyadri_consensus_core::tx::Transaction::new(
             0,
             vec![],
             vec![sahyadri_consensus_core::tx::TransactionOutput::new(
                 request.amount,
-                sahyadri_consensus_core::tx::ScriptPublicKey::new(0, receiver_bytes.into()),
+                receiver_spk,
             )],
             0,
             sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([0; 20]),
-            1000, // gas = TX_FEE (1 TX per block ≈ 0.00001 CSM)
+            1000,
             payload,
         );
 
         let tx_id = tx.id();
 
-        // 3. Mining Manager Submission (FIXED: Using .clone() and direct enum imports)
         let session = self.consensus_manager.consensus().session().await;
 
         match self

@@ -75,6 +75,7 @@ impl Router {
                 SubmitBlock,
                 SubmitTransaction,
                 SubmitTransactionReplacement,
+                SubmitAccountTransaction,
                 Unban,
             ]
         );

@@ -973,6 +973,8 @@ impl VirtualStateProcessor {
                         // Defense-in-depth: re-verify Dilithium signature
                         {
                             let signable_payload = &tx.payload[..sig_start];
+                            log::warn!("SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
+                            log::warn!("SENDER PUBKEY LEN: {}", sender_pubkey.len());    
                             let sighash = {
                                 let mut h = Sha256::new();
                                 h.update(b"SAHYADRI_ACCOUNT_TX_V1");
@@ -991,6 +993,14 @@ impl VirtualStateProcessor {
                                 h.update(signable_payload);
                                 h.finalize()
                             };
+                            log::warn!("SAHYADRI SIGHASH: {:02x?}", sighash);
+                            log::warn!("SPK VERSION: {}", tx.outputs[0].script_public_key.version);
+                            log::warn!("NODE SIGHASH: {:02x?}", sighash);
+                            log::warn!("NODE SENDER PUBKEY LEN: {}", sender_pubkey.len());
+                            log::warn!("NODE SENDER PUBKEY FIRST 40: {:02x?}", &sender_pubkey[..20.min(sender_pubkey.len())]);
+                            log::warn!("NODE SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
+                            log::warn!("NODE SIG FIRST 20: {:02x?}", &sig_bytes[..20.min(sig_bytes.len())]);
+
                             let sig = DilithiumSignature::from_slice(sig_bytes);
                             let is_valid = VERIFY_POOL.install(|| {
                                 DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE)

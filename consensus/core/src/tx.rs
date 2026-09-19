@@ -409,6 +409,15 @@ impl<'a> ValidatedTransaction<'a> {
         assert!(tx.is_coinbase());
         Self { tx, entries: Vec::new(), calculated_fee: 0 }
     }
+
+    /// SAHYADRI ACCOUNT MODEL BYPASS:
+    /// Builds a ValidatedTransaction with no UTXO context and zero fee, for
+    /// non-coinbase account-model transactions during the migration period.
+    /// Unlike new_coinbase(), this does NOT assert tx.is_coinbase() — callers
+    /// are responsible for knowing this tx is an account-model tx, not a coinbase.
+    pub fn new_account_bypass(tx: &'a Transaction) -> Self {
+        Self { tx, entries: Vec::new(), calculated_fee: 0 }
+    }
 }
 
 impl VerifiableTransaction for ValidatedTransaction<'_> {

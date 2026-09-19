@@ -3591,6 +3591,7 @@ impl Deserializer for UnsubscribeResponse {
 pub struct SubmitAccountTransactionRequest {
     /// The sender's address
     pub sender: String,
+    pub sender_pubkey: String,
     /// The receiver's address
     pub receiver: String,
     /// Amount in CSM (Sompi units)
@@ -3625,11 +3626,12 @@ impl Deserializer for SubmitAccountTransactionRequest {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u16, reader)?;
         let sender = load!(String, reader)?;
+        let sender_pubkey = load!(String, reader)?;
         let receiver = load!(String, reader)?;
         let amount = load!(u64, reader)?;
         let nonce = load!(u64, reader)?;
         let signature = load!(String, reader)?;
-        Ok(Self { sender, receiver, amount, nonce, signature })
+        Ok(Self { sender, sender_pubkey, receiver, amount, nonce, signature })
     }
 }
 

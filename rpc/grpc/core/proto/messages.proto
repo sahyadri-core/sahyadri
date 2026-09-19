@@ -150,11 +150,12 @@ service RPC {
 }
 
 message SubmitAccountTransactionRequestMessage {
-    string sender = 1;
-    string receiver = 2;
-    uint64 amount = 3;
-    uint64 nonce = 4;
-    string signature = 5;
+  string sender = 1;
+  string receiver = 2;
+  uint64 amount = 3;
+  uint64 nonce = 4;
+  string signature = 5;
+  string sender_pubkey = 6;
 }
 
 message SubmitAccountTransactionResponseMessage {

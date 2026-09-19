@@ -258,7 +258,7 @@ from!(item: RpcResult<&sahyadri_rpc_core::SubmitTransactionReplacementResponse>,
     Self { transaction_id: item.transaction_id.to_string(), replaced_transaction: Some((&item.replaced_transaction).into()), error: None }
 });
 from!(item: &sahyadri_rpc_core::SubmitAccountTransactionRequest, protowire::SubmitAccountTransactionRequestMessage, {
-    Self { sender: item.sender.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
+    Self { sender: item.sender.clone(), sender_pubkey: item.sender_pubkey.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
 });
 from!(item: RpcResult<&sahyadri_rpc_core::SubmitAccountTransactionResponse>, protowire::SubmitAccountTransactionResponseMessage, {
 from!(item: &sahyadri_rpc_core::SubmitDidCreateRequest, protowire::SubmitDidCreateRequestMessage, {
@@ -801,7 +801,7 @@ try_from!(item: &protowire::SubmitTransactionReplacementResponseMessage, RpcResu
 });
 
 try_from!(item: &protowire::SubmitAccountTransactionRequestMessage, sahyadri_rpc_core::SubmitAccountTransactionRequest, {
-    Self { sender: item.sender.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
+    Self { sender: item.sender.clone(), sender_pubkey: item.sender_pubkey.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
 });
 try_from!(item: &protowire::SubmitAccountTransactionResponseMessage, RpcResult<sahyadri_rpc_core::SubmitAccountTransactionResponse>, {
 try_from!(item: &protowire::SubmitDidCreateRequestMessage, sahyadri_rpc_core::SubmitDidCreateRequest, {

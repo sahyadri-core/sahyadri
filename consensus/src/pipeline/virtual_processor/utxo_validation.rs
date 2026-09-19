@@ -264,7 +264,7 @@ impl VirtualStateProcessor {
             .skip(1) // Skip the coinbase transaction
             .map(|(i, tx)| {
             // We use new_coinbase as a bypass for account model migration
-            (ValidatedTransaction::new_coinbase(tx), i as u32)
+            (ValidatedTransaction::new_account_bypass(tx), i as u32)
        })
             .collect()
     }
