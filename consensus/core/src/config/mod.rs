@@ -48,6 +48,9 @@ pub struct Config {
     /// Allow the node to accept blocks from RPC while not synced
     /// (required when initiating a new network from genesis)
     pub enable_unsynced_mining: bool,
+    
+    /// Enable Sahyadri Flash Transaction (SFT) nonce-less tx path.
+    pub enable_flash_tx: bool,
 
     /// Allow mainnet mining. Until a stable Beta version we keep this option off by default
     pub enable_mainnet_mining: bool,
@@ -88,6 +91,7 @@ impl Config {
             utxoindex: false,
             unsafe_rpc: false,
             enable_unsynced_mining: false,
+            enable_flash_tx: false,
             enable_mainnet_mining: false,
             user_agent_comments: Default::default(),
             externalip: None,

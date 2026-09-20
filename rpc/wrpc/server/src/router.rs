@@ -47,10 +47,10 @@ impl Router {
                 GetCurrentBlockColor,
                 GetCoinSupply,
                 GetConnectedPeerInfo,
+                GetDaaScore,
                 GetDaaScoreTimestampEstimate,
                 GetUtxoReturnAddress,
                 GetCurrentNetwork,
-                GetDaaScoreTimestampEstimate,
                 GetFeeEstimate,
                 GetFeeEstimateExperimental,
                 GetHeaders,
@@ -76,6 +76,7 @@ impl Router {
                 SubmitTransaction,
                 SubmitTransactionReplacement,
                 SubmitAccountTransaction,
+                SubmitFlashTransaction,
                 Unban,
             ]
         );

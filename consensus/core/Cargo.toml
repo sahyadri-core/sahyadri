@@ -38,6 +38,7 @@ rand.workspace = true
 sahyadri-dilithium.workspace = true
 sahyadri-plonky3 = { path = "../../crypto/plonky3", optional = true }
 sha2.workspace = true
+sha3 = "0.10"
 serde_json.workspace = true
 serde-wasm-bindgen.workspace = true
 serde.workspace = true

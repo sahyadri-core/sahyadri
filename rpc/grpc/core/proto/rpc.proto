@@ -576,6 +576,17 @@ message GetBalanceByAddressResponseMessage {
   RPCError error = 1000;
 }
 
+
+// GetDaaScoreRequest returns the current virtual DAA score of the node
+message GetDaaScoreRequestMessage {
+}
+
+message GetDaaScoreResponseMessage {
+  uint64 daaScore = 1;
+
+  RPCError error = 1000;
+}
+
 message GetBalancesByAddressesRequestMessage {
   repeated string addresses = 1;
 }

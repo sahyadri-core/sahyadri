@@ -119,6 +119,23 @@ use std::{
     sync::{Arc, atomic::Ordering},
 };
 
+/// Convert sender pubkey (1952 bytes) to P2PKH script.
+/// Matches SDK's pubkeyToAddress: sha3(pubkey)[..20] with 0x14/0xac wrapper.
+fn pubkey_to_p2pkh_spk(pubkey: &[u8]) -> sahyadri_consensus_core::tx::ScriptPublicKey {
+    use sha3::{Digest, Sha3_256};
+    let mut hasher = Sha3_256::new();
+    hasher.update(pubkey);
+    let hash = hasher.finalize();
+    let hash20 = &hash[..20];
+
+    let mut script = Vec::with_capacity(22);
+    script.push(0x14);
+    script.extend_from_slice(hash20);
+    script.push(0xac);
+
+    sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, script)
+}
+
 pub struct VirtualStateProcessor {
     // Channels
     receiver: CrossbeamReceiver<VirtualStateProcessingMessage>,
@@ -135,6 +152,8 @@ pub struct VirtualStateProcessor {
     pub(super) genesis: GenesisBlock,
     pub(super) max_block_parents: u8,
     pub(super) mergeset_size_limit: u64,
+    /// Enables the Sahyadri Flash Transaction (SFT) nonce-less path.
+    pub(super) enable_flash_tx: bool,
 
     // Stores
     pub(super) statuses_store: Arc<RwLock<DbStatusesStore>>,
@@ -206,6 +225,7 @@ impl VirtualStateProcessor {
         notification_root: Arc<ConsensusNotificationRoot>,
         counters: Arc<ProcessingCounters>,
         mining_rules: Arc<MiningRules>,
+        enable_flash_tx: bool,
     ) -> Self {
         Self {
             receiver,
@@ -216,6 +236,7 @@ impl VirtualStateProcessor {
             genesis: params.genesis.clone(),
             max_block_parents: params.max_block_parents(),
             mergeset_size_limit: params.mergeset_size_limit(),
+            enable_flash_tx,
 
             db,
             statuses_store: storage.statuses_store.clone(),
@@ -675,38 +696,57 @@ impl VirtualStateProcessor {
                     // Reverse the outputs (Deduct what was wrongly added)
                     for output in tx.outputs.iter() {
                         let amount = -(output.value as i64); // Negative to deduct
-                            {
-                                if let Err(e) = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount) {
-                                    log::error!("SAHYADRI: CRITICAL — failed to reverse balance during reorg: {:?}", e);
-                                    continue;
-                                }
+                        {
+                            if let Err(e) = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount) {
+                                log::error!("SAHYADRI: CRITICAL — failed to reverse balance during reorg: {:?}", e);
+                                continue;
                             }
+                        }
                     }
 
                     if i > 0 {
-                        // Refund the sender and roll back their nonce, mirroring the apply path
+                        // Refund the sender and roll back their nonce, mirroring the apply path.
+                        // BUT: only refund if the tx was actually applied in the first place.
+                        // We detect this by checking the current nonce — if it's 0, no tx was
+                        // ever applied from this account, so this is a skipped tx (nonce mismatch,
+                        // insufficient balance, etc.) and must NOT be refunded.
                         let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
                         if tx.payload.len() >= min_payload {
                             let sig_start = tx.payload.len() - SIG_SIZE;
                             let sender_pubkey = &tx.payload[..sig_start - 8];
-                            let sender_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, sender_pubkey.to_vec());
+                            let sender_spk = pubkey_to_p2pkh_spk(sender_pubkey);
+
+                            // Only refund if this exact tx was the LAST APPLIED on this account
+                            let last_applied = self.account_store.get_last_tx_id(&sender_spk).unwrap_or([0u8; 32]);
+                            if last_applied != tx.id().as_bytes() {
+                                log::warn!(
+                                    "SAHYADRI: reorg — skipping refund: tx id mismatch (last_applied {:02x?}, this tx {:02x?})",
+                                    &last_applied[..4],
+                                    &tx.id().as_bytes()[..4]
+                                );
+                                continue;
+                            }
 
                             let mut total_spent: u64 = tx.gas;
                             for output in tx.outputs.iter() {
                                 total_spent += output.value;
                             }
 
-                              {
-                                  if let Err(e) = self.account_store.update_balance_batch(&mut batch, &sender_spk, total_spent as i64) {
-                                      log::error!("SAHYADRI: CRITICAL — failed to refund sender during reorg: {:?}", e);
-                                      continue;
-                                  }
-                              }
-                              {
-                                  if let Err(e) = self.account_store.decrement_nonce_batch(&mut batch, &sender_spk) {
-                                      log::error!("SAHYADRI: CRITICAL — failed to roll back nonce during reorg: {:?}", e);
-                                  }
-                              }
+                            if let Err(e) = self.account_store.update_balance_batch(&mut batch, &sender_spk, total_spent as i64) {
+                                log::error!("SAHYADRI: CRITICAL — failed to refund sender during reorg: {:?}", e);
+                                continue;
+                            }
+                            if let Err(e) = self.account_store.decrement_nonce_batch(&mut batch, &sender_spk) {
+                                log::error!("SAHYADRI: CRITICAL — failed to roll back nonce during reorg: {:?}", e);
+                            }
+                            // Clear last_tx_id so this tx can't be refunded twice
+                            if let Err(e) = self.account_store.set_last_tx_id_batch(
+                                &mut batch,
+                                &sender_spk,
+                                [0u8; 32],
+                            ) {
+                                log::error!("SAHYADRI: CRITICAL — failed to clear last_tx_id during reorg: {:?}", e);
+                            }
                         } else {
                             log::error!(
                                 "SAHYADRI: reorg refund skipped — undersized payload ({} bytes) for tx in removed block",
@@ -715,8 +755,28 @@ impl VirtualStateProcessor {
                         }
                     }
                 }
+
+                // ──── FLASH TX REORG HOOK ────
+                // Per-block unwind: only removes flash entries whose block_hash matches
+                if self.enable_flash_tx {
+                    let flash_txs: Vec<sahyadri_consensus_core::tx::FlashTransaction> = txs
+                        .iter()
+                        .filter_map(|tx| sahyadri_consensus_core::tx::FlashTransaction::from_transaction(tx))
+                        .collect();
+                    if !flash_txs.is_empty() {
+                        if let Err(e) = crate::pipeline::virtual_processor::flash_tx::reorg_flash_block(
+                            &self.account_store,
+                            &mut batch,
+                            hash,
+                            &flash_txs,
+                        ) {
+                            log::error!("SAHYADRI: flash reorg failed for block {:?}: {:?}", hash, e);
+                        }
+                    }
+                }
             }
         }
+
 
         // 2. NEW BLOCKS: Process Miners & User Transactions
         for &hash in chain_path.added.iter() {
@@ -765,13 +825,21 @@ impl VirtualStateProcessor {
                     // FIX 2: USER TRANSACTIONS
                     // ==========================================
                     else {
+                        // ──── FLASH TX BYPASS ────
+                        // FlashTransactions use the FLASH_V1 prefix and are handled
+                        // by the dedicated per-block flash hook below. Skip classical
+                        // account-tx processing entirely (their outputs are empty).
+                        if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
+                            continue;
+                        }
+                        // ─────────────────────────
+
                         // SAHYADRI: DID transaction check — must come first
                         let is_did_tx = tx.payload.len() > 4 && (
                             &tx.payload[..4] == b"DCRT" ||
                             &tx.payload[..4] == b"DUPD" ||
                             &tx.payload[..4] == b"DDEC"
                         );
-
                         if is_did_tx && tx.payload.len() >= 20 {
                             let did_tx_type = &tx.payload[..4];
 
@@ -968,7 +1036,7 @@ impl VirtualStateProcessor {
                                                         }
                                                     });
                         let sig_bytes = &tx.payload[sig_start..];
-                        let sender_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, sender_pubkey.to_vec());
+                        let sender_spk = pubkey_to_p2pkh_spk(sender_pubkey);
 
                         // Defense-in-depth: re-verify Dilithium signature
                         {
@@ -994,7 +1062,9 @@ impl VirtualStateProcessor {
                                 h.finalize()
                             };
                             log::warn!("SAHYADRI SIGHASH: {:02x?}", sighash);
-                            log::warn!("SPK VERSION: {}", tx.outputs[0].script_public_key.version);
+                            if let Some(out0) = tx.outputs.first() {
+                                log::warn!("SPK VERSION: {}", out0.script_public_key.version);
+                            }
                             log::warn!("NODE SIGHASH: {:02x?}", sighash);
                             log::warn!("NODE SENDER PUBKEY LEN: {}", sender_pubkey.len());
                             log::warn!("NODE SENDER PUBKEY FIRST 40: {:02x?}", &sender_pubkey[..20.min(sender_pubkey.len())]);
@@ -1011,7 +1081,7 @@ impl VirtualStateProcessor {
                             }
                         }
 
-                        // Verify nonce
+                        // Verify nonce (tx_nonce must equal account_nonce + 1)
                         let current_nonce = match self.account_store.get_nonce(&sender_spk) {
                             Ok(n) => n,
                             Err(e) => {
@@ -1019,10 +1089,10 @@ impl VirtualStateProcessor {
                                 continue;
                             }
                         };
-                        if expected_nonce != current_nonce {
+                        if expected_nonce != current_nonce + 1 {
                             log::warn!(
-                                "SAHYADRI: skipping invalid account tx — nonce mismatch (have {}, tx claims {})",
-                                current_nonce, expected_nonce
+                                "SAHYADRI: skipping invalid account tx — nonce mismatch (have {}, expected tx nonce {})",
+                                current_nonce, current_nonce + 1
                             );
                             continue;
                         }
@@ -1049,23 +1119,94 @@ impl VirtualStateProcessor {
                         }
 
                         // All checks passed — apply state changes
+                        // 1. Debit sender (outputs + gas)
+                        if let Err(e) = self.account_store.update_balance_batch(
+                            &mut batch,
+                            &sender_spk,
+                            -(total_spent as i64),
+                        ) {
+                            log::error!("SAHYADRI: CRITICAL — failed to debit sender: {:?}", e);
+                            continue;
+                        }
+
+                        // 2. Credit receiver(s)
                         for output in tx.outputs.iter() {
                             let amount = output.value as i64;
-                          {
-                              if let Err(e) = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount) {
-                                  log::error!("SAHYADRI: CRITICAL — failed to credit receiver: {:?}", e);
-                                  break;
-                              }
-                          }
+                            if let Err(e) = self.account_store.update_balance_batch(
+                                &mut batch,
+                                &output.script_public_key,
+                                amount,
+                            ) {
+                                log::error!("SAHYADRI: CRITICAL — failed to credit receiver: {:?}", e);
+                                break;
+                            }
                         }
-                          {
-                              if let Err(e) = self.account_store.increment_nonce_batch(&mut batch, &sender_spk) {
-                                  log::error!("SAHYADRI: CRITICAL — failed to increment nonce: {:?}", e);
-                              }
-                          }
-                        self.account_store
-                            .increment_nonce_batch(&mut batch, &sender_spk)
-                            .expect("SAHYADRI: CRITICAL — failed to increment nonce");
+
+                        // 3. Increment sender nonce — ONLY ONCE
+                        if let Err(e) = self.account_store.increment_nonce_batch(&mut batch, &sender_spk) {
+                            log::error!("SAHYADRI: CRITICAL — failed to increment nonce: {:?}", e);
+                        }
+
+                        // 4. Record which tx was just applied — for reorg refund safety
+                        if let Err(e) = self.account_store.set_last_tx_id_batch(
+                            &mut batch,
+                            &sender_spk,
+                            tx.id().as_bytes(),
+                        ) {
+                            log::error!("SAHYADRI: failed to record last_applied_tx_id: {:?}", e);
+                        }
+                    }
+                }
+                // ──── FLASH TX APPLY HOOK ────
+                // Per-block: decode all flash txs, batch-validate, then apply.
+                // Balance reservation is handled by validate_flash_batch (per-sender aggregate).
+                if self.enable_flash_tx {
+                    let flash_txs: Vec<sahyadri_consensus_core::tx::FlashTransaction> = txs
+                        .iter()
+                        .filter_map(|tx| sahyadri_consensus_core::tx::FlashTransaction::from_transaction(tx))
+                        .collect();
+
+                    if !flash_txs.is_empty() {
+                        let current_daa = new_virtual_state.daa_score;
+                        match self.transaction_validator.validate_flash_batch(&flash_txs, current_daa) {
+                            Ok(()) => {
+                                let mut affected_spks: Vec<sahyadri_consensus_core::tx::ScriptPublicKey> = Vec::new();
+                                for flash_tx in &flash_txs {
+                                    if let Err(e) = crate::pipeline::virtual_processor::flash_tx::apply_flash_tx(
+                                        &self.account_store,
+                                        &mut batch,
+                                        flash_tx,
+                                        hash,
+                                    ) {
+                                        log::error!("SAHYADRI: flash apply failed in block {:?}: {:?}", hash, e);
+                                        continue;
+                                    }
+                                    affected_spks.push(
+                                        crate::pipeline::virtual_processor::flash_tx::flash_pubkey_to_spk(&flash_tx.pubkey),
+                                    );
+                                    affected_spks.push(
+                                        crate::pipeline::virtual_processor::flash_tx::hash20_to_p2pkh_spk(&flash_tx.recipient),
+                                    );
+                                }
+
+                                // Prune expired flash entries on affected accounts
+                                if let Err(e) = crate::pipeline::virtual_processor::flash_tx::prune_flashes_for_accounts(
+                                    &self.account_store,
+                                    &mut batch,
+                                    &affected_spks,
+                                    current_daa,
+                                ) {
+                                    log::error!("SAHYADRI: flash prune failed in block {:?}: {:?}", hash, e);
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "SAHYADRI: flash batch rejected in block {:?}: {:?}",
+                                    hash,
+                                    e
+                                );
+                            }
+                        }
                     }
                 }
             }

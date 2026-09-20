@@ -6,3 +6,4 @@ pub use processor::*;
 pub mod test_block_builder;
 #[cfg(test)]
 mod tests;
+pub mod flash_tx;

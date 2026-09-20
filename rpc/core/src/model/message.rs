@@ -1338,6 +1338,51 @@ impl Deserializer for GetBalanceByAddressResponse {
     }
 }
 
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct GetDaaScoreRequest {}
+
+impl Serializer for GetDaaScoreRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetDaaScoreRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        Ok(Self {})
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct GetDaaScoreResponse {
+    pub daa_score: u64,
+}
+
+impl GetDaaScoreResponse {
+    pub fn new(daa_score: u64) -> Self {
+        Self { daa_score }
+    }
+}
+
+impl Serializer for GetDaaScoreResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(u64, &self.daa_score, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetDaaScoreResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let daa_score = load!(u64, reader)?;
+        Ok(Self { daa_score })
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBalancesByAddressesRequest {
@@ -3608,6 +3653,52 @@ pub struct SubmitAccountTransactionResponse {
     pub transaction_id: String,
     /// Error message if something went wrong
     pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitFlashTransactionRequest {
+    /// Hex-encoded serialized FlashTransaction (starts with "FLASH_V1")
+    pub flash_hex: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub struct SubmitFlashTransactionResponse {
+    pub transaction_id: String,
+    pub error: Option<String>,
+}
+
+impl Serializer for SubmitFlashTransactionRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.flash_hex, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitFlashTransactionRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let flash_hex = load!(String, reader)?;
+        Ok(Self { flash_hex })
+    }
+}
+
+impl Serializer for SubmitFlashTransactionResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.transaction_id, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for SubmitFlashTransactionResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        let transaction_id = load!(String, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { transaction_id, error })
+    }
 }
 // --- SERIALIZER FOR REQUEST ---
 impl Serializer for SubmitAccountTransactionRequest {

@@ -62,6 +62,8 @@ pub struct Args {
     pub rpc_max_clients: usize,
     pub max_tracked_addresses: usize,
     pub enable_unsynced_mining: bool,
+    /// Enable Sahyadri Flash Transaction (SFT) nonce-less tx path.
+    pub enable_flash_tx: bool,
     pub enable_mainnet_mining: bool,
     pub testnet: bool,
     #[serde(rename = "netsuffix")]
@@ -115,6 +117,7 @@ impl Default for Args {
             rpc_max_clients: 128,
             max_tracked_addresses: 0,
             enable_unsynced_mining: false,
+            enable_flash_tx: false,
             enable_mainnet_mining: true,
             testnet: false,
             testnet_suffix: 10,
@@ -162,6 +165,7 @@ impl Args {
         config.disable_upnp = self.disable_upnp;
         config.unsafe_rpc = self.unsafe_rpc;
         config.enable_unsynced_mining = self.enable_unsynced_mining;
+        config.enable_flash_tx = self.enable_flash_tx;
         config.enable_mainnet_mining = self.enable_mainnet_mining;
         config.is_archival = self.archival;
         // TODO: change to `config.enable_sanity_checks = self.sanity` when we reach stable versions
@@ -327,6 +331,7 @@ pub fn cli() -> Command {
         )
         .arg(arg!(--"reset-db" "Reset database before starting node. It's needed when switching between subnetworks.").env("SAHYADRID_RESET_DB"))
         .arg(arg!(--"enable-unsynced-mining" "Allow the node to accept blocks from RPC while not synced (this flag is mainly used for testing)").env("SAHYADRID_ENABLE_UNSYNCED_MINING"))
+        .arg(arg!(--"enable-flash-tx" "Enable Sahyadri Flash Transaction (SFT) nonce-less tx path").env("SAHYADRID_ENABLE_FLASH_TX"))
         .arg(
             Arg::new("enable-mainnet-mining")
                 .long("enable-mainnet-mining")
@@ -501,6 +506,7 @@ impl Args {
             max_tracked_addresses: arg_match_unwrap_or::<usize>(&m, "max-tracked-addresses", defaults.max_tracked_addresses),
             reset_db: arg_match_unwrap_or::<bool>(&m, "reset-db", defaults.reset_db),
             enable_unsynced_mining: arg_match_unwrap_or::<bool>(&m, "enable-unsynced-mining", defaults.enable_unsynced_mining),
+            enable_flash_tx: arg_match_unwrap_or::<bool>(&m, "enable-flash-tx", defaults.enable_flash_tx),
             enable_mainnet_mining: arg_match_unwrap_or::<bool>(&m, "enable-mainnet-mining", defaults.enable_mainnet_mining),
             utxoindex: arg_match_unwrap_or::<bool>(&m, "utxoindex", defaults.utxoindex),
             testnet: arg_match_unwrap_or::<bool>(&m, "testnet", defaults.testnet),

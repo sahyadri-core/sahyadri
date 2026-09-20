@@ -1,3 +1,4 @@
+
 //! Conversions of protowire messages from and to rpc core counterparts.
 //!
 //! Response payloads in protowire do always contain an error field and generally a set of
@@ -265,7 +266,14 @@ from!(item: RpcResult<&sahyadri_rpc_core::SubmitTransactionReplacementResponse>,
 from!(item: &sahyadri_rpc_core::SubmitAccountTransactionRequest, protowire::SubmitAccountTransactionRequestMessage, {
     Self { sender: item.sender.clone(), sender_pubkey: item.sender_pubkey.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
 });
+from!(item: &sahyadri_rpc_core::SubmitFlashTransactionRequest, protowire::SubmitFlashTransactionRequestMessage, {
+    Self { flash_hex: item.flash_hex.clone() }
+});
 from!(item: RpcResult<&sahyadri_rpc_core::SubmitAccountTransactionResponse>, protowire::SubmitAccountTransactionResponseMessage, {
+from!(item: RpcResult<&sahyadri_rpc_core::SubmitFlashTransactionResponse>, protowire::SubmitFlashTransactionResponseMessage, {
+    debug!("GRPC, Creating SubmitFlashTransaction messages");
+    Self { transaction_id: item.transaction_id.clone(), error: None }
+});
 from!(item: &sahyadri_rpc_core::SubmitDidCreateRequest, protowire::SubmitDidCreateRequestMessage, {
     Self { sender: item.sender.clone(), did: item.did.clone(), document: item.document.clone(), public_key_hex: item.public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, purposes: item.purposes.clone(), services: item.services.clone(), timestamp: item.timestamp }
 });
@@ -385,6 +393,13 @@ from!(item: &sahyadri_rpc_core::GetBalanceByAddressRequest, protowire::GetBalanc
 from!(item: RpcResult<&sahyadri_rpc_core::GetBalanceByAddressResponse>, protowire::GetBalanceByAddressResponseMessage, {
     debug!("GRPC, Creating GetBalanceByAddress messages");
     Self { balance: item.balance, error: None }
+});
+from!(_item: &sahyadri_rpc_core::GetDaaScoreRequest, protowire::GetDaaScoreRequestMessage, {
+    Self {}
+});
+from!(item: RpcResult<&sahyadri_rpc_core::GetDaaScoreResponse>, protowire::GetDaaScoreResponseMessage, {
+    debug!("GRPC, Creating GetDaaScore messages");
+    Self { daa_score: item.daa_score, error: None }
 });
 
 from!(item: &sahyadri_rpc_core::GetBalancesByAddressesRequest, protowire::GetBalancesByAddressesRequestMessage, {
@@ -808,7 +823,16 @@ try_from!(item: &protowire::SubmitTransactionReplacementResponseMessage, RpcResu
 try_from!(item: &protowire::SubmitAccountTransactionRequestMessage, sahyadri_rpc_core::SubmitAccountTransactionRequest, {
     Self { sender: item.sender.clone(), sender_pubkey: item.sender_pubkey.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
 });
+try_from!(item: &protowire::SubmitFlashTransactionRequestMessage, sahyadri_rpc_core::SubmitFlashTransactionRequest, {
+    Self { flash_hex: item.flash_hex.clone() }
+});
 try_from!(item: &protowire::SubmitAccountTransactionResponseMessage, RpcResult<sahyadri_rpc_core::SubmitAccountTransactionResponse>, {
+try_from!(item: &protowire::SubmitFlashTransactionResponseMessage, RpcResult<sahyadri_rpc_core::SubmitFlashTransactionResponse>, {
+    Self {
+        transaction_id: item.transaction_id.clone(),
+        error: None,
+    }
+});
 try_from!(item: &protowire::SubmitDidCreateRequestMessage, sahyadri_rpc_core::SubmitDidCreateRequest, {
     Self { sender: item.sender.clone(), did: item.did.clone(), document: item.document.clone(), public_key_hex: item.public_key_hex.clone(), signature: item.signature.clone(), nonce: item.nonce, purposes: item.purposes.clone(), services: item.services.clone(), timestamp: item.timestamp }
 });
@@ -931,7 +955,12 @@ try_from!(item: &protowire::GetBalanceByAddressRequestMessage, sahyadri_rpc_core
 try_from!(item: &protowire::GetBalanceByAddressResponseMessage, RpcResult<sahyadri_rpc_core::GetBalanceByAddressResponse>, {
     Self { balance: item.balance }
 });
-
+try_from!(_item: &protowire::GetDaaScoreRequestMessage, sahyadri_rpc_core::GetDaaScoreRequest, {
+    Self {}
+});
+try_from!(item: &protowire::GetDaaScoreResponseMessage, RpcResult<sahyadri_rpc_core::GetDaaScoreResponse>, {
+    Self { daa_score: item.daa_score }
+});
 try_from!(item: &protowire::GetBalancesByAddressesRequestMessage, sahyadri_rpc_core::GetBalancesByAddressesRequest, {
     Self { addresses: item.addresses.iter().map(|x| x.as_str().try_into()).collect::<Result<Vec<_>, _>>()? }
 });

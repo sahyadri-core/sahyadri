@@ -38,6 +38,7 @@ pub mod sahyadrid_request_convert {
     impl_into_sahyadrid_request!(SubmitTransaction);
     impl_into_sahyadrid_request!(SubmitTransactionReplacement);
     impl_into_sahyadrid_request!(SubmitAccountTransaction);
+    impl_into_sahyadrid_request!(SubmitFlashTransaction);
     impl_into_sahyadrid_request!(SubmitDidCreate);
     impl_into_sahyadrid_request!(SubmitDidUpdate);
     impl_into_sahyadrid_request!(SubmitDidDeactivate);
@@ -50,6 +51,7 @@ pub mod sahyadrid_request_convert {
     impl_into_sahyadrid_request!(GetHeaders);
     impl_into_sahyadrid_request!(GetUtxosByAddresses);
     impl_into_sahyadrid_request!(GetBalanceByAddress);
+    impl_into_sahyadrid_request!(GetDaaScore);
     impl_into_sahyadrid_request!(GetBalancesByAddresses);
     impl_into_sahyadrid_request!(GetSinkBlueScore);
     impl_into_sahyadrid_request!(Ban);
@@ -181,6 +183,7 @@ pub mod sahyadrid_response_convert {
     impl_into_sahyadrid_response!(SubmitTransaction);
     impl_into_sahyadrid_response!(SubmitTransactionReplacement);
     impl_into_sahyadrid_response!(SubmitAccountTransaction);
+    impl_into_sahyadrid_response!(SubmitFlashTransaction);
     impl_into_sahyadrid_response!(SubmitDidCreate);
     impl_into_sahyadrid_response!(SubmitDidUpdate);
     impl_into_sahyadrid_response!(SubmitDidDeactivate);
@@ -193,6 +196,7 @@ pub mod sahyadrid_response_convert {
     impl_into_sahyadrid_response!(GetHeaders);
     impl_into_sahyadrid_response!(GetUtxosByAddresses);
     impl_into_sahyadrid_response!(GetBalanceByAddress);
+    impl_into_sahyadrid_response!(GetDaaScore);
     impl_into_sahyadrid_response!(GetBalancesByAddresses);
     impl_into_sahyadrid_response!(GetSinkBlueScore);
     impl_into_sahyadrid_response!(Ban);

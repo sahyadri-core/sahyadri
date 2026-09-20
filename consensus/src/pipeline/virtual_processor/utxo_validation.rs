@@ -141,7 +141,14 @@ impl VirtualStateProcessor {
 
             let mut block_fee = 0u64;
             for (validated_tx, _) in validated_transactions.iter() {
-                ctx.mergeset_diff.add_transaction(validated_tx, pov_daa_score).unwrap();
+                if let Err(e) = ctx.mergeset_diff.add_transaction(validated_tx, pov_daa_score) {
+                    log::warn!(
+                        "SAHYADRI: DoubleAddCall ignored for tx {}: {:?}",
+                        validated_tx.id(),
+                        e
+                    );
+                    continue;
+                }
                 ctx.accepted_tx_ids.push(validated_tx.id());
                 block_fee += validated_tx.calculated_fee;
             }

@@ -184,6 +184,16 @@ fn check_transaction_subnetwork(tx: &Transaction) -> TxResult<()> {
 const ACCOUNT_TX_MIN_PAYLOAD: usize = PUBKEY_SIZE + 8 + SIG_SIZE;
 
 fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
+    // ──── SAHYADRI FLASH TX BYPASS ────
+    // FlashTransactions use the FLASH_V1 magic prefix and are validated
+    // separately via `validate_flash_transaction` / `validate_flash_batch`
+    // inside the virtual processor. Skip the classical account-tx signature
+    // check here so they can flow through the mempool.
+    if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
+        return Ok(());
+    }
+    // ──────────────────────────────────
+
     if tx.payload.len() < ACCOUNT_TX_MIN_PAYLOAD {
         return Err(TxRuleError::Message(format!(
             "Account tx payload too small: {} bytes, minimum {}",

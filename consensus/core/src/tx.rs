@@ -592,6 +592,143 @@ pub enum TransactionQueryResult {
     SignableTransaction(Arc<Vec<SignableTransaction>>),
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SAHYADRI FLASH TRANSACTION (SFT) — nonce-less transaction layer
+// ═══════════════════════════════════════════════════════════════
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct FlashTransaction {
+    pub version: u16,
+    pub pubkey: Vec<u8>,
+    pub recipient: Vec<u8>,
+    pub amount: u64,
+    pub fee: u64,
+    pub expiry_daa_score: u64,
+    pub salt: [u8; 16],
+    pub signature: Vec<u8>,
+}
+
+impl FlashTransaction {
+    pub fn flash_id(&self) -> sahyadri_hashes::Hash {
+        use sha3::{Digest, Sha3_256};
+        let mut h = Sha3_256::new();
+        h.update(b"SAHYADRI_FLASH_ID_V1");
+        h.update(self.version.to_le_bytes());
+        h.update(&self.pubkey);
+        h.update(&self.recipient);
+        h.update(self.amount.to_le_bytes());
+        h.update(self.fee.to_le_bytes());
+        h.update(self.expiry_daa_score.to_le_bytes());
+        h.update(&self.salt);
+        let out: [u8; 32] = h.finalize().into();
+        sahyadri_hashes::Hash::from_bytes(out)
+    }
+
+    pub fn sighash(&self) -> [u8; 32] {
+        use sha3::{Digest, Sha3_256};
+        let mut h = Sha3_256::new();
+        h.update(b"SAHYADRI_FLASH_TX_V1");
+        h.update(self.version.to_le_bytes());
+        h.update(&self.pubkey);
+        h.update(&self.recipient);
+        h.update(self.amount.to_le_bytes());
+        h.update(self.fee.to_le_bytes());
+        h.update(self.expiry_daa_score.to_le_bytes());
+        h.update(&self.salt);
+        h.finalize().into()
+    }
+    /// Encode this FlashTransaction into a Transaction (for block inclusion).
+    /// Uses magic prefix `FLASH_V1` in the payload.
+    pub fn to_transaction(&self) -> Transaction {
+        let mut payload = Vec::with_capacity(8 + 4096);
+        payload.extend_from_slice(b"FLASH_V1");
+        payload.extend_from_slice(&self.version.to_le_bytes());
+        payload.extend_from_slice(&(self.pubkey.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&self.pubkey);
+        payload.extend_from_slice(&(self.recipient.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&self.recipient);
+        payload.extend_from_slice(&self.amount.to_le_bytes());
+        payload.extend_from_slice(&self.fee.to_le_bytes());
+        payload.extend_from_slice(&self.expiry_daa_score.to_le_bytes());
+        payload.extend_from_slice(&self.salt);
+        payload.extend_from_slice(&(self.signature.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&self.signature);
+
+        Transaction::new(
+            0,
+            vec![],
+            vec![],
+            0,
+            crate::subnets::SubnetworkId::from_bytes([0u8; 20]),
+            0,
+            payload,
+        )
+    }
+
+    /// Decode a FlashTransaction from a Transaction, if it carries our magic prefix.
+    pub fn from_transaction(tx: &Transaction) -> Option<FlashTransaction> {
+        let p = &tx.payload;
+        if p.len() < 8 || &p[..8] != b"FLASH_V1" {
+            return None;
+        }
+        let mut off = 8;
+
+        // version: u16
+        if off + 2 > p.len() { return None; }
+        let version = u16::from_le_bytes(p[off..off + 2].try_into().ok()?);
+        off += 2;
+
+        // pubkey
+        if off + 4 > p.len() { return None; }
+        let pk_len = u32::from_le_bytes(p[off..off + 4].try_into().ok()?) as usize;
+        off += 4;
+        if off + pk_len > p.len() { return None; }
+        let pubkey = p[off..off + pk_len].to_vec();
+        off += pk_len;
+
+        // recipient
+        if off + 4 > p.len() { return None; }
+        let rc_len = u32::from_le_bytes(p[off..off + 4].try_into().ok()?) as usize;
+        off += 4;
+        if off + rc_len > p.len() { return None; }
+        let recipient = p[off..off + rc_len].to_vec();
+        off += rc_len;
+
+        // amount, fee, expiry
+        if off + 24 > p.len() { return None; }
+        let amount = u64::from_le_bytes(p[off..off + 8].try_into().ok()?);
+        off += 8;
+        let fee = u64::from_le_bytes(p[off..off + 8].try_into().ok()?);
+        off += 8;
+        let expiry_daa_score = u64::from_le_bytes(p[off..off + 8].try_into().ok()?);
+        off += 8;
+
+        // salt: [u8; 16]
+        if off + 16 > p.len() { return None; }
+        let mut salt = [0u8; 16];
+        salt.copy_from_slice(&p[off..off + 16]);
+        off += 16;
+
+        // signature
+        if off + 4 > p.len() { return None; }
+        let sig_len = u32::from_le_bytes(p[off..off + 4].try_into().ok()?) as usize;
+        off += 4;
+        if off + sig_len > p.len() { return None; }
+        let signature = p[off..off + sig_len].to_vec();
+
+        Some(FlashTransaction {
+            version,
+            pubkey,
+            recipient,
+            amount,
+            fee,
+            expiry_daa_score,
+            salt,
+            signature,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

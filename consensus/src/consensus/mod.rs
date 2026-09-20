@@ -275,6 +275,7 @@ impl Consensus {
             notification_root.clone(),
             counters.clone(),
             mining_rules,
+            config.enable_flash_tx,
         ));
 
         let pruning_processor = Arc::new(PruningProcessor::new(

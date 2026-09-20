@@ -332,6 +332,45 @@ impl RpcCoreService {
         }
     }
 
+    async fn submit_flash_transaction_call(
+        &self,
+        request: SubmitFlashTransactionRequest,
+    ) -> RpcResult<SubmitFlashTransactionResponse> {
+        // 1. Decode hex → bytes
+        let mut flash_bytes = vec![0u8; request.flash_hex.len() / 2];
+        hex_decode(request.flash_hex.as_bytes(), &mut flash_bytes)
+            .map_err(|_| RpcError::General("Invalid flash tx hex".into()))?;
+
+        // 2. Wrap in Transaction envelope (FLASH_V1 payload lives inside)
+        let tx = sahyadri_consensus_core::tx::Transaction::new(
+            0,
+            vec![],
+            vec![],
+            0,
+            sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([0; 20]),
+            0,
+            flash_bytes,
+        );
+
+        // 3. Sanity: must decode as FlashTransaction
+        let _flash_tx = sahyadri_consensus_core::tx::FlashTransaction::from_transaction(&tx)
+            .ok_or_else(|| RpcError::General("Invalid FLASH_V1 payload".into()))?;
+
+        let tx_id = tx.id();
+
+        let session = self.consensus_manager.consensus().session().await;
+
+        match self
+            .mining_manager
+            .clone()
+            .validate_and_insert_transaction(&session, tx, Priority::High, Orphan::Forbidden, RbfPolicy::Forbidden)
+            .await
+        {
+            Ok(_) => Ok(SubmitFlashTransactionResponse { transaction_id: tx_id.to_string(), error: None }),
+            Err(e) => Ok(SubmitFlashTransactionResponse { transaction_id: tx_id.to_string(), error: Some(e.to_string()) }),
+        }
+    }
+
     async fn submit_did_create(
         &self,
         request: SubmitDidCreateRequest,
@@ -791,6 +830,22 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         self.submit_account_transaction(request).await
     }
 
+
+    async fn submit_flash_transaction(
+        &self,
+        request: SubmitFlashTransactionRequest,
+    ) -> RpcResult<SubmitFlashTransactionResponse> {
+        self.submit_flash_transaction_call(request).await
+    }
+
+    async fn submit_flash_transaction_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: SubmitFlashTransactionRequest,
+    ) -> RpcResult<SubmitFlashTransactionResponse> {
+        self.submit_flash_transaction(request).await
+    }
+
     async fn submit_did_create_call(
         &self,
         _connection: Option<&DynRpcConnection>,
@@ -985,6 +1040,16 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         println!("WALLET CHECK: Address {} asked for balance, DB returned: {}", address, real_balance);
 
         Ok(GetBalanceByAddressResponse::new(real_balance))
+    }
+
+    async fn get_daa_score_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        _request: GetDaaScoreRequest,
+    ) -> RpcResult<GetDaaScoreResponse> {
+        let session = self.consensus_manager.consensus().unguarded_session();
+        let daa_score = session.get_virtual_daa_score();
+        Ok(GetDaaScoreResponse::new(daa_score))
     }
 
     async fn resolve_did_call(

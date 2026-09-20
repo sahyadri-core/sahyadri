@@ -6,23 +6,39 @@ use sahyadri_utils::mem_size::MemSizeEstimator;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// Represents the state of an account in the Sahyadri network.
+/// A single flash-tx entry in an account's recent history.
+/// Block_hash tracking enables per-block reorg unwind.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct FlashEntry {
+    pub flash_id: sahyadri_hashes::Hash,
+    pub expiry_daa_score: u64,
+    pub block_hash: sahyadri_hashes::Hash,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct AccountState {
     pub balance: u64,
+    pub recent_flashes: Vec<FlashEntry>,
     pub nonce: u64,
+    pub last_applied_tx_id: [u8; 32],
 }
 
 impl AccountState {
     pub fn new(balance: u64, nonce: u64) -> Self {
-        Self { balance, nonce }
+        Self {
+            balance,
+            nonce,
+            last_applied_tx_id: [0u8; 32],
+            recent_flashes: Vec::new(),
+        }
     }
 }
 
 // RocksDB needs to know how much memory this struct takes for caching
 impl MemSizeEstimator for AccountState {
     fn estimate_mem_bytes(&self) -> usize {
-        16 // 8 bytes for u64 balance + 8 bytes for u64 nonce
+        // 16 bytes base + 40 bytes per recent_flash entry
+        16 + self.recent_flashes.len() * 40
     }
 }
 
@@ -58,6 +74,7 @@ pub trait AccountStoreReader {
     fn get(&self, script_public_key: &ScriptPublicKey) -> StoreResult<AccountState>;
     fn get_balance(&self, script_public_key: &ScriptPublicKey) -> StoreResult<u64>;
     fn get_nonce(&self, script_public_key: &ScriptPublicKey) -> StoreResult<u64>;
+    fn get_last_tx_id(&self, script_public_key: &ScriptPublicKey) -> StoreResult<[u8; 32]>;
 }
 
 pub trait AccountStore: AccountStoreReader {
@@ -70,6 +87,12 @@ pub trait AccountStore: AccountStoreReader {
     ) -> StoreResult<()>;
     fn increment_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()>;
     fn decrement_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()>;
+    fn set_last_tx_id_batch(
+        &self,
+        batch: &mut WriteBatch,
+        script_public_key: &ScriptPublicKey,
+        tx_id: [u8; 32],
+    ) -> StoreResult<()>;
 }
 
 const STORE_PREFIX: &[u8] = b"accounts-store";
@@ -101,6 +124,10 @@ impl AccountStoreReader for DbAccountStore {
     fn get_nonce(&self, script_public_key: &ScriptPublicKey) -> StoreResult<u64> {
         self.get(script_public_key).map(|state| state.nonce)
     }
+
+    fn get_last_tx_id(&self, script_public_key: &ScriptPublicKey) -> StoreResult<[u8; 32]> {
+        self.get(script_public_key).map(|state| state.last_applied_tx_id)
+    }
 }
 
 impl AccountStore for DbAccountStore {
@@ -114,7 +141,7 @@ impl AccountStore for DbAccountStore {
         script_public_key: &ScriptPublicKey,
         balance_change: i64,
     ) -> StoreResult<()> {
-        let mut state = self.get(script_public_key).unwrap_or(AccountState { balance: 0, nonce: 0 });
+        let mut state = self.get(script_public_key).unwrap_or_default();
 
         if balance_change >= 0 {
             state.balance = state.balance.saturating_add(balance_change as u64);
@@ -127,14 +154,69 @@ impl AccountStore for DbAccountStore {
     }
 
     fn increment_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()> {
-        let mut state = self.get(script_public_key).unwrap_or(AccountState { balance: 0, nonce: 0 });
+        let mut state = self.get(script_public_key).unwrap_or_default();
         state.nonce = state.nonce.saturating_add(1);
         self.set_batch(batch, script_public_key, state)
     }
 
     fn decrement_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()> {
-        let mut state = self.get(script_public_key).unwrap_or(AccountState { balance: 0, nonce: 0 });
+        let mut state = self.get(script_public_key).unwrap_or_default();
         state.nonce = state.nonce.saturating_sub(1);
         self.set_batch(batch, script_public_key, state)
+    }
+
+    fn set_last_tx_id_batch(
+        &self,
+        batch: &mut WriteBatch,
+        script_public_key: &ScriptPublicKey,
+        tx_id: [u8; 32],
+    ) -> StoreResult<()> {
+        let mut state = self.get(script_public_key).unwrap_or_default();
+        state.last_applied_tx_id = tx_id;
+        self.set_batch(batch, script_public_key, state)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FLASH TRANSACTION HELPERS (SFT)
+// ═══════════════════════════════════════════════════════════════
+
+/// Prune window — must be > FLASH_EXPIRY_BLOCKS to avoid edge-case replay
+pub const FLASH_EXPIRY_BLOCKS: u64 = 100;
+pub const FLASH_PRUNE_BUFFER: u64 = 50;
+pub const FLASH_PRUNE_WINDOW: u64 = FLASH_EXPIRY_BLOCKS + FLASH_PRUNE_BUFFER; // 150
+
+impl AccountState {
+    /// Check if this flash_id is a replay (already applied within window)
+    pub fn is_flash_replay(&self, flash_id: &sahyadri_hashes::Hash) -> bool {
+        self.recent_flashes.iter().any(|e| &e.flash_id == flash_id)
+    }
+
+    /// Record a flash entry with block_hash (for per-block reorg tracking)
+    pub fn record_flash(
+        &mut self,
+        flash_id: sahyadri_hashes::Hash,
+        expiry_daa_score: u64,
+        block_hash: sahyadri_hashes::Hash,
+    ) {
+        self.recent_flashes.push(FlashEntry { flash_id, expiry_daa_score, block_hash });
+    }
+
+    /// Prune expired flash entries — call after each block commit
+    pub fn prune_recent_flashes(&mut self, current_daa_score: u64) {
+        let cutoff = current_daa_score.saturating_sub(FLASH_PRUNE_BUFFER);
+        self.recent_flashes.retain(|e| e.expiry_daa_score > cutoff);
+    }
+
+    /// Reorg: remove all flash entries that came from the given block_hash.
+    /// Returns true if any entry was removed.
+    ///
+    /// Note: this is the safe unwind — we only remove entries that this
+    /// specific block added. Parallel flash-txs from other blocks are
+    /// untouched, so they remain valid and replay-protected.
+    pub fn reorg_block_flashes(&mut self, block_hash: &sahyadri_hashes::Hash) -> bool {
+        let before = self.recent_flashes.len();
+        self.recent_flashes.retain(|e| &e.block_hash != block_hash);
+        self.recent_flashes.len() < before
     }
 }

@@ -110,6 +110,7 @@ pub enum RpcApiOps {
     GetUtxosByAddresses = 135,
     /// Get a balance for a given address
     GetBalanceByAddress = 136,
+    GetDaaScore = 200,
     /// Get a balance for a number of addresses
     GetBalancesByAddresses = 137,
     // ?
@@ -141,6 +142,7 @@ pub enum RpcApiOps {
     /// Get Virtual Chain from Block V2
     GetVirtualChainFromBlockV2 = 151,
     SubmitAccountTransaction,
+    SubmitFlashTransaction,
     SubmitDidCreate,
     SubmitDidUpdate,
     SubmitDidDeactivate,

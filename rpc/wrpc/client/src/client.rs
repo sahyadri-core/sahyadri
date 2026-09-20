@@ -637,6 +637,7 @@ impl RpcApi for SahyadriRpcClient {
             GetConnectedPeerInfo,
             GetConnections,
             GetCurrentNetwork,
+            GetDaaScore,
             GetDaaScoreTimestampEstimate,
             GetFeeEstimate,
             GetFeeEstimateExperimental,
@@ -663,6 +664,7 @@ impl RpcApi for SahyadriRpcClient {
             SubmitTransaction,
             SubmitTransactionReplacement,
             SubmitAccountTransaction,
+            SubmitFlashTransaction,
             Unban,
         ]
     );
@@ -673,6 +675,15 @@ impl RpcApi for SahyadriRpcClient {
     ) -> RpcResult<sahyadri_rpc_core::SubmitAccountTransactionResponse> {
         self.submit_account_transaction_call(None, request).await
     }
+
+    async fn submit_flash_transaction(
+        &self,
+        request: sahyadri_rpc_core::SubmitFlashTransactionRequest,
+    ) -> RpcResult<sahyadri_rpc_core::SubmitFlashTransactionResponse> {
+        self.submit_flash_transaction_call(None, request).await
+    }
+
+
     // ── DID Operations (Web5 Decentralized Identifiers) ──
     async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
         let response: ClientResult<SubmitDidCreateResponse> = self.inner.rpc_client.call(RpcApiOps::SubmitDidCreate, Serializable(request)).await;

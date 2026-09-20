@@ -28,6 +28,17 @@ pub trait RpcApi: Sync + Send + AnySync {
         request: SubmitAccountTransactionRequest,
     ) -> RpcResult<SubmitAccountTransactionResponse>;
 
+    ///
+    async fn submit_flash_transaction(
+        &self,
+        request: SubmitFlashTransactionRequest,
+    ) -> RpcResult<SubmitFlashTransactionResponse>;
+
+    async fn submit_flash_transaction_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: SubmitFlashTransactionRequest,
+    ) -> RpcResult<SubmitFlashTransactionResponse>;
 
     async fn submit_did_create(
         &self,
@@ -392,6 +403,17 @@ pub trait RpcApi: Sync + Send + AnySync {
         connection: Option<&DynRpcConnection>,
         request: GetBalanceByAddressRequest,
     ) -> RpcResult<GetBalanceByAddressResponse>;
+
+    /// Returns the current virtual DAA score of the node.
+    /// Used by wallets to compute `expiry_daa_score` for FlashTransactions.
+    async fn get_daa_score(&self) -> RpcResult<u64> {
+        Ok(self.get_daa_score_call(None, GetDaaScoreRequest {}).await?.daa_score)
+    }
+    async fn get_daa_score_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: GetDaaScoreRequest,
+    ) -> RpcResult<GetDaaScoreResponse>;
 
     ///
     async fn get_balances_by_addresses(&self, addresses: Vec<RpcAddress>) -> RpcResult<Vec<RpcBalancesByAddressesEntry>> {

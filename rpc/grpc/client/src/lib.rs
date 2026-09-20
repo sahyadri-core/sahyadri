@@ -244,6 +244,7 @@ impl RpcApi for GrpcClient {
     route!(get_system_info_call, GetSystemInfo);
     route!(submit_block_call, SubmitBlock);
     route!(submit_account_transaction_call, SubmitAccountTransaction);
+    route!(submit_flash_transaction_call, SubmitFlashTransaction);
     route!(get_block_template_call, GetBlockTemplate);
     route!(get_block_call, GetBlock);
     route!(get_info_call, GetInfo);
@@ -266,6 +267,7 @@ impl RpcApi for GrpcClient {
     route!(get_headers_call, GetHeaders);
     route!(get_utxos_by_addresses_call, GetUtxosByAddresses);
     route!(get_balance_by_address_call, GetBalanceByAddress);
+    route!(get_daa_score_call, GetDaaScore);
     route!(get_balances_by_addresses_call, GetBalancesByAddresses);
     route!(get_sink_blue_score_call, GetSinkBlueScore);
     route!(ban_call, Ban);
@@ -313,6 +315,13 @@ impl RpcApi for GrpcClient {
         request: SubmitAccountTransactionRequest,
     ) -> RpcResult<SubmitAccountTransactionResponse> {
         self.submit_account_transaction_call(None, request).await
+    }
+
+    async fn submit_flash_transaction(
+        &self,
+        request: SubmitFlashTransactionRequest,
+    ) -> RpcResult<SubmitFlashTransactionResponse> {
+        self.submit_flash_transaction_call(None, request).await
     }
 
     async fn submit_did_create(&self, request: SubmitDidCreateRequest) -> RpcResult<SubmitDidCreateResponse> {
