@@ -15,6 +15,7 @@ sahyadri-consensus-core.workspace = true
 sahyadri-consensus-notify.workspace = true
 sahyadri-consensusmanager.workspace = true
 sahyadri-core.workspace = true
+sahyadri-dilithium = { path = "../../crypto/dilithium" }
 sahyadri-hashes.workspace = true
 sahyadri-index-core.workspace = true
 sahyadri-math.workspace = true

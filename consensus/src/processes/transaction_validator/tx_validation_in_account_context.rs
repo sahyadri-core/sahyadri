@@ -44,16 +44,27 @@ impl TransactionValidator {
         }
 
         // ──── FLASH TX BYPASS ────
-        // FlashTransactions use FLASH_V1 prefix and are validated separately
-        // via validate_flash_transaction in the virtual processor.
-        // Skip classical account-tx nonce validation for them.
         {
             let payload = &tx.tx().payload;
             if payload.len() >= 8 && &payload[..8] == b"FLASH_V1" {
                 return Ok(0);
             }
         }
-        // ─────────────────────────
+
+        // ──── DID TX BYPASS ────
+        // DID operations (create/update/deactivate) use 0-value outputs and
+        // do not go through account-tx nonce validation. Signature verification
+        // happens in the processor (DCRT/DUPD/DDEC handlers).
+        {
+            let payload = &tx.tx().payload;
+            if payload.len() >= 4 {
+                let p = &payload[..4];
+                if p == b"DCRT" || p == b"DUPD" || p == b"DDEC" {
+                    return Ok(0);
+                }
+            }
+        }
+
         let (sender_spk, tx_nonce) = self.extract_sender_and_nonce(tx)?;
         let account_state = self.account_store.get(&sender_spk).map_err(|_| TxRuleError::Unknown)?;
 

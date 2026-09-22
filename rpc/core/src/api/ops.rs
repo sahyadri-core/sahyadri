@@ -146,6 +146,8 @@ pub enum RpcApiOps {
     SubmitDidCreate,
     SubmitDidUpdate,
     SubmitDidDeactivate,
+    ResolveDid,
+    ResolveDidByAddress,
 }
 
 impl RpcApiOps {

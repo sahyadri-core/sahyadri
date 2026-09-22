@@ -376,42 +376,82 @@ impl RpcCoreService {
         request: SubmitDidCreateRequest,
     ) -> RpcResult<SubmitDidCreateResponse> {
         eprintln!("[DID CREATE] Creating DID transaction for did={}", request.did);
+
+        // ──── STEP 1: VERIFY SIGNATURE ────
+        // Decode pubkey and signature from hex
+        let mut pubkey_bytes = vec![0u8; request.public_key_hex.len() / 2];
+        faster_hex::hex_decode(request.public_key_hex.as_bytes(), &mut pubkey_bytes)
+            .map_err(|_| RpcError::General("Invalid public key hex".into()))?;
+
+        let mut sig_bytes = vec![0u8; request.signature.len() / 2];
+        faster_hex::hex_decode(request.signature.as_bytes(), &mut sig_bytes)
+            .map_err(|_| RpcError::General("Invalid signature hex".into()))?;
+
+        // Reconstruct the exact message that was signed
+        // SDK signs: `did:create:${address}:${timestamp}`
+        let message = format!("did:create:{}:{}", request.sender, request.timestamp);
         
+        // Verify ML-DSA-65 signature
+        let sig = sahyadri_dilithium::DilithiumSignature::from_slice(&sig_bytes);
+        let msg_bytes = message.as_bytes();
+        let is_valid = sahyadri_dilithium::DilithiumKeyPair::verify(
+            &pubkey_bytes,
+            &sig,
+            msg_bytes,
+            b"",
+            sahyadri_dilithium::SAHYADRI_MODE,
+        );
+        
+        if !is_valid {
+            eprintln!("[DID CREATE] Signature verification FAILED");
+            return Ok(SubmitDidCreateResponse {
+                transaction_id: "".to_string(),
+                error: Some("Invalid signature — DID create rejected".to_string()),
+            });
+        }
+        eprintln!("[DID CREATE] Signature verified");
+
+        
+        // ──── STEP 2: Build payload (raw bytes, no length prefixes for fixed-size fields) ────
         let mut payload = Vec::new();
         payload.extend_from_slice(b"DCRT");
         
-        // DID string
+        // DID string (length-prefixed)
         let did_bytes = request.did.as_bytes();
         payload.extend_from_slice(&(did_bytes.len() as u32).to_le_bytes());
         payload.extend_from_slice(did_bytes);
         
-        // Public key hex
-        let pubkey_bytes = request.public_key_hex.as_bytes().to_vec();
-        payload.extend_from_slice(&(pubkey_bytes.len() as u32).to_le_bytes());
+        // Public key — RAW 1952 bytes, NO length prefix
         payload.extend_from_slice(&pubkey_bytes);
         
-        // Address/sender
+        // Address/sender (length-prefixed)
         let addr_bytes = request.sender.as_bytes();
         payload.extend_from_slice(&(addr_bytes.len() as u32).to_le_bytes());
         payload.extend_from_slice(addr_bytes);
         
-        // Document JSON
+        // Document JSON (length-prefixed)
         let doc_bytes = request.document.as_bytes();
         payload.extend_from_slice(&(doc_bytes.len() as u32).to_le_bytes());
         payload.extend_from_slice(doc_bytes);
         
-        // Signature (hex string to bytes)
-        let sig_bytes = request.signature.as_bytes().to_vec();
-        payload.extend_from_slice(&(sig_bytes.len() as u32).to_le_bytes());
+        // Timestamp (8 bytes — needed by processor for message reconstruction)
+        payload.extend_from_slice(&request.timestamp.to_le_bytes());
+        
+        // Signature — RAW 3309 bytes, at end, NO length prefix
         payload.extend_from_slice(&sig_bytes);
         
+        // Parse sender address → real P2PKH script (mempool requires standard form)
+        let sender_address = sahyadri_addresses::Address::try_from(request.sender.as_str())
+            .map_err(|_| RpcError::General("Invalid sender address".into()))?;
+        let sender_spk = sahyadri_txscript::pay_to_address_script(&sender_address);
+
         // Create transaction
         let tx = sahyadri_consensus_core::tx::Transaction::new(
             0,
             vec![],
             vec![sahyadri_consensus_core::tx::TransactionOutput {
-                value: 0,
-                script_public_key: sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, vec![]),
+                value: 0,  // Free DID — no CSM needed
+                script_public_key: sender_spk,
             }],
             0,
             sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([b'D', b'I', b'D', b'_', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -1058,20 +1098,55 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         request: ResolveDidRequest,
     ) -> RpcResult<ResolveDidResponse> {
         eprintln!("[RESOLVE DID] Looking up: {}", request.did);
-        
-        // TODO: Implement when ConsensusInstance exposes DID methods via session
-        // For now return pending response
-        Ok(ResolveDidResponse {
-            found: false,
-            active: false,
-            did: Some(request.did.clone()),
-            document: None,
-            public_key: None,
-            csm_address: None,
-            version: None,
-            created_at: None,
-            error: Some("DID resolution pending - requires ConsensusInstance API extension".to_string()),
-        })
+
+        // Normalize: extract address from DID
+        let address_str = if request.did.starts_with("did:sahyadri:") {
+            request.did.strip_prefix("did:sahyadri:").unwrap_or("")
+        } else {
+            request.did.as_str()
+        };
+
+        if address_str.is_empty() {
+            return Ok(ResolveDidResponse {
+                found: false,
+                active: false,
+                did: Some(request.did.clone()),
+                document: None,
+                public_key: None,
+                csm_address: None,
+                version: None,
+                created_at: None,
+                error: Some("Invalid DID format".to_string()),
+            });
+        }
+
+        let session = self.consensus_manager.consensus().unguarded_session();
+
+        // Sync call — no .await, returns Option<DidDocumentDto>
+        match session.get_did_document(&request.did) {
+            Some(doc) => Ok(ResolveDidResponse {
+                found: true,
+                active: doc.active,
+                did: Some(doc.did.clone()),
+                document: Some(doc.document.clone()),
+                public_key: Some(doc.public_key.clone()),
+                csm_address: Some(doc.csm_address.clone()),
+                version: Some(doc.version),
+                created_at: Some(doc.created_at),
+                error: None,
+            }),
+            None => Ok(ResolveDidResponse {
+                found: false,
+                active: false,
+                did: Some(request.did.clone()),
+                document: None,
+                public_key: None,
+                csm_address: None,
+                version: None,
+                created_at: None,
+                error: Some("DID not found".to_string()),
+            }),
+        }
     }
 
     async fn resolve_did_by_address_call(
@@ -1080,15 +1155,23 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         request: ResolveDidByAddressRequest,
     ) -> RpcResult<ResolveDidByAddressResponse> {
         eprintln!("[RESOLVE BY ADDRESS] Looking up: {}", request.address);
-        
-        // TODO: Implement when ConsensusInstance exposes DID methods via session
-        // For now return pending response
-        Ok(ResolveDidByAddressResponse {
-            found: false,
-            did: None,
-            document: None,
-            error: Some("DID resolution by address pending - requires ConsensusInstance API extension".to_string()),
-        })
+
+        let session = self.consensus_manager.consensus().unguarded_session();
+
+        match session.get_did_by_address(&request.address) {
+            Some(doc) => Ok(ResolveDidByAddressResponse {
+                found: true,
+                did: Some(doc.did),
+                document: Some(doc.document),
+                error: None,
+            }),
+            None => Ok(ResolveDidByAddressResponse {
+                found: false,
+                did: None,
+                document: None,
+                error: Some("DID not found for address".to_string()),
+            }),
+        }
     }
 
     async fn get_balances_by_addresses_call(

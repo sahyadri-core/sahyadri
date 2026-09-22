@@ -76,6 +76,11 @@ impl Router {
                 SubmitTransaction,
                 SubmitTransactionReplacement,
                 SubmitAccountTransaction,
+                SubmitDidCreate,
+                SubmitDidUpdate,
+                SubmitDidDeactivate,
+                ResolveDid,
+                ResolveDidByAddress,
                 SubmitFlashTransaction,
                 Unban,
             ]

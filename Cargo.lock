@@ -5136,6 +5136,7 @@ dependencies = [
  "sahyadri-consensus-notify",
  "sahyadri-consensusmanager",
  "sahyadri-core",
+ "sahyadri-dilithium",
  "sahyadri-hashes",
  "sahyadri-index-core",
  "sahyadri-math",

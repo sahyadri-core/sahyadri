@@ -870,23 +870,25 @@ impl VirtualStateProcessor {
                                     offset += 4;
                                     if offset + doc_len > tx.payload.len() { continue; }
                                     let document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
+                                    offset += doc_len;   // ← YEH ADD KARO (advance past document)
+
+                                    // Timestamp (8 bytes before signature)
+                                    if offset + 8 > tx.payload.len() { continue; }
+                                    let timestamp = u64::from_le_bytes(
+                                        tx.payload[offset..offset+8].try_into().unwrap()
+                                    );
 
                                     const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
+                                    if tx.payload.len() < DILITHIUM_SIG_SIZE { continue; }
                                     let sig_start = tx.payload.len() - DILITHIUM_SIG_SIZE;
                                     let sig_bytes = &tx.payload[sig_start..];
 
-                                    let sighash = {
-                                        let mut h = Sha256::new();
-                                        h.update(b"SAHYADRI_DID_CREATE_V1");
-                                        h.update(&tx.payload[..sig_start]);
-                                        h.finalize()
-                                    };
-
+                                    // Verify over "did:create:addr:ts" (matches wallet + RPC)
+                                    let message = format!("did:create:{}:{}", csm_address, timestamp);
                                     let sig = DilithiumSignature::from_slice(sig_bytes);
 
-                                    // PARALLEL VERIFY (Rayon + AVX2)
                                     let is_valid = VERIFY_POOL.install(|| {
-                                        DilithiumKeyPair::verify(did_pubkey, &sig, &sighash, b"", SAHYADRI_MODE)
+                                        DilithiumKeyPair::verify(did_pubkey, &sig, message.as_bytes(), b"", SAHYADRI_MODE)
                                     });
                                     if !is_valid {
                                         log::warn!("SAHYADRI: DID_CREATE invalid signature");
@@ -943,23 +945,26 @@ impl VirtualStateProcessor {
                                     if offset + doc_len > tx.payload.len() { continue; }
                                     let new_document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
 
+                                    // Read timestamp (8 bytes before signature)
+                                    if tx.payload.len() < DILITHIUM_SIG_SIZE + 8 { continue; }
+                                    let ts_start = tx.payload.len() - DILITHIUM_SIG_SIZE - 8;
+                                    let timestamp = u64::from_le_bytes(
+                                        tx.payload[ts_start..ts_start+8].try_into().unwrap()
+                                    );
+
                                     const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
                                     let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
                                     let orig_pk = existing_doc.public_key.as_bytes().to_vec();
 
                                     let sig = DilithiumSignature::from_slice(sig_bytes);
 
-                                    let sighash = {
-                                        let mut h = Sha256::new();
-                                        h.update(b"SAHYADRI_DID_UPDATE_V1");
-                                        h.update(&did);
-                                        h.update(&new_document);
-                                        h.finalize()
-                                    };
+                                    // Verify over "did:update:addr:ts" (matches wallet + RPC)
+                                    let message = format!("did:update:{}:{}", existing_doc.csm_address, timestamp);
 
                                     let is_valid = VERIFY_POOL.install(|| {
-                                        DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE)
+                                        DilithiumKeyPair::verify(&orig_pk, &sig, message.as_bytes(), b"", SAHYADRI_MODE)
                                     });
+
                                     if !is_valid {
                                         continue;
                                     }
@@ -989,20 +994,25 @@ impl VirtualStateProcessor {
                                     };
 
                                     const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
+                                    
+                                    // Read timestamp (8 bytes before signature)
+                                    if tx.payload.len() < DILITHIUM_SIG_SIZE + 8 { continue; }
+                                    let ts_start = tx.payload.len() - DILITHIUM_SIG_SIZE - 8;
+                                    let timestamp = u64::from_le_bytes(
+                                        tx.payload[ts_start..ts_start+8].try_into().unwrap()
+                                    );
+
                                     let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
                                     let orig_pk = existing.public_key.as_bytes().to_vec();
                                     let sig = DilithiumSignature::from_slice(sig_bytes);
 
-                                    let sighash = {
-                                        let mut h = Sha256::new();
-                                        h.update(b"SAHYADRI_DID_DEACTIVATE_V1");
-                                        h.update(&did);
-                                        h.finalize()
-                                    };
+                                    // Verify over "did:deactivate:addr:ts"
+                                    let message = format!("did:deactivate:{}:{}", existing.csm_address, timestamp);
 
                                     let is_valid = VERIFY_POOL.install(|| {
-                                        DilithiumKeyPair::verify(&orig_pk, &sig, &sighash, b"", SAHYADRI_MODE)
+                                        DilithiumKeyPair::verify(&orig_pk, &sig, message.as_bytes(), b"", SAHYADRI_MODE)
                                     });
+
                                     if !is_valid {
                                         continue;
                                     }

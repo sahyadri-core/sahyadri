@@ -25,6 +25,27 @@ impl TransactionValidator {
     /// on checks here to be truly independent and avoid calling it multiple times wherever possible
     /// (e.g., BBT relies on mempool in isolation checks even though virtual daa score might have changed)   
     pub fn validate_tx_in_isolation(&self, tx: &Transaction) -> TxResult<()> {
+        // ──── DID SUBNETWORK EXEMPTION ────
+        // DID operations (DCRT/DUPD/DDEC) use 0-value outputs (free identity,
+        // works even with 0 balance). Skip account-tx specific checks here:
+        //
+        //  - `check_transaction_output_value_ranges` rejects 0-value → skip
+        //  - `verify_account_tx_signature` expects account-tx payload layout
+        //    [pk][nonce][sig], but DID tx layout is [OP][len+did][len+pk]
+        //    [len+addr][len+doc][len+sig] → format mismatch, skip
+        //
+        // SECURITY: DID signatures ARE verified in the virtual processor
+        // (commit_virtual_state DCRT/DUPD/DDEC handlers, lines 880-1004)
+        // before writing to crest_store. Any tx with a fake DID signature
+        // is rejected there and never mutates identity state.
+        if tx.payload.len() >= 4 {
+            let p = &tx.payload[..4];
+            if p == b"DCRT" || p == b"DUPD" || p == b"DDEC" {
+                return Ok(());
+            }
+        }
+        // ─────────────────────────────────
+
         // SAHYADRI ACCOUNT MODEL: Verify signature for account transactions
         // Payload: [sender_pubkey:PUBKEY_SIZE][nonce:8][signature:SIG_SIZE]
         if tx.inputs.is_empty() && !tx.payload.is_empty() && !tx.is_coinbase() {

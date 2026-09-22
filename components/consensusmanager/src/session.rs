@@ -210,6 +210,14 @@ impl ConsensusSessionOwned {
         self.consensus.get_account_balance(address)
     }
 
+    pub fn get_did_document(&self, did: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> {
+        self.consensus.get_did_document(did)
+    }
+
+    pub fn get_did_by_address(&self, address: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> {
+        self.consensus.get_did_by_address(address)
+    }
+
     pub fn get_virtual_bits(&self) -> u32 {
         // Accessing cached virtual fields is lock-free and does not require spawn_blocking
         self.consensus.get_virtual_bits()

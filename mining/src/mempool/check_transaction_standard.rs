@@ -39,6 +39,19 @@ const MAXIMUM_STANDARD_TRANSACTION_MASS: u64 = 100_000;
 
 impl Mempool {
     pub(crate) fn check_transaction_standard_in_isolation(&self, transaction: &MutableTransaction) -> NonStandardResult<()> {
+        // ──── DID SUBNETWORK EXEMPTION ────
+        // DID operations (create/update/deactivate) are FREE:
+        //  - 0-value output (no CSM required)
+        //  - 0 balance accounts can also create DID
+        // Skip all standardness checks (dust, script, fee)
+        if transaction.tx.payload.len() >= 4 {
+            let p = &transaction.tx.payload[..4];
+            if p == b"DCRT" || p == b"DUPD" || p == b"DDEC" {
+                return Ok(());
+            }
+        }
+        // ─────────────────────────────────
+
         let transaction_id = transaction.id();
 
         // The transaction must be a currently supported version.
