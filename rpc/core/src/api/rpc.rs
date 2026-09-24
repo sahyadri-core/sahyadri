@@ -90,6 +90,37 @@ pub trait RpcApi: Sync + Send + AnySync {
         Ok(())
     }
 
+
+    // ============= DWN RELAY METHODS =============
+
+    /// Register this connection as online for a DID. Returns any pending envelopes.
+    async fn relay_subscribe_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: RelaySubscribeRequest,
+    ) -> RpcResult<RelaySubscribeResponse>;
+
+    /// Route an encrypted envelope to a recipient DID (delivered or queued).
+    async fn relay_send_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: RelaySendRequest,
+    ) -> RpcResult<RelaySendResponse>;
+
+    /// Poll and drain queued envelopes for a DID.
+    async fn relay_poll_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: RelayPollRequest,
+    ) -> RpcResult<RelayPollResponse>;
+
+    /// Online presence check for a list of DIDs.
+    async fn relay_presence_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: RelayPresenceRequest,
+    ) -> RpcResult<RelayPresenceResponse>;
+
     async fn ping_call(&self, connection: Option<&DynRpcConnection>, request: PingRequest) -> RpcResult<PingResponse>;
 
 

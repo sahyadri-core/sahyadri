@@ -33,10 +33,11 @@ sahyadri-utxoindex.workspace = true
 sha2 = "0.10"
 async-trait.workspace = true
 log.workspace = true
-tokio.workspace = true
+tokio = { workspace = true }
 triggered.workspace = true
 workflow-rpc.workspace = true
 faster-hex.workspace = true
+dashmap.workspace = true
 
 [lints]
 workspace = true

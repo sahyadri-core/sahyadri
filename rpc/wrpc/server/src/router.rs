@@ -82,6 +82,10 @@ impl Router {
                 ResolveDid,
                 ResolveDidByAddress,
                 SubmitFlashTransaction,
+                RelaySubscribe,
+                RelaySend,
+                RelayPoll,
+                RelayPresence,
                 Unban,
             ]
         );

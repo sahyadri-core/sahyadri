@@ -4073,3 +4073,261 @@ impl Deserializer for ResolveDidByAddressResponse {
         Ok(Self { found, did, document, error })
     }
 }
+
+
+// ============================================================
+// DWN Relay — encrypted envelope forwarding (RAM-only)
+// ============================================================
+//
+// Zero storage on node. Envelopes are E2E-encrypted by clients.
+// Node only routes opaque blobs and holds offline queues in RAM
+// with a TTL. Node restart = queues gone (by design).
+
+/// relay_subscribe: register this connection to receive envelopes for a DID.
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelaySubscribeRequest {
+    /// Caller's DID (did:sahyadri:...)
+    pub did: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelaySubscribeResponse {
+    pub subscribed: bool,
+    /// Envelopes that were already queued for this DID (flushed on subscribe)
+    pub pending: Vec<RelayEnvelope>,
+    pub error: Option<String>,
+}
+
+/// relay_send: route an opaque encrypted envelope to a recipient DID.
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelaySendRequest {
+    /// Sender's DID (must match the DID this connection subscribed with)
+    pub from: String,
+    /// Recipient's DID
+    pub to: String,
+    /// Client-generated envelope id
+    pub id: String,
+    /// E2E-encrypted payload (base64/JSON, node cannot decrypt)
+    pub envelope: String,
+    /// Client timestamp (ms)
+    pub timestamp: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelaySendResponse {
+    /// "delivered" = recipient online, "queued" = stored in RAM for TTL
+    pub status: String,
+    pub error: Option<String>,
+}
+
+/// relay_poll: fetch and drain queued envelopes for a DID.
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayPollRequest {
+    pub did: String,
+    /// Max envelopes to return in this call (server may cap further)
+    pub limit: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayPollResponse {
+    pub envelopes: Vec<RelayEnvelope>,
+    /// Total still queued after this poll
+    pub remaining: u32,
+    pub error: Option<String>,
+}
+
+/// relay_presence: check which DIDs are currently online.
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayPresenceRequest {
+    pub dids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayPresenceResponse {
+    /// did -> online (true/false)
+    pub statuses: std::collections::HashMap<String, bool>,
+}
+
+/// A single queued envelope on the node.
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayEnvelope {
+    pub id: String,
+    pub from: String,
+    pub to: String,
+    pub envelope: String,
+    pub timestamp: u64,
+}
+
+// --- Serializers for wRPC wire format ---
+
+impl Serializer for RelaySubscribeRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.did, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelaySubscribeRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let did = load!(String, reader)?;
+        Ok(Self { did })
+    }
+}
+
+impl Serializer for RelaySubscribeResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(bool, &self.subscribed, writer)?;
+        serialize!(Vec<RelayEnvelope>, &self.pending, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelaySubscribeResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let subscribed = load!(bool, reader)?;
+        let pending = deserialize!(Vec<RelayEnvelope>, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { subscribed, pending, error })
+    }
+}
+
+impl Serializer for RelaySendRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.from, writer)?;
+        store!(String, &self.to, writer)?;
+        store!(String, &self.id, writer)?;
+        store!(String, &self.envelope, writer)?;
+        store!(u64, &self.timestamp, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelaySendRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let from = load!(String, reader)?;
+        let to = load!(String, reader)?;
+        let id = load!(String, reader)?;
+        let envelope = load!(String, reader)?;
+        let timestamp = load!(u64, reader)?;
+        Ok(Self { from, to, id, envelope, timestamp })
+    }
+}
+
+impl Serializer for RelaySendResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.status, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelaySendResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let status = load!(String, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { status, error })
+    }
+}
+
+impl Serializer for RelayPollRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.did, writer)?;
+        store!(u32, &self.limit, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelayPollRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let did = load!(String, reader)?;
+        let limit = load!(u32, reader)?;
+        Ok(Self { did, limit })
+    }
+}
+
+impl Serializer for RelayPollResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        serialize!(Vec<RelayEnvelope>, &self.envelopes, writer)?;
+        store!(u32, &self.remaining, writer)?;
+        store!(Option<String>, &self.error, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelayPollResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let envelopes = deserialize!(Vec<RelayEnvelope>, reader)?;
+        let remaining = load!(u32, reader)?;
+        let error = load!(Option<String>, reader)?;
+        Ok(Self { envelopes, remaining, error })
+    }
+}
+
+impl Serializer for RelayPresenceRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(Vec<String>, &self.dids, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelayPresenceRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let dids = load!(Vec<String>, reader)?;
+        Ok(Self { dids })
+    }
+}
+
+impl Serializer for RelayPresenceResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(std::collections::HashMap<String, bool>, &self.statuses, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelayPresenceResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let statuses = load!(std::collections::HashMap<String, bool>, reader)?;
+        Ok(Self { statuses })
+    }
+}
+
+impl Serializer for RelayEnvelope {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(String, &self.id, writer)?;
+        store!(String, &self.from, writer)?;
+        store!(String, &self.to, writer)?;
+        store!(String, &self.envelope, writer)?;
+        store!(u64, &self.timestamp, writer)?;
+        Ok(())
+    }
+}
+impl Deserializer for RelayEnvelope {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _v = load!(u16, reader)?;
+        let id = load!(String, reader)?;
+        let from = load!(String, reader)?;
+        let to = load!(String, reader)?;
+        let envelope = load!(String, reader)?;
+        let timestamp = load!(u64, reader)?;
+        Ok(Self { id, from, to, envelope, timestamp })
+    }
+}

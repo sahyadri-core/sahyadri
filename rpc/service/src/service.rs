@@ -75,11 +75,13 @@ use sahyadri_utils_tower::counters::TowerConnectionCounters;
 use sahyadri_utxoindex::api::UtxoIndexProxy;
 use std::time::Duration;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     iter::once,
     sync::{Arc, atomic::Ordering},
+    time::Instant,
     vec,
 };
+use dashmap::DashMap;
 use tokio::join;
 use workflow_rpc::server::WebSocketCounters as WrpcServerCounters;
 
@@ -123,9 +125,88 @@ pub struct RpcCoreService {
     fee_estimate_cache: ExpiringCache<RpcFeeEstimate>,
     fee_estimate_verbose_cache: ExpiringCache<sahyadri_mining::errors::MiningManagerResult<GetFeeEstimateExperimentalResponse>>,
     mining_rule_engine: Arc<MiningRuleEngine>,
+    relay_state: Arc<RelayState>,
 }
 
 const RPC_CORE: &str = "rpc-core";
+
+
+// ============================================================================
+// DWN RELAY — RAM-only encrypted envelope forwarding
+// ============================================================================
+//
+// Zero disk persistence. Node holds:
+//   sessions: did -> (conn_id, last_seen)   [presence]
+//   queues:   did -> VecDeque<QueuedEnvelope> [offline messages, TTL 48h]
+//
+// Envelopes are opaque E2E-encrypted blobs. Node never decrypts.
+// Node restart = both maps empty. By design.
+
+#[derive(Clone, Copy, Debug)]
+struct SessionInfo {
+    conn_id: u64,
+    last_seen: Instant,
+}
+
+struct QueuedEnvelope {
+    envelope: RelayEnvelope,
+    enqueued_at: Instant,
+}
+
+struct RelayState {
+    sessions: DashMap<String, SessionInfo>,
+    queues: DashMap<String, VecDeque<QueuedEnvelope>>,
+    ttl: Duration,
+    max_per_did: usize,
+    max_envelope_bytes: usize,
+    cleanup_started: std::sync::atomic::AtomicBool,
+}
+
+impl RelayState {
+    fn new() -> Self {
+        Self {
+            sessions: DashMap::new(),
+            queues: DashMap::new(),
+            ttl: Duration::from_secs(48 * 3600),
+            max_per_did: 100,
+            max_envelope_bytes: 8 * 1024,
+            cleanup_started: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    fn cleanup(&self) {
+        let now = Instant::now();
+        self.sessions
+            .retain(|_, s| now.duration_since(s.last_seen) < Duration::from_secs(90));
+        let ttl = self.ttl;
+        self.queues.retain(|_, q| {
+            while let Some(front) = q.front() {
+                if now.duration_since(front.enqueued_at) >= ttl {
+                    q.pop_front();
+                } else {
+                    break;
+                }
+            }
+            !q.is_empty()
+        });
+    }
+
+    fn ensure_cleanup_task(self: Arc<Self>) {
+        if self
+            .cleanup_started
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return;
+        }
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                tick.tick().await;
+                self.cleanup();
+            }
+        });
+    }
+}
 
 impl RpcCoreService {
     pub const IDENT: &'static str = "rpc-core-service";
@@ -155,6 +236,8 @@ impl RpcCoreService {
             Some(_) => MutationPolicies::new(UtxosChangedMutationPolicy::AddressSet),
             None => MutationPolicies::new(UtxosChangedMutationPolicy::Wildcard),
         };
+
+        let relay_state = Arc::new(RelayState::new());
 
         // Prepare consensus-notify objects
         let consensus_notify_channel = Channel::<ConsensusNotification>::default();
@@ -228,7 +311,31 @@ impl RpcCoreService {
             fee_estimate_cache: ExpiringCache::new(Duration::from_millis(500), Duration::from_millis(1000)),
             fee_estimate_verbose_cache: ExpiringCache::new(Duration::from_millis(500), Duration::from_millis(1000)),
             mining_rule_engine,
+            relay_state,
         }
+    }
+
+
+    fn drain_queue(&self, did: &str, limit: usize) -> Vec<RelayEnvelope> {
+        let mut out = Vec::new();
+        if let Some(mut q) = self.relay_state.queues.get_mut(did) {
+            let take = limit.min(q.len());
+            for _ in 0..take {
+                if let Some(item) = q.pop_front() {
+                    out.push(item.envelope);
+                }
+            }
+        }
+        let empty = self
+            .relay_state
+            .queues
+            .get(did)
+            .map(|q| q.is_empty())
+            .unwrap_or(false);
+        if empty {
+            self.relay_state.queues.remove(did);
+        }
+        out
     }
 
     pub fn start_impl(&self) {
@@ -1172,6 +1279,176 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
                 error: Some("DID not found for address".to_string()),
             }),
         }
+    }
+
+
+    async fn relay_subscribe_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: RelaySubscribeRequest,
+    ) -> RpcResult<RelaySubscribeResponse> {
+        self.relay_state.clone().ensure_cleanup_task();
+        let conn_id = match connection {
+            Some(c) => c.id(),
+            None => {
+                return Ok(RelaySubscribeResponse {
+                    subscribed: false,
+                    pending: Vec::new(),
+                    error: Some("relay_subscribe requires an active connection".to_string()),
+                });
+            }
+        };
+
+        if request.did.is_empty() {
+            return Ok(RelaySubscribeResponse {
+                subscribed: false,
+                pending: Vec::new(),
+                error: Some("did required".to_string()),
+            });
+        }
+
+        self.relay_state.sessions.insert(
+            request.did.clone(),
+            SessionInfo { conn_id, last_seen: Instant::now() },
+        );
+
+        let pending = self.drain_queue(&request.did, 100);
+
+        Ok(RelaySubscribeResponse {
+            subscribed: true,
+            pending,
+            error: None,
+        })
+    }
+
+    async fn relay_send_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: RelaySendRequest,
+    ) -> RpcResult<RelaySendResponse> {
+        self.relay_state.clone().ensure_cleanup_task();
+        let conn_id = connection.map(|c| c.id());
+        let mut sender_ok = conn_id.is_none();
+        if let Some(mut s) = self.relay_state.sessions.get_mut(&request.from) {
+            if conn_id.is_none() || Some(s.conn_id) == conn_id {
+                s.last_seen = Instant::now();
+                sender_ok = true;
+            }
+        }
+        if !sender_ok {
+            return Ok(RelaySendResponse {
+                status: "error".to_string(),
+                error: Some("sender is not subscribed with this connection".to_string()),
+            });
+        }
+
+        if request.to.is_empty() || request.id.is_empty() {
+            return Ok(RelaySendResponse {
+                status: "error".to_string(),
+                error: Some("to and id are required".to_string()),
+            });
+        }
+
+        if request.envelope.len() > self.relay_state.max_envelope_bytes {
+            return Ok(RelaySendResponse {
+                status: "error".to_string(),
+                error: Some(format!(
+                    "envelope exceeds {} bytes",
+                    self.relay_state.max_envelope_bytes
+                )),
+            });
+        }
+
+        let envelope = RelayEnvelope {
+            id: request.id,
+            from: request.from.clone(),
+            to: request.to.clone(),
+            envelope: request.envelope,
+            timestamp: request.timestamp,
+        };
+
+        let recipient_online = self.relay_state.sessions.contains_key(&request.to);
+        let max = self.relay_state.max_per_did;
+
+        {
+            let mut entry = self
+                .relay_state
+                .queues
+                .entry(request.to.clone())
+                .or_insert_with(VecDeque::new);
+            entry.push_back(QueuedEnvelope {
+                envelope,
+                enqueued_at: Instant::now(),
+            });
+            while entry.len() > max {
+                entry.pop_front();
+            }
+        }
+
+        Ok(RelaySendResponse {
+            status: if recipient_online {
+                "delivered".to_string()
+            } else {
+                "queued".to_string()
+            },
+            error: None,
+        })
+    }
+
+    async fn relay_poll_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: RelayPollRequest,
+    ) -> RpcResult<RelayPollResponse> {
+        self.relay_state.clone().ensure_cleanup_task();
+        if request.did.is_empty() {
+            return Ok(RelayPollResponse {
+                envelopes: Vec::new(),
+                remaining: 0,
+                error: Some("did required".to_string()),
+            });
+        }
+
+        if let Some(mut s) = self.relay_state.sessions.get_mut(&request.did) {
+            s.last_seen = Instant::now();
+        }
+
+        let limit = request.limit.clamp(1, 200) as usize;
+        let envelopes = self.drain_queue(&request.did, limit);
+
+        let remaining = self
+            .relay_state
+            .queues
+            .get(&request.did)
+            .map(|q| q.len() as u32)
+            .unwrap_or(0);
+
+        Ok(RelayPollResponse {
+            envelopes,
+            remaining,
+            error: None,
+        })
+    }
+
+    async fn relay_presence_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: RelayPresenceRequest,
+    ) -> RpcResult<RelayPresenceResponse> {
+        self.relay_state.clone().ensure_cleanup_task();
+        let now = Instant::now();
+        let stale = Duration::from_secs(90);
+        let mut statuses = HashMap::new();
+        for did in request.dids {
+            let online = self
+                .relay_state
+                .sessions
+                .get(&did)
+                .map(|s| now.duration_since(s.last_seen) < stale)
+                .unwrap_or(false);
+            statuses.insert(did, online);
+        }
+        Ok(RelayPresenceResponse { statuses })
     }
 
     async fn get_balances_by_addresses_call(

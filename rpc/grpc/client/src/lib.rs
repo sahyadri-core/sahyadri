@@ -352,6 +352,40 @@ impl RpcApi for GrpcClient {
         // TODO: Implement via gRPC call to node
         Err(sahyadri_rpc_core::RpcError::NotImplemented)
     }
+
+
+    async fn relay_subscribe_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: RelaySubscribeRequest,
+    ) -> RpcResult<RelaySubscribeResponse> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
+    async fn relay_send_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: RelaySendRequest,
+    ) -> RpcResult<RelaySendResponse> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
+    async fn relay_poll_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: RelayPollRequest,
+    ) -> RpcResult<RelayPollResponse> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
+    async fn relay_presence_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: RelayPresenceRequest,
+    ) -> RpcResult<RelayPresenceResponse> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
     route!(submit_did_create_call, SubmitDidCreate);
     route!(submit_did_update_call, SubmitDidUpdate);
     route!(submit_did_deactivate_call, SubmitDidDeactivate);

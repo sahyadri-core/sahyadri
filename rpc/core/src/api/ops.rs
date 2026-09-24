@@ -148,6 +148,18 @@ pub enum RpcApiOps {
     SubmitDidDeactivate,
     ResolveDid,
     ResolveDidByAddress,
+
+    // ============================================================
+    // DWN Relay — RAM-only encrypted envelope forwarding
+    // ============================================================
+    /// Subscribe this connection to receive envelopes for a DID
+    RelaySubscribe = 159,
+    /// Send an encrypted envelope to a recipient DID
+    RelaySend = 160,
+    /// Poll pending envelopes for a DID
+    RelayPoll = 161,
+    /// Presence check for a list of DIDs
+    RelayPresence = 162,
 }
 
 impl RpcApiOps {
