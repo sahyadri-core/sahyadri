@@ -5129,6 +5129,7 @@ name = "sahyadri-rpc-service"
 version = "1.1.0"
 dependencies = [
  "async-trait",
+ "dashmap",
  "faster-hex 0.9.0",
  "log",
  "sahyadri-addresses",
