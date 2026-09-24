@@ -693,6 +693,17 @@ impl VirtualStateProcessor {
         for &hash in chain_path.removed.iter() {
             if let Ok(txs) = self.block_transactions_store.get(hash) {
                 for (i, tx) in txs.iter().enumerate() {
+                    // ──── FLASH TX BYPASS ────
+                    // FlashTransactions use the FLASH_V1 prefix. Their payload
+                    // layout is incompatible with the legacy account-tx format
+                    // below. State unwind for flash txs is handled exclusively
+                    // by reorg_flash_block() at the end of this removed-block
+                    // iteration.
+                    if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
+                        continue;
+                    }
+                    // ─────────────────────────
+
                     // Reverse the outputs (Deduct what was wrongly added)
                     for output in tx.outputs.iter() {
                         let amount = -(output.value as i64); // Negative to deduct
@@ -735,9 +746,6 @@ impl VirtualStateProcessor {
                             if let Err(e) = self.account_store.update_balance_batch(&mut batch, &sender_spk, total_spent as i64) {
                                 log::error!("SAHYADRI: CRITICAL — failed to refund sender during reorg: {:?}", e);
                                 continue;
-                            }
-                            if let Err(e) = self.account_store.decrement_nonce_batch(&mut batch, &sender_spk) {
-                                log::error!("SAHYADRI: CRITICAL — failed to roll back nonce during reorg: {:?}", e);
                             }
                             // Clear last_tx_id so this tx can't be refunded twice
                             if let Err(e) = self.account_store.set_last_tx_id_batch(
@@ -846,31 +854,46 @@ impl VirtualStateProcessor {
                             match did_tx_type {
                                 b"DCRT" => {
                                     log::info!("SAHYADRI: Processing DID_CREATE transaction");
-                                    if tx.payload.len() < 100 { continue; }
+                                    if tx.payload.len() < 100 { 
+                                        log::warn!("DID_CREATE FAIL #1: payload short = {}", tx.payload.len());
+                                        continue; 
+                                    }
 
                                     let mut offset = 4;
                                     let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
-                                    if offset + did_len > tx.payload.len() { continue; }
+                                    if offset + did_len > tx.payload.len() { 
+                                        log::warn!("DID_CREATE FAIL #2: did_len overflow");
+                                        continue; 
+                                    }
                                     let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
                                     offset += did_len;
 
                                     const DILITHIUM_PUBKEY_SIZE: usize = 1952;
-                                    if offset + DILITHIUM_PUBKEY_SIZE > tx.payload.len() { continue; }
+                                    if offset + DILITHIUM_PUBKEY_SIZE > tx.payload.len() { 
+                                        log::warn!("DID_CREATE FAIL #3: pubkey overflow");
+                                        continue; 
+                                    }
                                     let did_pubkey = &tx.payload[offset..offset+DILITHIUM_PUBKEY_SIZE];
                                     offset += DILITHIUM_PUBKEY_SIZE;
 
                                     let addr_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
-                                    if offset + addr_len > tx.payload.len() { continue; }
+                                    if offset + addr_len > tx.payload.len() { 
+                                        log::warn!("DID_CREATE FAIL #4: addr_len overflow");
+                                        continue; 
+                                     }
                                     let csm_address = String::from_utf8_lossy(&tx.payload[offset..offset+addr_len]).to_string();
                                     offset += addr_len;
 
                                     let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
                                     offset += 4;
-                                    if offset + doc_len > tx.payload.len() { continue; }
+                                    if offset + doc_len > tx.payload.len() { 
+                                        log::warn!("DID_CREATE FAIL #5: doc_len overflow");
+                                        continue; 
+                                    }
                                     let document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
-                                    offset += doc_len;   // ← YEH ADD KARO (advance past document)
+                                    offset += doc_len;
 
                                     // Timestamp (8 bytes before signature)
                                     if offset + 8 > tx.payload.len() { continue; }
@@ -1038,13 +1061,6 @@ impl VirtualStateProcessor {
                         let sig_start = tx.payload.len() - SIG_SIZE;
                         let nonce_start = sig_start - 8;
                         let sender_pubkey = &tx.payload[..nonce_start];
-                        let expected_nonce = u64::from_le_bytes(match tx.payload[nonce_start..sig_start].try_into() {
-                                                        Ok(b) => b,
-                                                        Err(_) => {
-                                                            log::error!("SAHYADRI: malformed nonce slice in account tx");
-                                                            continue;
-                                                        }
-                                                    });
                         let sig_bytes = &tx.payload[sig_start..];
                         let sender_spk = pubkey_to_p2pkh_spk(sender_pubkey);
 
@@ -1091,22 +1107,6 @@ impl VirtualStateProcessor {
                             }
                         }
 
-                        // Verify nonce (tx_nonce must equal account_nonce + 1)
-                        let current_nonce = match self.account_store.get_nonce(&sender_spk) {
-                            Ok(n) => n,
-                            Err(e) => {
-                                log::warn!("SAHYADRI: skipping account tx — failed to read nonce: {:?}", e);
-                                continue;
-                            }
-                        };
-                        if expected_nonce != current_nonce + 1 {
-                            log::warn!(
-                                "SAHYADRI: skipping invalid account tx — nonce mismatch (have {}, expected tx nonce {})",
-                                current_nonce, current_nonce + 1
-                            );
-                            continue;
-                        }
-
                         // Verify balance
                         let mut total_spent: u64 = 0;
                         for output in tx.outputs.iter() {
@@ -1150,11 +1150,6 @@ impl VirtualStateProcessor {
                                 log::error!("SAHYADRI: CRITICAL — failed to credit receiver: {:?}", e);
                                 break;
                             }
-                        }
-
-                        // 3. Increment sender nonce — ONLY ONCE
-                        if let Err(e) = self.account_store.increment_nonce_batch(&mut batch, &sender_spk) {
-                            log::error!("SAHYADRI: CRITICAL — failed to increment nonce: {:?}", e);
                         }
 
                         // 4. Record which tx was just applied — for reorg refund safety
