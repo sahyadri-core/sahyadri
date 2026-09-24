@@ -84,7 +84,7 @@ pub const GENESIS: GenesisBlock = GenesisBlock {
         0x16, 0x77, 0x04, 0x45, 0x5b, 0x5a, 0xf5, 0x9d, 0xef, 0x8e, 0x20,
     ]),
     timestamp: 1773133000000,
-    bits: 0x207fffff,
+    bits: 0x20050000,
     nonce: 0x3392c,
     daa_score: 1312860, // Checkpoint DAA score
     #[rustfmt::skip]
@@ -132,7 +132,7 @@ pub const TESTNET_GENESIS: GenesisBlock = GenesisBlock {
     ]),
     utxo_commitment: EMPTY_MUHASH,
     timestamp: 0x17c5f62fbb6,
-    bits: 0x207fffff,
+    bits: 0x20050000,
     nonce: 0x14582,
     daa_score: 0,
     #[rustfmt::skip]

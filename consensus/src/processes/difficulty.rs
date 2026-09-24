@@ -231,7 +231,11 @@ impl<T: HeaderStoreReader, U: SahyadriConsensusStoreReader> SampledDifficultyMan
         let expected_duration = self.target_time_per_block * self.difficulty_sample_rate * difficulty_blocks_len; // This does differ from FullDifficultyManager version
         let new_target = average_target * measured_duration / expected_duration;
 
-        Uint256::try_from(new_target.min(self.max_difficulty_target)).expect("max target < Uint256::MAX").compact_target_bits()
+        // SAHYADRI TESTNET CAP: never harder than genesis.
+        // Prevents DAA overshoot on single-miner testnets.
+        let genesis_target = Uint320::from(Uint256::from_compact_target_bits(self.genesis_bits));
+        let capped_target = new_target.max(genesis_target);
+        Uint256::try_from(capped_target.min(self.max_difficulty_target)).expect("max target < Uint256::MAX").compact_target_bits()
     }
 
     pub fn estimate_network_hashes_per_second(&self, window: &BlockWindowHeap) -> DifficultyResult<u64> {
