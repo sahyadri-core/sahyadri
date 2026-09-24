@@ -19,16 +19,12 @@ pub struct FlashEntry {
 pub struct AccountState {
     pub balance: u64,
     pub recent_flashes: Vec<FlashEntry>,
-    pub nonce: u64,
-    pub last_applied_tx_id: [u8; 32],
 }
 
 impl AccountState {
-    pub fn new(balance: u64, nonce: u64) -> Self {
+    pub fn new(balance: u64) -> Self {
         Self {
             balance,
-            nonce,
-            last_applied_tx_id: [0u8; 32],
             recent_flashes: Vec::new(),
         }
     }
@@ -73,7 +69,6 @@ impl std::fmt::Display for AccountKey {
 pub trait AccountStoreReader {
     fn get(&self, script_public_key: &ScriptPublicKey) -> StoreResult<AccountState>;
     fn get_balance(&self, script_public_key: &ScriptPublicKey) -> StoreResult<u64>;
-    fn get_nonce(&self, script_public_key: &ScriptPublicKey) -> StoreResult<u64>;
     fn get_last_tx_id(&self, script_public_key: &ScriptPublicKey) -> StoreResult<[u8; 32]>;
 }
 
@@ -85,8 +80,6 @@ pub trait AccountStore: AccountStoreReader {
         script_public_key: &ScriptPublicKey,
         balance_change: i64,
     ) -> StoreResult<()>;
-    fn increment_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()>;
-    fn decrement_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()>;
     fn set_last_tx_id_batch(
         &self,
         batch: &mut WriteBatch,
@@ -121,12 +114,8 @@ impl AccountStoreReader for DbAccountStore {
         self.get(script_public_key).map(|state| state.balance)
     }
 
-    fn get_nonce(&self, script_public_key: &ScriptPublicKey) -> StoreResult<u64> {
-        self.get(script_public_key).map(|state| state.nonce)
-    }
-
-    fn get_last_tx_id(&self, script_public_key: &ScriptPublicKey) -> StoreResult<[u8; 32]> {
-        self.get(script_public_key).map(|state| state.last_applied_tx_id)
+    fn get_last_tx_id(&self, _script_public_key: &ScriptPublicKey) -> StoreResult<[u8; 32]> {
+        Ok([0u8; 32])
     }
 }
 
@@ -153,27 +142,13 @@ impl AccountStore for DbAccountStore {
         self.set_batch(batch, script_public_key, state)
     }
 
-    fn increment_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()> {
-        let mut state = self.get(script_public_key).unwrap_or_default();
-        state.nonce = state.nonce.saturating_add(1);
-        self.set_batch(batch, script_public_key, state)
-    }
-
-    fn decrement_nonce_batch(&self, batch: &mut WriteBatch, script_public_key: &ScriptPublicKey) -> StoreResult<()> {
-        let mut state = self.get(script_public_key).unwrap_or_default();
-        state.nonce = state.nonce.saturating_sub(1);
-        self.set_batch(batch, script_public_key, state)
-    }
-
     fn set_last_tx_id_batch(
         &self,
-        batch: &mut WriteBatch,
-        script_public_key: &ScriptPublicKey,
-        tx_id: [u8; 32],
+        _batch: &mut WriteBatch,
+        _script_public_key: &ScriptPublicKey,
+        _tx_id: [u8; 32],
     ) -> StoreResult<()> {
-        let mut state = self.get(script_public_key).unwrap_or_default();
-        state.last_applied_tx_id = tx_id;
-        self.set_batch(batch, script_public_key, state)
+        Ok(())
     }
 }
 

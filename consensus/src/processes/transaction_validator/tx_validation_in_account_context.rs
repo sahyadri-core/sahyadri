@@ -65,12 +65,8 @@ impl TransactionValidator {
             }
         }
 
-        let (sender_spk, tx_nonce) = self.extract_sender_and_nonce(tx)?;
+        let sender_spk = self.extract_sender(tx)?;
         let account_state = self.account_store.get(&sender_spk).map_err(|_| TxRuleError::Unknown)?;
-
-        if tx_nonce != account_state.nonce + 1 {
-            return Err(TxRuleError::InvalidNonce(account_state.nonce + 1, tx_nonce));
-        }
 
         let total_out: u64 = tx.outputs().iter().map(|out| out.value).sum();
         let gas = tx.tx().gas;
@@ -96,21 +92,18 @@ impl TransactionValidator {
         Ok(gas)
     }
 
-    fn extract_sender_and_nonce(&self, tx: &impl VerifiableTransaction) -> TxResult<(ScriptPublicKey, u64)> {
+    fn extract_sender(&self, tx: &impl VerifiableTransaction) -> TxResult<ScriptPublicKey> {
         let payload = &tx.tx().payload;
         // Payload layout: [sender_pubkey:PUBKEY_SIZE][nonce:8][signature:SIG_SIZE]
+        // Nonce field kept for wire compatibility but its value is ignored.
         if payload.len() < PUBKEY_SIZE + 8 + SIG_SIZE {
             return Err(TxRuleError::InvalidPayload);
         }
         let sig_start = payload.len() - SIG_SIZE;
         let nonce_start = sig_start - 8;
         let sender_pubkey = &payload[..nonce_start];
-        let mut nonce_bytes = [0u8; 8];
-        nonce_bytes.copy_from_slice(&payload[nonce_start..sig_start]);
-        let nonce = u64::from_le_bytes(nonce_bytes);
-        // Convert pubkey to P2PKH script — same as account store uses
         let sender_spk = pubkey_to_p2pkh_spk(sender_pubkey);
-        Ok((sender_spk, nonce))
+        Ok(sender_spk)
     }
 
     pub fn check_scripts(&self, tx: &impl VerifiableTransaction) -> TxResult<()> {
