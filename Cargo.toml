@@ -26,6 +26,7 @@ members = [
     "crypto/muhash",
     "crypto/addresses",
     "crypto/merkle",
+    "crypto/smt",
     "crypto/dilithium",
     "crypto/plonky3",
     "notify",
@@ -108,6 +109,7 @@ sahyadri-index-core = { version = "1.1.0", path = "indexes/core" }
 sahyadri-index-processor = { version = "1.1.0", path = "indexes/processor" }
 sahyadri-math = { version = "1.1.0", path = "math" }
 sahyadri-merkle = { version = "1.1.0", path = "crypto/merkle" }
+sahyadri-smt = { version = "1.1.0", path = "crypto/smt" }
 sahyadri-metrics-core = { version = "1.1.0", path = "metrics/core" }
 sahyadri-mining = { version = "1.1.0", path = "mining" }
 sahyadri-mining-errors = { version = "1.1.0", path = "mining/errors" }

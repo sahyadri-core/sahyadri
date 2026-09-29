@@ -1,0 +1,16 @@
+[package]
+name = "sahyadri-smt"
+description = "Sahyadri sparse merkle tree for account state commitment"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sha3.workspace = true
+
+[lints]
+workspace = true
