@@ -18,6 +18,9 @@ use crate::{
             DB,
             acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
             account_store::{AccountStore, AccountStoreReader, DbAccountStore},
+            account_roots::{AccountRootsStore, AccountRootsStoreReader, DbAccountRootsStore},
+            account_states::{AccountStatesStore, DbAccountStatesStore},
+            smt_nodes::{DbSmtNodeStore, SmtNodeStore},
             did_store::{DidDocument, DidStore, DidStoreReader, DbDidStore},
             block_transactions::{BlockTransactionsStoreReader, DbBlockTransactionsStore},
             block_window_cache::{BlockWindowCacheStore, BlockWindowCacheWriter},
@@ -175,6 +178,11 @@ pub struct VirtualStateProcessor {
     pub(super) account_store: Arc<DbAccountStore>,
     pub(super) did_store: Arc<DbDidStore>,
     pub(super) virtual_stores: Arc<RwLock<VirtualStores>>,
+
+    // Account state commitment (SMT)
+    pub(super) smt_nodes_store: Arc<DbSmtNodeStore>,
+    pub(super) account_roots_store: Arc<DbAccountRootsStore>,
+    pub(super) account_states_store: Arc<DbAccountStatesStore>,
     pub(super) pruning_meta_stores: Arc<RwLock<PruningMetaStores>>,
 
     /// The "last known good" virtual state. To be used by any logic which does not want to wait
@@ -256,6 +264,9 @@ impl VirtualStateProcessor {
             account_store: storage.account_store.clone(),
             did_store: storage.did_store.clone(),
             virtual_stores: storage.virtual_stores.clone(),
+            smt_nodes_store: storage.smt_nodes_store.clone(),
+            account_roots_store: storage.account_roots_store.clone(),
+            account_states_store: storage.account_states_store.clone(),
             pruning_meta_stores: storage.pruning_meta_stores.clone(),
             lkg_virtual_state: storage.lkg_virtual_state.clone(),
 
@@ -692,6 +703,61 @@ impl VirtualStateProcessor {
         // 1. REORG HANDLING: Deduct everything from blocks that are removed from the main chain
         for &hash in chain_path.removed.iter() {
             if let Ok(txs) = self.block_transactions_store.get(hash) {
+            // ─── SMT commitment persist (per added block) ───
+            {
+                // Block ka selected parent nikaalo
+                let selected_parent = self
+                    .sahyadri_consensus_store
+                    .get_data(hash)
+                    .ok()
+                    .map(|d| d.selected_parent);
+
+                let parent_root = selected_parent
+                    .and_then(|sp| self.account_roots_store.get(sp).ok())
+                    .unwrap_or(sahyadri_smt::EMPTY);
+
+                let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
+
+                let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
+                    &txs,
+                    &self.coinbase_manager,
+                    SAHYADRI_TREASURY_PUBKEY_HEX,
+                );
+
+                let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
+                let mut overlay = sahyadri_smt::OverlayStore::new(&db_base);
+
+                match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+                    parent_root,
+                    &mut overlay,
+                    &*self.account_states_store,
+                    &flash_txs,
+                    &rewards,
+                    daa,
+                ) {
+                    Ok((new_root, changes)) => {
+                        // Overlay ke naye SMT nodes persist karo
+                        let pending_nodes: Vec<_> = overlay.into_pending().collect();
+                        if let Err(e) = self.smt_nodes_store.insert_batch_many(&mut batch, pending_nodes) {
+                            log::error!("SAHYADRI: smt_nodes persist failed for {}: {:?}", hash, e);
+                        }
+                        // Block ka root store karo
+                        if let Err(e) = self.account_roots_store.insert_batch(&mut batch, hash, new_root) {
+                            log::error!("SAHYADRI: account_root persist failed for {}: {:?}", hash, e);
+                        }
+                        // State snapshots store karo
+                        for (_spk, state) in changes {
+                            let state_hash = state.content_hash();
+                            if let Err(e) = self.account_states_store.insert_batch(&mut batch, state_hash, &state) {
+                                log::error!("SAHYADRI: account_state persist failed: {:?}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("SAHYADRI: account commitment compute failed for {}: {:?}", hash, e);
+                    }
+                }
+            }
                 for (i, tx) in txs.iter().enumerate() {
                     // ──── FLASH TX BYPASS ────
                     // FlashTransactions use the FLASH_V1 prefix. Their payload
@@ -1679,7 +1745,37 @@ impl VirtualStateProcessor {
             virtual_state.accepted_tx_ids.iter().copied(),
             virtual_state.sahyadri_consensus_data.selected_parent,
         );
-        let utxo_commitment = virtual_state.multiset.clone().finalize();
+        // ─── Account commitment ───
+        // Parent root + block ke effects → naya root → header me daalo
+        let selected_parent = virtual_state.sahyadri_consensus_data.selected_parent;
+        let parent_root = self
+            .account_roots_store
+            .get(selected_parent)
+            .unwrap_or(sahyadri_smt::EMPTY);
+
+        let (template_flash_txs, template_rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
+            &txs,
+            &self.coinbase_manager,
+            SAHYADRI_TREASURY_PUBKEY_HEX,
+        );
+
+        let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
+        let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
+        let account_commitment_h256 = match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+            parent_root,
+            &mut smt_overlay,
+            &*self.account_states_store,
+            &template_flash_txs,
+            &template_rewards,
+            virtual_state.daa_score,
+        ) {
+            Ok((root, _changes)) => root,
+            Err(e) => {
+                log::error!("SAHYADRI: account commitment compute failed in build: {:?}", e);
+                sahyadri_smt::EMPTY
+            }
+        };
+        let utxo_commitment = sahyadri_hashes::Hash::from_bytes(account_commitment_h256);
         // Past median time is the exclusive lower bound for valid block time, so we increase by 1 to get the valid min
         let min_block_time = virtual_state.past_median_time + 1;
         let header = Header::new_finalized(

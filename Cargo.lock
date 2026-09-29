@@ -4403,6 +4403,7 @@ dependencies = [
  "sahyadri-muhash",
  "sahyadri-notify",
  "sahyadri-pow",
+ "sahyadri-smt",
  "sahyadri-txscript",
  "sahyadri-txscript-errors",
  "sahyadri-utils",

@@ -33,6 +33,7 @@ sahyadri-merkle.workspace = true
 sahyadri-muhash.workspace = true
 sahyadri-notify.workspace = true
 sahyadri-pow.workspace = true
+sahyadri-smt.workspace = true
 sahyadri-txscript.workspace = true
 sahyadri-txscript-errors.workspace = true
 sahyadri-utils.workspace = true
