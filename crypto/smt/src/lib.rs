@@ -29,6 +29,38 @@ impl Node {
             Node::Branch { left, right } => hash_branch(left, right),
         }
     }
+
+    pub const ENCODED_SIZE: usize = 65;
+
+    pub fn encode(&self) -> [u8; Self::ENCODED_SIZE] {
+        let mut out = [0u8; Self::ENCODED_SIZE];
+        match self {
+            Node::Leaf { key, value } => {
+                out[0] = 0;
+                out[1..33].copy_from_slice(key);
+                out[33..65].copy_from_slice(value);
+            }
+            Node::Branch { left, right } => {
+                out[0] = 1;
+                out[1..33].copy_from_slice(left);
+                out[33..65].copy_from_slice(right);
+            }
+        }
+        out
+    }
+
+    pub fn decode(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != Self::ENCODED_SIZE { return None; }
+        let mut a = [0u8; 32];
+        let mut b = [0u8; 32];
+        a.copy_from_slice(&bytes[1..33]);
+        b.copy_from_slice(&bytes[33..65]);
+        match bytes[0] {
+            0 => Some(Node::Leaf { key: a, value: b }),
+            1 => Some(Node::Branch { left: a, right: b }),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -92,6 +124,41 @@ impl NodeStore for MemStore {
     fn put(&mut self, node: Node) -> H256 {
         let h = node.hash();
         self.nodes.insert(h, node);
+        h
+    }
+}
+
+
+/// Node store backed by a base store + pending write set.
+///
+/// Reads hit `pending` first, then `base`. Writes only touch `pending`,
+/// so the base (persistent) store is never mutated during speculative work.
+pub struct OverlayStore<'a, B: NodeStore> {
+    base: &'a B,
+    pending: HashMap<H256, Node>,
+}
+
+impl<'a, B: NodeStore> OverlayStore<'a, B> {
+    pub fn new(base: &'a B) -> Self {
+        Self { base, pending: HashMap::new() }
+    }
+
+    pub fn pending_len(&self) -> usize {
+        self.pending.len()
+    }
+
+    pub fn into_pending(self) -> impl Iterator<Item = (H256, Node)> {
+        self.pending.into_iter()
+    }
+}
+
+impl<'a, B: NodeStore> NodeStore for OverlayStore<'a, B> {
+    fn get(&self, hash: &H256) -> Option<Node> {
+        self.pending.get(hash).cloned().or_else(|| self.base.get(hash))
+    }
+    fn put(&mut self, node: Node) -> H256 {
+        let h = node.hash();
+        self.pending.insert(h, node);
         h
     }
 }
@@ -400,5 +467,33 @@ mod tests {
         let mut p = prove(&s, root, &k(3)).unwrap();
         p.siblings[0][0] ^= 1;
         assert!(!verify_inclusion(&root, &k(3), &v(3), &p));
+    }
+
+    #[test]
+    fn overlay_reads_through_and_isolates() {
+        let mut base = MemStore::default();
+        let base_root = build(&mut base, &[1, 2, 3]);
+
+        {
+            let mut overlay = OverlayStore::new(&base);
+            let r = update(&mut overlay, base_root, &k(4), Some(v(4))).unwrap();
+            assert_ne!(r, base_root);
+            assert_eq!(get(&overlay, r, &k(4)).unwrap(), Some(v(4)));
+            assert_eq!(get(&base, base_root, &k(4)).unwrap(), None);
+            assert!(overlay.pending_len() > 0);
+        }
+
+        let overlay2 = OverlayStore::new(&base);
+        assert_eq!(get(&overlay2, base_root, &k(2)).unwrap(), Some(v(2)));
+    }
+
+    #[test]
+    fn node_encode_decode_roundtrip() {
+        let leaf = Node::Leaf { key: k(1), value: v(1) };
+        let branch = Node::Branch { left: k(2), right: k(3) };
+        assert_eq!(Node::decode(&leaf.encode()).unwrap(), leaf);
+        assert_eq!(Node::decode(&branch.encode()).unwrap(), branch);
+        assert!(Node::decode(&[0u8; 10]).is_none());
+        assert!(Node::decode(&[9u8; 65]).is_none());
     }
 }

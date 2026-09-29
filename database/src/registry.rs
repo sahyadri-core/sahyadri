@@ -49,6 +49,11 @@ pub enum DatabaseStorePrefixes {
     // Stores a succinct pruning proof descriptor
     PruningProofDescriptor = 33,
 
+    // ---- Account state commitment (SMT) ----
+    AccountRoots = 34,
+    SmtNodes = 35,
+    AccountStates = 36,
+
     // ---- SahyadriConsensus Proof
     TempSahyadriConsensus = 40,
     TempSahyadriConsensusCompact = 41,

@@ -28,6 +28,35 @@ impl AccountState {
             recent_flashes: Vec::new(),
         }
     }
+
+    /// Canonical byte encoding — deterministic, order-independent for flashes.
+    /// `block_hash` excluded — it is reorg-local, not committed state.
+    pub fn to_canonical_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(12 + self.recent_flashes.len() * 40);
+        out.extend_from_slice(&self.balance.to_le_bytes());
+        let mut flashes: Vec<&FlashEntry> = self.recent_flashes.iter().collect();
+        flashes.sort_by(|a, b| a.flash_id.as_bytes().cmp(&b.flash_id.as_bytes()));
+        out.extend_from_slice(&(flashes.len() as u32).to_le_bytes());
+        for f in flashes {
+            out.extend_from_slice(&f.flash_id.as_bytes());
+            out.extend_from_slice(&f.expiry_daa_score.to_le_bytes());
+        }
+        out
+    }
+
+    /// Content-addressable hash of this state.
+    pub fn content_hash(&self) -> sahyadri_hashes::Hash {
+        use sha3::{Digest, Sha3_256};
+        let mut h = Sha3_256::new();
+        h.update(b"SAHYADRI_ACCOUNT_STATE_V1");
+        h.update(&self.to_canonical_bytes());
+        sahyadri_hashes::Hash::from_slice(&h.finalize())
+    }
+
+    /// Empty state must be absent from the SMT, not a zero-leaf.
+    pub fn is_empty(&self) -> bool {
+        self.balance == 0 && self.recent_flashes.is_empty()
+    }
 }
 
 // RocksDB needs to know how much memory this struct takes for caching
