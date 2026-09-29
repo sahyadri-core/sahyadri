@@ -129,6 +129,15 @@ pub enum RuleError {
     #[error("expected header pruning point is {0} but got {1}")]
     WrongHeaderPruningPoint(Hash, Hash),
 
+    /// Account commitment (SMT root) mismatch during verify.
+    /// (block_hash, header_commitment, computed_commitment)
+    #[error("account commitment mismatch for block {0}: header={1} computed={2}")]
+    BadAccountCommitment(Hash, Hash, Hash),
+
+    /// Account commitment computation failed (SMT error, store error, etc.)
+    #[error("account commitment computation failed")]
+    AccountCommitmentComputeFailed,
+
     #[error("expected indirect parents {0} but got {1}")]
     UnexpectedIndirectParents(TwoDimVecDisplay<Hash>, TwoDimVecDisplay<Hash>),
 

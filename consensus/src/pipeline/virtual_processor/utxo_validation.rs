@@ -2,13 +2,19 @@ use super::VirtualStateProcessor;
 use crate::{
     errors::{
         BlockProcessResult,
-        RuleError::{InvalidTransactionsInUtxoContext, WrongHeaderPruningPoint},
+        RuleError::{
+            AccountCommitmentComputeFailed, BadAccountCommitment,
+            InvalidTransactionsInUtxoContext, WrongHeaderPruningPoint,
+        },
     },
     model::stores::{
+        account_roots::AccountRootsStoreReader,
+        account_states::AccountStatesStoreReader,
         block_transactions::BlockTransactionsStoreReader,
         daa::DaaStoreReader,
         headers::HeaderStoreReader,
         sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusData},
+        smt_nodes::SmtNodeStoreReader,
     },
     processes::{
         pruning::PruningPointReply,
@@ -213,14 +219,48 @@ impl VirtualStateProcessor {
         selected_parent_utxo_view: &V,
         header: &Header,
     ) -> BlockProcessResult<()> {
-        // Verify header UTXO commitment
-        let expected_commitment = ctx.multiset_hash.finalize();
+        // ─── Account commitment verify (SMT) ───
+        // Purana UTXO bypass hata diya. Ab asli check hota hai:
+        // parent root → block effects → naya root → header se match?
+        let parent_root = self
+            .account_roots_store
+            .get(ctx.selected_parent())
+            .unwrap_or(sahyadri_smt::EMPTY);
+
+        let txs_for_effects = self
+            .block_transactions_store
+            .get(header.hash)
+            .map_err(|_| AccountCommitmentComputeFailed)?;
+
+        let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
+            &txs_for_effects,
+            &self.coinbase_manager,
+            super::processor::SAHYADRI_TREASURY_PUBKEY_HEX,
+        );
+
+        let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
+        let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
+
+        let (my_root, _) = crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+            parent_root,
+            &mut smt_overlay,
+            &*self.account_states_store,
+            &flash_txs,
+            &rewards,
+            header.daa_score,
+        )
+        .map_err(|e| {
+            log::error!("SAHYADRI: account commitment compute failed during verify: {:?}", e);
+            AccountCommitmentComputeFailed
+        })?;
+
+        let expected_commitment = sahyadri_hashes::Hash::from_bytes(my_root);
         if expected_commitment != header.utxo_commitment {
             log::warn!(
-                "SAHYADRI: UTXO commitment mismatch BYPASSED — block {} header={} calc={}",
+                "SAHYADRI: ACCOUNT COMMITMENT MISMATCH — block {} header={} calc={}",
                 header.hash, header.utxo_commitment, expected_commitment
             );
-        // BYPASSED: chain continues (testnet only)
+            return Err(BadAccountCommitment(header.hash, header.utxo_commitment, expected_commitment));
         }
 
         trace!("correct commitment: {}, {}", header.hash, expected_commitment);
