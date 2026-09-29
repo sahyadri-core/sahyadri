@@ -9,12 +9,10 @@ use crate::{
     },
     model::stores::{
         account_roots::AccountRootsStoreReader,
-        account_states::AccountStatesStoreReader,
         block_transactions::BlockTransactionsStoreReader,
         daa::DaaStoreReader,
         headers::HeaderStoreReader,
         sahyadri_consensus::{CompactSahyadriConsensusData, SahyadriConsensusData},
-        smt_nodes::SmtNodeStoreReader,
     },
     processes::{
         pruning::PruningPointReply,
