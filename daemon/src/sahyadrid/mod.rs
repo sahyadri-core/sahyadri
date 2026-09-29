@@ -103,6 +103,9 @@ impl TryFrom<SahyadridConfig> for Vec<String> {
             argv.push(flag);
         }
 
+        // SAHYADRI: --utxoindex is a no-op now; UTXO index is disabled.
+        // Forward the flag only if explicitly set, so that older scripts
+        // do not break on unknown-argument errors.
         if args.utxo_index {
             argv.push("--utxoindex");
         }

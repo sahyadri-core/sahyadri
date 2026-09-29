@@ -1,4 +1,6 @@
 pub mod acceptance_data;
+pub mod account_roots;
+pub mod account_states;
 pub mod account_store;
 pub mod did_store;
 pub mod block_transactions;
@@ -16,6 +18,7 @@ pub mod reachability;
 pub mod relations;
 pub mod sahyadri_consensus;
 pub mod selected_chain;
+pub mod smt_nodes;
 pub mod statuses;
 pub mod tips;
 pub mod utxo_diffs;

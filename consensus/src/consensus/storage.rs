@@ -4,7 +4,10 @@ use crate::{
         DB,
         acceptance_data::DbAcceptanceDataStore,
         account_store::DbAccountStore, // <--- 1. IMPORT SAHYADRI BANK
-            did_store::DbDidStore,
+        account_roots::DbAccountRootsStore,
+        account_states::DbAccountStatesStore,
+        smt_nodes::DbSmtNodeStore,
+        did_store::DbDidStore,
         block_transactions::DbBlockTransactionsStore,
         block_window_cache::BlockWindowCacheStore,
         daa::DbDaaStore,
@@ -68,6 +71,11 @@ pub struct ConsensusStorage {
     // Account Store (Sahyadri Bank)
     pub account_store: Arc<DbAccountStore>, // <--- 2. DECLARE BANK IN STRUCT
     pub did_store: Arc<DbDidStore>, // SAHYADRI: DID Store
+
+    // Account state commitment (SMT)
+    pub smt_nodes_store: Arc<DbSmtNodeStore>,
+    pub account_roots_store: Arc<DbAccountRootsStore>,
+    pub account_states_store: Arc<DbAccountStatesStore>,
 
     // Block window caches
     pub block_window_cache_for_difficulty: Arc<BlockWindowCacheStore>,
@@ -217,6 +225,10 @@ impl ConsensusStorage {
         // Initialize the Account Store (Sahyadri Bank) using the utxo_set_cache_size for cache allocation
         let account_store = Arc::new(DbAccountStore::new(db.clone(), perf_params.utxo_set_cache_size as u64)); // <--- 3. INIT BANK
 
+        let smt_nodes_store = Arc::new(DbSmtNodeStore::new(db.clone(), perf_params.utxo_set_cache_size as u64));
+        let account_roots_store = Arc::new(DbAccountRootsStore::new(db.clone(), perf_params.utxo_set_cache_size as u64));
+        let account_states_store = Arc::new(DbAccountStatesStore::new(db.clone(), perf_params.utxo_set_cache_size as u64));
+
         // Tips
         let headers_selected_tip_store = Arc::new(RwLock::new(DbHeadersSelectedTipStore::new(db.clone())));
         let body_tips_store = Arc::new(RwLock::new(DbTipsStore::new(db.clone())));
@@ -260,6 +272,9 @@ impl ConsensusStorage {
             block_window_cache_for_difficulty,
             block_window_cache_for_past_median_time,
             lkg_virtual_state,
+            smt_nodes_store,
+            account_roots_store,
+            account_states_store,
             did_store: Arc::new(DbDidStore::new(db.clone(), perf_params.utxo_set_cache_size as u64)),
         })
     }
