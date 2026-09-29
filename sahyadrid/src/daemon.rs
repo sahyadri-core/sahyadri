@@ -45,7 +45,6 @@ use sahyadri_mining::{
 use sahyadri_p2p_flows::{flow_context::FlowContext, service::P2pService};
 
 use sahyadri_perf_monitor::{builder::Builder as PerfMonitorBuilder, counters::CountersSnapshot};
-use sahyadri_utxoindex::{UtxoIndex, api::UtxoIndexProxy};
 use sahyadri_wrpc_server::service::{
     Options as WrpcServerOptions, WebSocketCounters as WrpcServerCounters, WrpcEncoding, WrpcService,
 };
@@ -608,22 +607,12 @@ Do you confirm? (y/n)";
     let system_info = SystemInfo::default();
 
     let notify_service = Arc::new(NotifyService::new(notification_root.clone(), notification_recv, subscription_context.clone()));
-    let index_service: Option<Arc<IndexService>> = if args.utxoindex {
-        // Use only a single thread for none-consensus databases
-        let utxoindex_db = sahyadri_database::prelude::ConnBuilder::default()
-            .with_db_path(utxoindex_db_dir)
-            .with_files_limit(utxo_files_limit)
-            .with_preset(rocksdb_preset)
-            .with_wal_dir(wal_dir.clone())
-            .with_cache_budget(cache_budget)
-            .build()
-            .unwrap();
-        let utxoindex = UtxoIndexProxy::new(UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap());
-        let index_service = Arc::new(IndexService::new(&notify_service.notifier(), subscription_context.clone(), Some(utxoindex)));
-        Some(index_service)
-    } else {
-        None
-    };
+    // SAHYADRI: UTXO index disabled — account model is the native commitment path.
+    // The flag is preserved for CLI compatibility but is a no-op.
+    let _ = args.utxoindex;
+    let _ = utxoindex_db_dir;
+    let _ = utxo_files_limit;
+    let index_service: Option<Arc<IndexService>> = None;
 
     let (address_manager, port_mapping_extender_svc) = AddressManager::new(config.clone(), meta_db, tick_service.clone());
 
