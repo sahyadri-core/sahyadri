@@ -19,6 +19,7 @@ NODE_BIN=~/sahyadri-final/sahyadri/target/release/sahyadrid
 # Run the node WITH ALL 3 RPC PROTOCOLS
 $NODE_BIN \
   --utxoindex \
+  --disable-upnp \
   --enable-unsynced-mining \
   --enable-flash-tx \
   --rpclisten-borsh=0.0.0.0:27110 \
