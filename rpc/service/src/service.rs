@@ -32,8 +32,6 @@ use sahyadri_core::{
     task::tick::TickService,
     trace, warn,
 };
-use sahyadri_index_core::{
-};
 use sahyadri_mining::feerate::FeeEstimateVerbose;
 use sahyadri_mining::manager::MiningManagerProxy;
 use sahyadri_mining::mempool::tx::{Orphan, Priority, RbfPolicy};
@@ -249,8 +247,8 @@ impl RpcCoreService {
         let consensus_subscriber =
             Arc::new(Subscriber::new("rpc-core => consensus", consensus_events, consensus_notifier, consensus_notify_listener_id));
 
-        let mut collectors: Vec<DynCollector<Notification>> = vec![consensus_collector];
-        let mut subscribers = vec![consensus_subscriber];
+        let collectors: Vec<DynCollector<Notification>> = vec![consensus_collector];
+        let subscribers = vec![consensus_subscriber];
 
         // Protocol converter
         let protocol_converter = Arc::new(ProtocolConverter::new(flow_context.clone()));
