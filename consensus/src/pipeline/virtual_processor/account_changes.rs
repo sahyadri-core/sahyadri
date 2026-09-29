@@ -161,3 +161,80 @@ pub fn compute_block_account_changes(
 
     Ok((root, touched.into_iter().collect()))
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Block effects extraction — existing commit logic ko pure karo
+// ═══════════════════════════════════════════════════════════════
+
+use crate::processes::coinbase::CoinbaseManager;
+use sahyadri_consensus_core::tx::Transaction;
+
+/// Treasury pubkey hex ko SPK me convert karo.
+/// Existing `commit_virtual_state` jaisa — `ScriptPublicKey::from_vec(0, raw_pubkey)`.
+fn treasury_spk_from_hex(hex: &str) -> Option<ScriptPublicKey> {
+    if hex.is_empty() {
+        return None;
+    }
+    // Dilithium pubkey size = 1952 bytes
+    let mut bytes = vec![0u8; 1952];
+    if faster_hex::hex_decode(hex.as_bytes(), &mut bytes).is_ok() {
+        Some(ScriptPublicKey::from_vec(0, bytes))
+    } else {
+        None
+    }
+}
+
+/// Block ke txs se account-model effects nikalo.
+///
+/// **Ye function pure hai** — kuch mutate nahi karta.
+///
+/// Returns:
+/// - `flash_txs`: block ke flash txs, canonical order me
+/// - `rewards`: `[(spk, amount)]` — miner + treasury credit
+///
+/// DID txs aur legacy account txs **ignore** hote hain — ye SMT state ka
+/// part nahi hain (DID alag store me, legacy dead hai).
+pub fn extract_block_effects(
+    txs: &[Transaction],
+    coinbase_manager: &CoinbaseManager,
+    treasury_hex: &str,
+) -> (Vec<FlashTransaction>, Vec<(ScriptPublicKey, u64)>) {
+    let mut flash_txs = Vec::new();
+    let mut rewards = Vec::new();
+
+    if txs.is_empty() {
+        return (flash_txs, rewards);
+    }
+
+    // ── Coinbase reward split (txs[0]) ──
+    if let Ok(cb) = coinbase_manager.deserialize_coinbase_payload(&txs[0].payload) {
+        let total = cb.subsidy;
+        if total > 0 {
+            let dev_fee = if treasury_hex.is_empty() {
+                0
+            } else {
+                total / 50
+            };
+            let miner_reward = total - dev_fee;
+
+            rewards.push((cb.miner_data.script_public_key.clone(), miner_reward));
+
+            if dev_fee > 0 {
+                if let Some(spk) = treasury_spk_from_hex(treasury_hex) {
+                    rewards.push((spk, dev_fee));
+                }
+            }
+        }
+    }
+
+    // ── Flash txs (skip coinbase) ──
+    for tx in txs.iter().skip(1) {
+        if let Some(flash) = FlashTransaction::from_transaction(tx) {
+            flash_txs.push(flash);
+        }
+        // DID (DCRT/DUPD/DDEC) — skip, SMT ke bahar
+        // Legacy account tx — skip, dead hai
+    }
+
+    (flash_txs, rewards)
+}
