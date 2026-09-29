@@ -4774,34 +4774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sahyadri-index-processor"
-version = "1.1.0"
-dependencies = [
- "async-channel 2.3.1",
- "async-trait",
- "derive_more",
- "futures",
- "log",
- "parking_lot",
- "paste",
- "rand 0.8.5",
- "sahyadri-consensus",
- "sahyadri-consensus-core",
- "sahyadri-consensus-notify",
- "sahyadri-consensusmanager",
- "sahyadri-core",
- "sahyadri-database",
- "sahyadri-hashes",
- "sahyadri-index-core",
- "sahyadri-notify",
- "sahyadri-utils",
- "sahyadri-utxoindex",
- "thiserror 1.0.64",
- "tokio",
- "triggered",
-]
-
-[[package]]
 name = "sahyadri-math"
 version = "1.1.0"
 dependencies = [
@@ -5246,7 +5218,6 @@ dependencies = [
  "sahyadri-grpc-core",
  "sahyadri-grpc-server",
  "sahyadri-hashes",
- "sahyadri-index-processor",
  "sahyadri-math",
  "sahyadri-merkle",
  "sahyadri-muhash",
@@ -5257,7 +5228,6 @@ dependencies = [
  "sahyadri-txscript",
  "sahyadri-txscript-errors",
  "sahyadri-utils",
- "sahyadri-utxoindex",
  "sahyadri-wrpc-server",
  "sahyadrid",
  "serde",
@@ -5360,27 +5330,6 @@ dependencies = [
  "tokio",
  "tower 0.5.1",
  "tower-http",
-]
-
-[[package]]
-name = "sahyadri-utxoindex"
-version = "1.1.0"
-dependencies = [
- "futures",
- "log",
- "parking_lot",
- "rand 0.8.5",
- "rocksdb",
- "sahyadri-consensus",
- "sahyadri-consensus-core",
- "sahyadri-consensusmanager",
- "sahyadri-core",
- "sahyadri-database",
- "sahyadri-hashes",
- "sahyadri-index-core",
- "sahyadri-utils",
- "serde",
- "thiserror 1.0.64",
 ]
 
 [[package]]
@@ -5791,7 +5740,6 @@ dependencies = [
  "sahyadri-txscript",
  "sahyadri-utils",
  "sahyadri-utils-tower",
- "sahyadri-utxoindex",
  "sahyadri-wrpc-server",
  "serde",
  "serde_json",

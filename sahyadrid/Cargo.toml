@@ -38,7 +38,6 @@ sahyadri-rpc-service.workspace = true
 sahyadri-txscript.workspace = true
 sahyadri-utils.workspace = true
 sahyadri-utils-tower.workspace = true
-sahyadri-utxoindex.workspace = true
 sahyadri-wrpc-server.workspace = true
 
 async-channel.workspace = true

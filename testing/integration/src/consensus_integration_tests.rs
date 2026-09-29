@@ -58,15 +58,12 @@ use sahyadri_core::task::runtime::AsyncRuntime;
 use sahyadri_core::{assert_match, info};
 use sahyadri_database::create_temp_db;
 use sahyadri_database::prelude::{CachePolicy, ConnBuilder};
-use sahyadri_index_processor::service::IndexService;
 use sahyadri_math::Uint256;
 use sahyadri_muhash::MuHash;
 use sahyadri_notify::subscription::context::SubscriptionContext;
 use sahyadri_txscript::caches::TxScriptCacheCounters;
 use sahyadri_txscript::opcodes::codes::OpTrue;
 // use sahyadri_txscript::script_builder::ScriptBuilderResult;
-use sahyadri_utxoindex::UtxoIndex;
-use sahyadri_utxoindex::api::{UtxoIndexApi, UtxoIndexProxy};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, max};
 use std::collections::HashSet;
@@ -742,19 +739,11 @@ async fn json_test(file_path: &str, concurrency: bool) {
     // External storage for storing block bodies. This allows separating header and body processing phases
     let (_external_db_lifetime, external_storage) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let external_block_store = DbBlockTransactionsStore::new(external_storage, CachePolicy::Count(config.perf.block_data_cache_size));
-    let (_utxoindex_db_lifetime, utxoindex_db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
     let consensus_manager = Arc::new(ConsensusManager::new(Arc::new(TestConsensusFactory::new(tc.clone()))));
-    let utxoindex = UtxoIndex::new(consensus_manager.clone(), utxoindex_db).unwrap();
-    let index_service = Arc::new(IndexService::new(
-        &notify_service.notifier(),
-        subscription_context.clone(),
-        Some(UtxoIndexProxy::new(utxoindex.clone())),
-    ));
 
     let async_runtime = Arc::new(AsyncRuntime::new(2));
     async_runtime.register(tick_service.clone());
     async_runtime.register(notify_service.clone());
-    async_runtime.register(index_service.clone());
     async_runtime.register(Arc::new(ConsensusMonitor::new(tc.processing_counters().clone(), tick_service)));
 
     let core = Arc::new(Core::new());
@@ -829,7 +818,6 @@ async fn json_test(file_path: &str, concurrency: bool) {
         }
 
         tc.import_pruning_point_utxo_set(pruning_point.unwrap(), multiset).unwrap();
-        utxoindex.write().resync().unwrap();
         // TODO: Add consensus validation that the pruning point is actually the right block according to the rules (in pruning depth etc).
     }
 
@@ -871,10 +859,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
     assert_selected_chain_store_matches_virtual_chain(&tc);
     let virtual_utxos: HashSet<TransactionOutpoint> =
         HashSet::from_iter(tc.get_virtual_utxos(None, usize::MAX, false).into_iter().map(|(outpoint, _)| outpoint));
-    let utxoindex_utxos = utxoindex.read().get_all_outpoints().unwrap();
-    assert_eq!(virtual_utxos.len(), utxoindex_utxos.len());
-    assert!(virtual_utxos.is_subset(&utxoindex_utxos));
-    assert!(utxoindex_utxos.is_subset(&virtual_utxos));
+    // SAHYADRI: UTXO index removed — the virtual UTXO check no longer applies.
 }
 
 fn submit_header_chunk(

@@ -31,8 +31,6 @@ members = [
     "crypto/plonky3",
     "notify",
     "indexes/core",
-    "indexes/processor",
-    "indexes/utxoindex",
     "rpc/macros",
     "rpc/core",
     "rpc/service",
@@ -106,7 +104,6 @@ sahyadri-grpc-core = { version = "1.1.0", path = "rpc/grpc/core" }
 sahyadri-grpc-server = { version = "1.1.0", path = "rpc/grpc/server" }
 sahyadri-hashes = { version = "1.1.0", path = "crypto/hashes" }
 sahyadri-index-core = { version = "1.1.0", path = "indexes/core" }
-sahyadri-index-processor = { version = "1.1.0", path = "indexes/processor" }
 sahyadri-math = { version = "1.1.0", path = "math" }
 sahyadri-merkle = { version = "1.1.0", path = "crypto/merkle" }
 sahyadri-smt = { version = "1.1.0", path = "crypto/smt" }
@@ -129,7 +126,6 @@ sahyadri-txscript-errors = { version = "1.1.0", path = "crypto/txscript/errors" 
 sahyadri-utils = { version = "1.1.0", path = "utils" }
 sahyadri-utils-tower = { version = "1.1.0", path = "utils/tower" }
 sahyadri-dilithium = { version = "1.1.0", path = "crypto/dilithium" }
-sahyadri-utxoindex = { version = "1.1.0", path = "indexes/utxoindex" }
 sahyadri-wallet = { version = "1.1.0", path = "wallet/native" }
 sahyadri-wallet-cli-wasm = { version = "1.1.0", path = "wallet/wasm" }
 sahyadri-wallet-keys = { version = "1.1.0", path = "wallet/keys" }

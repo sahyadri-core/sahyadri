@@ -24,7 +24,6 @@ sahyadri-grpc-client.workspace = true
 sahyadri-grpc-core.workspace = true
 sahyadri-grpc-server.workspace = true
 sahyadri-hashes.workspace = true
-sahyadri-index-processor.workspace = true
 sahyadri-math.workspace = true
 sahyadri-merkle.workspace = true
 sahyadri-muhash.workspace = true
@@ -34,7 +33,6 @@ sahyadri-rpc-core.workspace = true
 sahyadri-rpc-service.workspace = true
 sahyadri-txscript.workspace = true
 sahyadri-utils.workspace = true
-sahyadri-utxoindex.workspace = true
 sahyadri-wrpc-server.workspace = true
 sahyadrid.workspace = true
 
