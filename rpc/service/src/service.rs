@@ -107,6 +107,7 @@ pub struct RpcCoreService {
     notifier: Arc<Notifier<Notification, ChannelConnection>>,
     mining_manager: MiningManagerProxy,
     flow_context: Arc<FlowContext>,
+    #[allow(dead_code)]
     utxoindex: Option<UtxoIndexProxy>,
     config: Arc<Config>,
     consensus_converter: Arc<ConsensusConverter>,
@@ -899,7 +900,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             p2p_id: self.flow_context.node_id.to_string(),
             mempool_size: self.mining_manager.transaction_count_sample(TransactionQuery::TransactionsOnly),
             server_version: version().to_string(),
-            is_utxo_indexed: true,
+            is_utxo_indexed: false,  // SAHYADRI: UTXO index disabled
             is_synced: true,
 
             has_notify_command: true,
@@ -1155,6 +1156,11 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: GetUtxosByAddressesRequest,
     ) -> RpcResult<GetUtxosByAddressesResponse> {
+        // SAHYADRI: UTXO index disabled. This endpoint is preserved as a
+        // compatibility shim for legacy wallets — it presents each account's
+        // balance as a single synthetic UTXO entry so that existing wallet
+        // code continues to work while the network transitions to the pure
+        // account model. Real UTXO tracking is not performed.
         let session = self.consensus_manager.consensus().unguarded_session();
         let mut entries = vec![];
 
@@ -1492,9 +1498,8 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         if session.async_is_consensus_in_transitional_ibd_state().await {
             return Err(RpcError::ConsensusInTransitionalIbdState);
         }
-        let circulating_kana =
-            self.utxoindex.clone().unwrap().get_circulating_supply().await.map_err(|e| RpcError::General(e.to_string()))?;
-        Ok(GetCoinSupplyResponse::new(MAX_KANA, circulating_kana))
+        // SAHYADRI: UTXO index disabled — supply from treasury/emission model (TODO)
+        Ok(GetCoinSupplyResponse::new(MAX_KANA, 0u64))
     }
 
     async fn get_daa_score_timestamp_estimate_call(
@@ -1949,7 +1954,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             rpc_api_revision: RPC_API_REVISION,
             server_version: version().to_string(),
             network_id: self.config.net,
-            has_utxo_index: self.config.utxoindex,
+            has_utxo_index: false,  // SAHYADRI: UTXO index disabled
             is_synced,
             virtual_daa_score,
         })
