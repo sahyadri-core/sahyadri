@@ -27,7 +27,6 @@ sahyadri-core.workspace = true
 sahyadri-database.workspace = true
 sahyadri-grpc-server.workspace = true
 sahyadri-hashes.workspace = true
-sahyadri-index-processor.workspace = true
 sahyadri-mining.workspace = true
 sahyadri-notify.workspace = true
 sahyadri-p2p-flows.workspace = true

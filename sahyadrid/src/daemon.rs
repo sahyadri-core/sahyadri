@@ -36,7 +36,6 @@ use sahyadri_consensus::{
 };
 use sahyadri_consensusmanager::ConsensusManager;
 use sahyadri_core::task::runtime::AsyncRuntime;
-use sahyadri_index_processor::service::IndexService;
 use sahyadri_mining::{
     MiningCounters,
     manager::{MiningManager, MiningManagerProxy},
@@ -609,10 +608,7 @@ Do you confirm? (y/n)";
     let notify_service = Arc::new(NotifyService::new(notification_root.clone(), notification_recv, subscription_context.clone()));
     // SAHYADRI: UTXO index disabled — account model is the native commitment path.
     // The flag is preserved for CLI compatibility but is a no-op.
-    let _ = args.utxoindex;
-    let _ = utxoindex_db_dir;
     let _ = utxo_files_limit;
-    let index_service: Option<Arc<IndexService>> = None;
 
     let (address_manager, port_mapping_extender_svc) = AddressManager::new(config.clone(), meta_db, tick_service.clone());
 
@@ -661,11 +657,9 @@ Do you confirm? (y/n)";
     let rpc_core_service = Arc::new(RpcCoreService::new(
         consensus_manager.clone(),
         notify_service.notifier(),
-        index_service.as_ref().map(|x| x.notifier()),
         mining_manager,
         flow_context,
         subscription_context,
-        index_service.as_ref().map(|x| x.utxoindex().unwrap()),
         config.clone(),
         core.clone(),
         processing_counters,
@@ -695,9 +689,6 @@ Do you confirm? (y/n)";
     let async_runtime = Arc::new(AsyncRuntime::new(args.async_threads));
     async_runtime.register(tick_service);
     async_runtime.register(notify_service);
-    if let Some(index_service) = index_service {
-        async_runtime.register(index_service)
-    };
     if let Some(port_mapping_extender_svc) = port_mapping_extender_svc {
         async_runtime.register(Arc::new(port_mapping_extender_svc))
     };

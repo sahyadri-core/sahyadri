@@ -29,7 +29,6 @@ sahyadri-rpc-core.workspace = true
 sahyadri-txscript.workspace = true
 sahyadri-utils.workspace = true
 sahyadri-utils-tower.workspace = true
-sahyadri-utxoindex.workspace = true
 sha2 = "0.10"
 async-trait.workspace = true
 log.workspace = true

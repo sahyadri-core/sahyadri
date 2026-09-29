@@ -1,7 +1,7 @@
 //! Core server implementation for ClientAPI
-use super::collector::{CollectorFromConsensus, CollectorFromIndex};
+use super::collector::CollectorFromConsensus;
 use crate::converter::feerate_estimate::{FeeEstimateConverter, FeeEstimateVerboseConverter};
-use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
+use crate::converter::{consensus::ConsensusConverter, protocol::ProtocolConverter};
 use async_trait::async_trait;
 use faster_hex::hex_decode;
 use sahyadri_consensus_core::api::counters::ProcessingCounters;
@@ -32,10 +32,7 @@ use sahyadri_core::{
     task::tick::TickService,
     trace, warn,
 };
-use sahyadri_index_core::indexed_utxos::BalanceByScriptPublicKey;
 use sahyadri_index_core::{
-    connection::IndexChannelConnection, indexed_utxos::UtxoSetByScriptPublicKey, notification::Notification as IndexNotification,
-    notifier::IndexNotifier,
 };
 use sahyadri_mining::feerate::FeeEstimateVerbose;
 use sahyadri_mining::manager::MiningManagerProxy;
@@ -72,7 +69,6 @@ use sahyadri_utils::expiring_cache::ExpiringCache;
 use sahyadri_utils::sysinfo::SystemInfo;
 use sahyadri_utils::{channel::Channel, triggers::SingleTrigger};
 use sahyadri_utils_tower::counters::TowerConnectionCounters;
-use sahyadri_utxoindex::api::UtxoIndexProxy;
 use std::time::Duration;
 use std::{
     collections::{HashMap, VecDeque},
@@ -108,10 +104,8 @@ pub struct RpcCoreService {
     mining_manager: MiningManagerProxy,
     flow_context: Arc<FlowContext>,
     #[allow(dead_code)]
-    utxoindex: Option<UtxoIndexProxy>,
     config: Arc<Config>,
     consensus_converter: Arc<ConsensusConverter>,
-    _index_converter: Arc<IndexConverter>,
     protocol_converter: Arc<ProtocolConverter>,
     core: Arc<Core>,
     processing_counters: Arc<ProcessingCounters>,
@@ -216,11 +210,9 @@ impl RpcCoreService {
     pub fn new(
         consensus_manager: Arc<ConsensusManager>,
         consensus_notifier: Arc<ConsensusNotifier>,
-        index_notifier: Option<Arc<IndexNotifier>>,
         mining_manager: MiningManagerProxy,
         flow_context: Arc<FlowContext>,
         subscription_context: SubscriptionContext,
-        utxoindex: Option<UtxoIndexProxy>,
         config: Arc<Config>,
         core: Arc<Core>,
         processing_counters: Arc<ProcessingCounters>,
@@ -232,11 +224,8 @@ impl RpcCoreService {
         system_info: SystemInfo,
         mining_rule_engine: Arc<MiningRuleEngine>,
     ) -> Self {
-        // This notifier UTXOs subscription granularity to index-processor or consensus notifier
-        let policies = match index_notifier {
-            Some(_) => MutationPolicies::new(UtxosChangedMutationPolicy::AddressSet),
-            None => MutationPolicies::new(UtxosChangedMutationPolicy::Wildcard),
-        };
+        // SAHYADRI: UTXO index retired — no address-set mutation policy needed.
+        let policies = MutationPolicies::new(UtxosChangedMutationPolicy::Wildcard);
 
         let relay_state = Arc::new(RelayState::new());
 
@@ -250,7 +239,7 @@ impl RpcCoreService {
         // Prepare the rpc-core notifier objects
         let mut consensus_events: EventSwitches = EVENT_TYPE_ARRAY[..].into();
         consensus_events[EventType::UtxosChanged] = false;
-        consensus_events[EventType::PruningPointUtxoSetOverride] = index_notifier.is_none();
+        consensus_events[EventType::PruningPointUtxoSetOverride] = true;
         let consensus_converter = Arc::new(ConsensusConverter::new(consensus_manager.clone(), config.clone()));
         let consensus_collector = Arc::new(CollectorFromConsensus::new(
             "rpc-core <= consensus",
@@ -262,25 +251,6 @@ impl RpcCoreService {
 
         let mut collectors: Vec<DynCollector<Notification>> = vec![consensus_collector];
         let mut subscribers = vec![consensus_subscriber];
-
-        // Prepare index-processor objects if an IndexService is provided
-        let index_converter = Arc::new(IndexConverter::new(config.clone()));
-        if let Some(ref index_notifier) = index_notifier {
-            let index_notify_channel = Channel::<IndexNotification>::default();
-            let index_notify_listener_id = index_notifier.clone().register_new_listener(
-                IndexChannelConnection::new(RPC_CORE, index_notify_channel.sender(), ChannelType::Closable),
-                ListenerLifespan::Static(policies),
-            );
-
-            let index_events: EventSwitches = [EventType::UtxosChanged, EventType::PruningPointUtxoSetOverride].as_ref().into();
-            let index_collector =
-                Arc::new(CollectorFromIndex::new("rpc-core <= index", index_notify_channel.receiver(), index_converter.clone()));
-            let index_subscriber =
-                Arc::new(Subscriber::new("rpc-core => index", index_events, index_notifier.clone(), index_notify_listener_id));
-
-            collectors.push(index_collector);
-            subscribers.push(index_subscriber);
-        }
 
         // Protocol converter
         let protocol_converter = Arc::new(ProtocolConverter::new(flow_context.clone()));
@@ -294,10 +264,8 @@ impl RpcCoreService {
             notifier,
             mining_manager,
             flow_context,
-            utxoindex,
             config,
             consensus_converter,
-            _index_converter: index_converter,
             protocol_converter,
             core,
             processing_counters,
@@ -361,27 +329,6 @@ impl RpcCoreService {
 
     pub fn core_shutdown_request_listener(&self) -> triggered::Listener {
         self.core_shutdown_request.listener.clone()
-    }
-
-    async fn _get_utxo_set_by_script_public_key<'a>(
-        &self,
-        addresses: impl Iterator<Item = &'a RpcAddress>,
-    ) -> UtxoSetByScriptPublicKey {
-        self.utxoindex
-            .clone()
-            .unwrap()
-            .get_utxos_by_script_public_keys(addresses.map(pay_to_address_script).collect())
-            .await
-            .unwrap_or_default()
-    }
-
-    async fn get_balance_by_script_public_key<'a>(&self, addresses: impl Iterator<Item = &'a RpcAddress>) -> BalanceByScriptPublicKey {
-        self.utxoindex
-            .clone()
-            .unwrap()
-            .get_balance_by_script_public_keys(addresses.map(pay_to_address_script).collect())
-            .await
-            .unwrap_or_default()
     }
 
     async fn submit_account_transaction_call(
@@ -1471,13 +1418,13 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         if session.async_is_consensus_in_transitional_ibd_state().await {
             return Err(RpcError::ConsensusInTransitionalIbdState);
         }
-        let entry_map = self.get_balance_by_script_public_key(request.addresses.iter()).await;
+        // SAHYADRI: UTXO index retired — pull each address's balance directly
+        // from the account store via the consensus session.
         let entries = request
             .addresses
             .iter()
             .map(|address| {
-                let script_public_key = pay_to_address_script(address);
-                let balance = entry_map.get(&script_public_key).copied();
+                let balance = session.get_account_balance(address);
                 RpcBalancesByAddressesEntry { address: address.to_owned(), balance }
             })
             .collect();
