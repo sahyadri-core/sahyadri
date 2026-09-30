@@ -22,7 +22,6 @@ pub mod smt_nodes;
 pub mod statuses;
 pub mod tips;
 pub mod utxo_diffs;
-pub mod utxo_multisets;
 pub mod utxo_set;
 pub mod virtual_state;
 

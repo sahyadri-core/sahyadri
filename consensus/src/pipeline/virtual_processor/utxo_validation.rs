@@ -78,7 +78,6 @@ pub(crate) mod raigad {
 /// Note this can also be the virtual block.
 pub(super) struct UtxoProcessingContext<'a> {
     pub sahyadri_consensus_data: Refs<'a, SahyadriConsensusData>,
-    pub multiset_hash: MuHash,
     pub mergeset_diff: UtxoDiff,
     pub accepted_tx_ids: Vec<TransactionId>,
     pub mergeset_acceptance_data: Vec<MergesetBlockAcceptanceData>,
@@ -87,11 +86,10 @@ pub(super) struct UtxoProcessingContext<'a> {
 }
 
 impl<'a> UtxoProcessingContext<'a> {
-    pub fn new(sahyadri_consensus_data: Refs<'a, SahyadriConsensusData>, selected_parent_multiset_hash: MuHash) -> Self {
+    pub fn new(sahyadri_consensus_data: Refs<'a, SahyadriConsensusData>) -> Self {
         let mergeset_size = sahyadri_consensus_data.mergeset_size();
         Self {
             sahyadri_consensus_data,
-            multiset_hash: selected_parent_multiset_hash,
             mergeset_diff: UtxoDiff::default(),
             accepted_tx_ids: Vec::with_capacity(1), // We expect at least the selected parent coinbase tx
             mergeset_rewards: BlockHashMap::with_capacity(mergeset_size),
@@ -117,7 +115,6 @@ impl VirtualStateProcessor {
         let validated_coinbase = ValidatedTransaction::new_coinbase(&selected_parent_transactions[0]);
 
         ctx.mergeset_diff.add_transaction(&validated_coinbase, pov_daa_score).unwrap();
-        ctx.multiset_hash.add_transaction(&validated_coinbase, pov_daa_score);
         let validated_coinbase_id = validated_coinbase.id();
         ctx.accepted_tx_ids.push(validated_coinbase_id);
 
@@ -177,7 +174,6 @@ impl VirtualStateProcessor {
                     continue;
                 }
 
-                ctx.multiset_hash.add_transaction(validated_tx, pov_daa_score);
                 ctx.accepted_tx_ids.push(txid);
                 block_fee += validated_tx.calculated_fee;
             }

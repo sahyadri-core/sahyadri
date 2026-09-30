@@ -13,7 +13,6 @@ use sahyadri_database::prelude::{CachePolicy, StoreResult};
 use sahyadri_database::prelude::{DB, StoreError};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
-use sahyadri_muhash::MuHash;
 use serde::{Deserialize, Serialize};
 
 use super::sahyadri_consensus::SahyadriConsensusData;
@@ -26,7 +25,6 @@ pub struct VirtualState {
     pub daa_score: u64,
     pub bits: u32,
     pub past_median_time: u64,
-    pub multiset: MuHash,
     pub account_diff: HashMap<String, i64>,
     pub accepted_tx_ids: Vec<TransactionId>,
     pub mergeset_rewards: BlockHashMap<BlockRewardData>,
@@ -39,7 +37,6 @@ impl VirtualState {
         daa_score: u64,
         bits: u32,
         past_median_time: u64,
-        multiset: MuHash,
         account_diff: HashMap<String, i64>,
         accepted_tx_ids: Vec<TransactionId>,
         mergeset_rewards: BlockHashMap<BlockRewardData>,
@@ -52,7 +49,6 @@ impl VirtualState {
             daa_score,
             bits,
             past_median_time,
-            multiset,
             account_diff,
             accepted_tx_ids,
             mergeset_rewards,
@@ -67,7 +63,6 @@ impl VirtualState {
             daa_score: genesis.daa_score,
             bits: genesis.bits,
             past_median_time: genesis.timestamp,
-            multiset: MuHash::new(),
             account_diff: HashMap::new(), // The account balances are empty (0) at Genesis
             accepted_tx_ids: genesis.build_genesis_transactions().into_iter().map(|tx| tx.id()).collect(),
             mergeset_rewards: BlockHashMap::new(),

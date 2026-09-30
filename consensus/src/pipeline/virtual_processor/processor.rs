@@ -38,7 +38,6 @@ use crate::{
             statuses::{DbStatusesStore, StatusesStore, StatusesStoreBatchExtensions, StatusesStoreReader},
             tips::{DbTipsStore, TipsStoreReader},
             utxo_diffs::{DbUtxoDiffsStore, UtxoDiffsStoreReader},
-            utxo_multisets::{DbUtxoMultisetsStore, UtxoMultisetsStoreReader},
             virtual_state::{LkgVirtualState, VirtualState, VirtualStateStoreReader, VirtualStores},
         },
     },
@@ -99,7 +98,7 @@ use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHY
 // TODO: Replace with treasury Dilithium pubkey hex (1952 bytes = 3904 hex chars)
 // Until set, 100% reward goes to miner
 pub(super) const SAHYADRI_TREASURY_PUBKEY_HEX: &str = "2d980235b2e054a227bed91b20bad2592859ec1581c1b3fa9c494c5138f058195202e59335416cf6c650dd1dc5e53479e1f7d815c147ab0990bee8bb7a57dd43ef87484d656760888f68ca40d220d3256bc76a0acb109e47056976c45bfbc80992e0a6f6626f9318cf0b940cdbcb38f9850ad60e345f968fd0229099adc4e4d12abc40762f2ad711f4edcd1daa4e144a9f5b3275ea97c0d64d3fb607d2868cceb91fa1bcacf981e29051f63811eed7ca941a3e0e00dca6892608f8bb8ceeed22c5839adeac8b856cd942b2f0ec0e3b88c4fbbb40ce581c0ef3dde590081b970f7d952de92a4fa80fa5ae92f31ca69b6d8c51b70cfa453083516ed8df8e50ff60a7fa88fd092be563fd3b1bd239e5e0a85bb18039b6350d27b2665684aad09faa7f3703e9d49fa658a3b338aadb43755c5f4322acd27f314ff59bd3fbaad0c0e4b3231a04ddeabd7165f4609a63af2e69f84df36c6a56a50cc93b4d9d6579315ef11dc297b96923daf177262981821429c4296a2f9d8d79ad06ba866ca95b2b51e0b766402e4619387ea770e2a67d725df18aa552bf84dbf2ea3aaf567df880041e01257e81855fff92afd48c5cba600703ceaf25bccf5f2b487a8cb46ac721bfc157910e39e5d4579b7a03daf1cb0b91a20f15306dfd7730d9c9e86e4805d11545d912e388fb533368cc0877a719791033929d9020e35bc11bd7cd4837cdb6b75437235fb65c7e0c6759c51d25c2d12ff56cc2603d393bbe71198f1b48cff60dc7d263fc5cc2a39f2c446cb4548ae42956fdd1aa787ce7515f5050d6a46c29aae3d053caa63b3faf2fe6e25b6b0d004520be02629ff93c9252dbda7f086c1316a7d6a3f08fd2fbfbae7d658120864395fcd76dd37c88ec9fdfc464117fdffec3fff90c17c81f3f43dcf94cb08cc30116c8b1748affd4648530609e2db1092684990f4391ad7f4623b22d86061959ff624a1c0d25a09b2e90052a59a4cce059861f4dae7651cd5abf0921e8aff1035eb62792e1df3388bebc24ebd290df0629907c1f4a39b6464369b785960d41568103b615e612d5eacf589f6aa856de4721a1870baae1e17d0224f3c584a1e971f54c54f48725399bac72cf77beda2a09e1ebb94dd718188f4adeeb3706c12245fe196f15dfae8c2b399bbc336cebaefe2829ae2bba13ef00cdb3d2ccfdc683a71e80696fd94b2ab4b670c49ca1d0138fece2d66a30f90fcdd79d16506846a4b24a49e5d02a04ddc9c6e5417083d911443c2b7a3f27f20a16702806598a6894571b9bbddd29b084210b31b7d1dbb6cab1153b926d524ec11d962bc2bfd52ba5876ff12520db879e938fd637fc4d85e1b793ead8c441f5b7b1cf8999aa434e1126844e593a59d301405ac55020c3832e0b7cdf0ea59e9d5025b6c2b63b7664246ee0237c6b3f1a8b704e41257fc37e5c883cf354e994d45b5e18443219df5eb853009a9c2ca179536d5fc668560a6bc0d840fd7e14caf8740c27894c52be062d8b9a8f8d836c472405b891101bb16e04d36d64acdf6919a8261d56ffd161717725ba28ff86e718d87e68a6d1f8f7876eee50e7a3d6a80e3a6a2829cf92a600f6915db9cf528693c24927283d40974ded9a5782203e4b84c15e1a4172066ed013780bceaf1007a4fcb1bd2e9b962ee1868968f6a45057d5bb6d2b46d61ccd914a63cbc4f3e92452566c97902e9ab7c10fcb15074f339eb55251f9299b39630c4a945399704846e3a997efa7f8e05595cec9285c4db39b2d8f7b552eb305a5db339e962ff319072f3878874d589f6ee81c8f23bc888738801317adec5930266ab609d6bed62fb195a7a3c199c367258e4fed5a32a6b3a96f5bb0945908871983a8fae8e2a0438a462043ca21a524d09f1ee763e8a98d48ae74125059cef889ab7b0a406c1823be6c5bca56e26e951588ee3e91497fb12ec50b2a8ed0444d219790628c5abcea0275884e39c943305b596cabfac5b5c81fbd393165ed89b0affb61d95051784943f7b944ea199eebc5e3d83bf67a873762a37812ccdbc82cfdca1c1fe29d8bbde8d67a44d10168600105c3b9c2726c158070b4a9fedbb4aa9dd3993e2f0e72ce78422636b32089d3e3d68cd23dbcc7388f3a3ab2b9bd8d75628a2ad568f08e51b0115fa9d954cd4268e5e693dcd3145400aaa1514e4a45d3672c18a07712c97ffde07c81c2de29e046bfdbfcd37c719eb02ed656dea808c885c61c0f822685f965283f9cdc4609f00b1e05ed7ae7e65d89d16772da4ce4b177d0c7ae6d81550f33c580b4c94a9911f17de4449068903ad9f2738fcd686967e9c2ac647ff46d376a6ce0fdef8dbb7dae4ddfcd9c6cefd106b1f3ff76ecac2aee84c7c8b5be663dee91766d60253732e156993b9d24a3a36c30fb596ffa1dcf8a728662f5b51dacf69e0c03d74aed62a9ffb76f8c55c772249b22ca904d8efddc122fa5f822c258e5e4b3cff7e0574dd2cedf5e8c78708b69e9e78518ce2f04b0fcc1e537902126f41ec8f636b7dff9158327819658d1d8a82d6b13127d1abbaa17b5b85cfb1218ca68bf939bf8354869ddd68a088cafca0a3a0a1c377fd6692bbfd792eb5d39f33226ab87a4f67d548191bb8e57c66f2ae2ea09673441fb2e27b68226382da98314facfca9d1313939acdc98271c2faec100b02ba5b05a63a44cf03ec8b4f12a5aa7d78c438d3f87bfa60e7231b2baf2adb7ddf32cfdb3c0788acc468780134e5727471fe07f870a682633f3fbae7";
-use sahyadri_hashes::{Hash, ZERO_HASH};
+use sahyadri_hashes::Hash;
 use sahyadri_muhash::MuHash;
 use sahyadri_notify::{events::EventType, notifier::Notify};
 use sha2::{Digest, Sha256};
@@ -173,7 +172,6 @@ pub struct VirtualStateProcessor {
 
     // Utxo-related stores
     pub(super) utxo_diffs_store: Arc<DbUtxoDiffsStore>,
-    pub(super) utxo_multisets_store: Arc<DbUtxoMultisetsStore>,
     pub(super) acceptance_data_store: Arc<DbAcceptanceDataStore>,
     pub(super) account_store: Arc<DbAccountStore>,
     pub(super) did_store: Arc<DbDidStore>,
@@ -259,7 +257,6 @@ impl VirtualStateProcessor {
             selected_chain_store: storage.selected_chain_store.clone(),
             pruning_samples_store: storage.pruning_samples_store.clone(),
             utxo_diffs_store: storage.utxo_diffs_store.clone(),
-            utxo_multisets_store: storage.utxo_multisets_store.clone(),
             acceptance_data_store: storage.acceptance_data_store.clone(),
             account_store: storage.account_store.clone(),
             did_store: storage.did_store.clone(),
@@ -383,13 +380,6 @@ impl VirtualStateProcessor {
             return;
         }
 
-        let sink_multiset = match self.utxo_multisets_store.get(new_sink) {
-            Ok(m) => m,
-            Err(e) => {
-                log::error!("SAHYADRI: CRITICAL — failed to get sink multiset: {:?}", e);
-                return;
-            }
-        };
         let chain_path = self.dag_traversal_manager.calculate_chain_path(prev_sink, new_sink, None);
         let sink_sahyadri_consensus_data = Lazy::new(|| self.sahyadri_consensus_store.get_data(new_sink).unwrap_or_else(|e| {
             log::error!("SAHYADRI: CRITICAL — failed to get sink consensus data: {:?}", e);
@@ -403,7 +393,6 @@ impl VirtualStateProcessor {
                 virtual_read,
                 virtual_parents,
                 virtual_sahyadri_consensus_data,
-                sink_multiset,
                 &mut accumulated_diff,
                 &chain_path,
             )
@@ -546,10 +535,8 @@ impl VirtualStateProcessor {
                     let mergeset_data = self.sahyadri_consensus_store.get_data(current).unwrap();
                     let pov_daa_score = header.daa_score;
 
-                    let selected_parent_multiset_hash = self.utxo_multisets_store.get(selected_parent).unwrap();
-                    let selected_parent_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default(); // DHYAN DE: Maine '_' hata diya!
-
-                    let mut ctx = UtxoProcessingContext::new(mergeset_data.into(), selected_parent_multiset_hash);
+                    let selected_parent_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
+                    let mut ctx = UtxoProcessingContext::new(mergeset_data.into());
 
                     self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
                     let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
@@ -569,7 +556,6 @@ impl VirtualStateProcessor {
                         self.commit_utxo_state(
                             current,
                             ctx.mergeset_diff,
-                            ctx.multiset_hash,
                             ctx.mergeset_acceptance_data,
                             ctx.pruning_sample_from_pov.unwrap_or_else(|| {
                                 log::error!("SAHYADRI: pruning_sample_from_pov is None");
@@ -596,13 +582,11 @@ impl VirtualStateProcessor {
         &self,
         current: Hash,
         mergeset_diff: UtxoDiff,
-        multiset: MuHash,
         acceptance_data: AcceptanceData,
         pruning_sample_from_pov: Hash,
     ) {
         let mut batch = WriteBatch::default();
         self.utxo_diffs_store.insert_batch(&mut batch, current, Arc::new(mergeset_diff)).unwrap();
-        self.utxo_multisets_store.insert_batch(&mut batch, current, multiset).unwrap();
         self.acceptance_data_store.insert_batch(&mut batch, current, Arc::new(acceptance_data)).unwrap();
         // Note we call idempotent since this field can be populated during IBD with headers proof
         self.pruning_samples_store.insert_batch(&mut batch, current, pruning_sample_from_pov).idempotent().unwrap();
@@ -617,12 +601,11 @@ impl VirtualStateProcessor {
         virtual_read: RwLockUpgradableReadGuard<'_, VirtualStores>,
         virtual_parents: Vec<Hash>,
         virtual_sahyadri_consensus_data: SahyadriConsensusData,
-        selected_parent_multiset: MuHash,
         accumulated_diff: &mut UtxoDiff,
         chain_path: &ChainPath,
     ) -> Result<Arc<VirtualState>, RuleError> {
         let new_virtual_state =
-            self.calculate_virtual_state(&virtual_read, virtual_parents, virtual_sahyadri_consensus_data, selected_parent_multiset)?;
+            self.calculate_virtual_state(&virtual_read, virtual_parents, virtual_sahyadri_consensus_data)?;
         self.commit_virtual_state(virtual_read, new_virtual_state.clone(), accumulated_diff, chain_path);
         Ok(new_virtual_state)
     }
@@ -633,7 +616,6 @@ impl VirtualStateProcessor {
         _virtual_stores: &VirtualStores,
         virtual_parents: Vec<Hash>,
         virtual_sahyadri_consensus_data: SahyadriConsensusData,
-        selected_parent_multiset: MuHash,
     ) -> Result<Arc<VirtualState>, RuleError> {
         let virtual_daa_window = self.window_manager.block_daa_window(&virtual_sahyadri_consensus_data)?;
         let virtual_bits = self.window_manager.calculate_difficulty_bits(&virtual_sahyadri_consensus_data, &virtual_daa_window);
@@ -666,7 +648,6 @@ impl VirtualStateProcessor {
             virtual_daa_window.daa_score,
             virtual_bits,
             virtual_past_median_time,
-            selected_parent_multiset,
             account_diff,
             accepted_tx_ids,
             mergeset_rewards,
@@ -1828,7 +1809,7 @@ impl VirtualStateProcessor {
     /// Note that pruning point-related stores are initialized by `init`
     pub fn process_genesis(self: &Arc<Self>) {
         // Write the UTXO state of genesis
-        self.commit_utxo_state(self.genesis.hash, UtxoDiff::default(), MuHash::new(), AcceptanceData::default(), ZERO_HASH);
+        self.commit_utxo_state(self.genesis.hash, UtxoDiff::default(), AcceptanceData::default(), Default::default());
 
         // Init the virtual selected chain store
         let mut batch = WriteBatch::default();
@@ -1904,10 +1885,7 @@ impl VirtualStateProcessor {
 
         {
             // Submit partial UTXO state for the pruning point.
-            // Note we only have and need the multiset; acceptance data and utxo-diff are irrelevant.
             let mut batch = WriteBatch::default();
-            self.utxo_multisets_store.set_batch(&mut batch, new_pruning_point, imported_utxo_multiset.clone()).unwrap();
-
             let statuses_write = self.statuses_store.set_batch(&mut batch, new_pruning_point, StatusUTXOValid).unwrap();
             self.db.write(batch).unwrap();
             drop(statuses_write);
@@ -1921,7 +1899,6 @@ impl VirtualStateProcessor {
             virtual_read,
             virtual_parents,
             virtual_sahyadri_consensus_data,
-            imported_utxo_multiset.clone(),
             &mut UtxoDiff::default(),
             &ChainPath::default(),
         )?;

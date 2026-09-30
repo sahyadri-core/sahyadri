@@ -25,7 +25,6 @@ use crate::{
         statuses::DbStatusesStore,
         tips::DbTipsStore,
         utxo_diffs::DbUtxoDiffsStore,
-        utxo_multisets::DbUtxoMultisetsStore,
         virtual_state::{LkgVirtualState, VirtualStores},
     },
     processes::{reachability::inquirer as reachability, relations, sahyadri_consensus::ordering::SortableBlock},
@@ -65,7 +64,6 @@ pub struct ConsensusStorage {
 
     // Utxo-related stores
     pub utxo_diffs_store: Arc<DbUtxoDiffsStore>,
-    pub utxo_multisets_store: Arc<DbUtxoMultisetsStore>,
     pub acceptance_data_store: Arc<DbAcceptanceDataStore>,
 
     // Account Store (Sahyadri Bank)
@@ -171,7 +169,6 @@ impl ConsensusStorage {
             PolicyBuilder::new().bytes_budget(sahyadri_consensus_budget).min_items(level_lower_bound).tracked_bytes();
         let headers_builder = PolicyBuilder::new().bytes_budget(headers_budget).tracked_bytes();
         let utxo_diffs_builder = PolicyBuilder::new().bytes_budget(utxo_diffs_budget).tracked_bytes();
-        let block_data_builder = PolicyBuilder::new().max_items(perf_params.block_data_cache_size).untracked();
         let header_data_builder = PolicyBuilder::new().max_items(perf_params.header_data_cache_size).untracked();
         let utxo_set_builder = PolicyBuilder::new().max_items(perf_params.utxo_set_cache_size).untracked();
         let transactions_builder = PolicyBuilder::new().bytes_budget(transactions_budget).tracked_bytes();
@@ -219,7 +216,6 @@ impl ConsensusStorage {
         // Txs
         let block_transactions_store = Arc::new(DbBlockTransactionsStore::new(db.clone(), transactions_builder.build()));
         let utxo_diffs_store = Arc::new(DbUtxoDiffsStore::new(db.clone(), utxo_diffs_builder.build()));
-        let utxo_multisets_store = Arc::new(DbUtxoMultisetsStore::new(db.clone(), block_data_builder.build()));
         let acceptance_data_store = Arc::new(DbAcceptanceDataStore::new(db.clone(), acceptance_data_builder.build()));
 
         // Initialize the Account Store (Sahyadri Bank) using the utxo_set_cache_size for cache allocation
@@ -267,7 +263,6 @@ impl ConsensusStorage {
             depth_store,
             pruning_samples_store,
             utxo_diffs_store,
-            utxo_multisets_store,
             account_store, // <--- 4. PLUG IN BANK
             block_window_cache_for_difficulty,
             block_window_cache_for_past_median_time,

@@ -1,7 +1,7 @@
 use std::{ops::Deref, sync::Arc};
 
 use crate::model::stores::{
-    pruning::PruningStoreReader, utxo_multisets::UtxoMultisetsStoreReader, virtual_state::VirtualStateStoreReader,
+    pruning::PruningStoreReader, virtual_state::VirtualStateStoreReader,
 };
 use sahyadri_consensus_core::{
     block::BlockTemplate, blockhash::ORIGIN, coinbase::MinerData, errors::block::RuleError, tx::Transaction,
@@ -49,13 +49,11 @@ impl TestBlockBuilder {
             self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point);
         let (pov_virtual_parents, pov_virtual_sahyadri_consensus_data) =
             self.pick_virtual_parents(pov_sink, virtual_parent_candidates, pruning_point);
-        let _pov_sink_multiset = self.utxo_multisets_store.get(pov_sink).unwrap();
         // Call mein se pub(crate) hatao
         let pov_virtual_state = self.calculate_virtual_state(
             &virtual_read,
             pov_virtual_parents,
             pov_virtual_sahyadri_consensus_data,
-            sahyadri_muhash::MuHash::new(),
         )?;
 
         let dummy_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
