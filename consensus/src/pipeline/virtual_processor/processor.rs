@@ -1240,9 +1240,9 @@ impl VirtualStateProcessor {
                     if !flash_txs.is_empty() {
                         let current_daa = new_virtual_state.daa_score;
                         match self.transaction_validator.validate_flash_batch(&flash_txs, current_daa) {
-                            Ok(()) => {
+                            Ok(valid_flash_txs) => {
                                 let mut affected_spks: Vec<sahyadri_consensus_core::tx::ScriptPublicKey> = Vec::new();
-                                for flash_tx in &flash_txs {
+                                for flash_tx in &valid_flash_txs {
                                     if let Err(e) = crate::pipeline::virtual_processor::flash_tx::apply_flash_tx(
                                         &self.account_store,
                                         &mut batch,

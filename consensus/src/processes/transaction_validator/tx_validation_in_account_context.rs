@@ -183,30 +183,79 @@ impl TransactionValidator {
 
         Ok(())
     }
-    /// Validate a batch of FlashTransactions from a single block.
+    
+    /// Validate a batch of flash transactions for a block.
     ///
-    /// Handles double-spend via cumulative sender debits:
-    ///   ─ Same block, same sender, multiple FlashTxs = aggregate check
-    ///   ─ If aggregate > balance → whole batch rejected (all-or-nothing)
+    /// Returns the list of unique, valid flash txs that should be applied.
     ///
-    /// Check order:
-    ///   1. Aggregate sender debits → cumulative balance check
-    ///   2. Duplicate flash_id within batch
-    ///   3. Per-tx: validate_flash_transaction (expiry, replay, sig)
+    /// Skip rules (do NOT reject the batch):
+    /// - **within-batch duplicate**: same `flash_id` twice in one block.
+    /// - **expired**: `block_daa_score > tx.expiry_daa_score`.
+    /// - **replay**: `flash_id` already present in sender's `recent_flashes`,
+    ///   which happens when a parallel block in the same mergeset already
+    ///   applied the same logical flash tx.
+    ///
+    /// Reject rules (whole batch fails):
+    /// - per-sender aggregate debit exceeds sender balance.
+    /// - invalid signature, bad fee, or other per-tx rule violation.
+    ///
+    /// This is critical under mergeset acceptance: parallel blocks can carry
+    /// the same flash tx, and rejecting the whole batch on a duplicate would
+    /// silently drop every other flash tx from the block.
     pub fn validate_flash_batch(
         &self,
         txs: &[sahyadri_consensus_core::tx::FlashTransaction],
-        current_daa_score: u64,
-    ) -> TxResult<()> {
+        block_daa_score: u64,
+    ) -> TxResult<Vec<sahyadri_consensus_core::tx::FlashTransaction>> {
         use std::collections::{HashMap, HashSet};
 
         if txs.is_empty() {
-            return Ok(());
+            return Ok(Vec::new());
         }
 
-        // ── 1. Aggregate sender debits ──
-        let mut sender_debits: HashMap<ScriptPublicKey, u64> = HashMap::new();
+        // ── 1. Filter out skip-cases: within-batch duplicates, expired, replays ──
+        let mut seen: HashSet<sahyadri_hashes::Hash> = HashSet::new();
+        let mut eligible: Vec<sahyadri_consensus_core::tx::FlashTransaction> = Vec::with_capacity(txs.len());
+
         for tx in txs {
+            let id = tx.flash_id();
+
+            // (a) within-batch duplicate
+            if !seen.insert(id) {
+                log::warn!("SAHYADRI: duplicate flash_id in batch, skipping: {:?}", id);
+                continue;
+            }
+
+            // (b) expired
+            if block_daa_score > tx.expiry_daa_score {
+                log::warn!(
+                    "SAHYADRI: flash tx expired (block_daa={} > expiry={}), skipping: {:?}",
+                    block_daa_score, tx.expiry_daa_score, id
+                );
+                continue;
+            }
+
+            // (c) already applied by a parallel block in the same mergeset
+            let sender_spk = pubkey_to_p2pkh_spk(&tx.pubkey);
+            let account = self
+                .account_store
+                .get(&sender_spk)
+                .map_err(|_| TxRuleError::Unknown)?;
+            if account.is_flash_replay(&id) {
+                log::warn!("SAHYADRI: flash tx already applied by parallel block, skipping: {:?}", id);
+                continue;
+            }
+
+            eligible.push(tx.clone());
+        }
+
+        if eligible.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // ── 2. Aggregate sender debits over eligible txs ──
+        let mut sender_debits: HashMap<ScriptPublicKey, u64> = HashMap::new();
+        for tx in &eligible {
             let spk = pubkey_to_p2pkh_spk(&tx.pubkey);
             let entry = sender_debits.entry(spk).or_insert(0);
             *entry = entry
@@ -215,7 +264,7 @@ impl TransactionValidator {
                 .ok_or(TxRuleError::InputAmountOverflow)?;
         }
 
-        // ── 2. Cumulative balance check (all-or-nothing) ──
+        // ── 3. Cumulative balance check (all-or-nothing per sender) ──
         for (spk, total_debit) in sender_debits.iter() {
             let account = self.account_store.get(spk).map_err(|_| TxRuleError::Unknown)?;
             if account.balance < *total_debit {
@@ -223,24 +272,15 @@ impl TransactionValidator {
             }
         }
 
-        // ── 3. Duplicate flash_id within same batch ──
-        let mut seen = HashSet::new();
-        for tx in txs {
-            let id = tx.flash_id();
-            if !seen.insert(id) {
-                return Err(TxRuleError::Message(format!(
-                    "Duplicate flash_id in batch: {:?}",
-                    id
-                )));
-            }
+        // ── 4. Per-tx validation on eligible: fee, signature, individual balance ──
+        //    Expiry and replay were already filtered in step 1, so this loop
+        //    only sees txs that should pass those checks. Any failure here is a
+        //    genuine rejection (bad signature, insufficient individual balance).
+        for tx in &eligible {
+            self.validate_flash_transaction(tx, block_daa_score)?;
         }
 
-        // ── 4. Per-tx validation ──
-        for tx in txs {
-            self.validate_flash_transaction(tx, current_daa_score)?;
-        }
-
-        Ok(())
+        Ok(eligible)
     }
 }
 
