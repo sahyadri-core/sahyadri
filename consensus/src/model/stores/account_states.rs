@@ -25,18 +25,37 @@ pub trait AccountStatesStore: AccountStatesStoreReader {
 
 #[derive(Clone)]
 pub struct DbAccountStatesStore {
+    db: Arc<sahyadri_database::prelude::DB>,
     access: CachedDbAccess<Hash, AccountState>,
 }
 
 impl DbAccountStatesStore {
     pub fn new(db: Arc<sahyadri_database::prelude::DB>, cache_size: u64) -> Self {
         Self {
+            db: db.clone(),
             access: CachedDbAccess::new(
                 db,
                 CachePolicy::Count(cache_size as usize),
                 DatabaseStorePrefixes::AccountStates.into(),
             ),
         }
+    }
+
+    /// SAHYADRI: synchronously persist a state snapshot to DB.
+    ///
+    /// Content-addressed (keyed by `state_hash`), so this is idempotent —
+    /// writing the same state twice is a no-op effect. Called from verify
+    /// and build paths so that descendants can read the state without
+    /// waiting for the commit-time batch flush.
+    pub fn insert_sync(&self, state_hash: Hash, state: &AccountState) -> StoreResult<()> {
+        let mut batch = rocksdb::WriteBatch::default();
+        self.access.write(
+            BatchDbWriter::new(&mut batch),
+            state_hash,
+            state.clone(),
+        )?;
+        self.db.write(batch)?;
+        Ok(())
     }
 }
 

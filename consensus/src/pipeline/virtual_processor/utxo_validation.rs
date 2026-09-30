@@ -8,7 +8,6 @@ use crate::{
         },
     },
     model::stores::{
-        account_roots::AccountRootsStoreReader,
         block_transactions::BlockTransactionsStoreReader,
         daa::DaaStoreReader,
         headers::HeaderStoreReader,
@@ -213,15 +212,26 @@ impl VirtualStateProcessor {
         selected_parent_utxo_view: &V,
         header: &Header,
     ) -> BlockProcessResult<()> {
-        // ─── Account commitment verify (SMT) ───
-        // Purana UTXO bypass hata diya. Ab asli check hota hai:
-        // parent root → block effects → naya root → header se match?
-        let parent_root = self
-            .account_roots_store
-            .get(ctx.selected_parent())
-            .unwrap_or(sahyadri_smt::EMPTY);
+        // SAHYADRI: read parent root from the parent's HEADER, not from
+        // account_roots_store. The store is written asynchronously during
+        // commit, so for recent parents (which is the normal case) it may
+        // not yet contain the entry. The header's utxo_commitment field is
+        // always populated by the producer and available before verify.
+        let parent_hash = ctx.selected_parent();
+        let parent_header = self
+            .headers_store
+            .get_header(parent_hash)
+            .map_err(|e| {
+                log::error!(
+                    "SAHYADRI: parent header missing for {} while verifying {}: {:?}",
+                    parent_hash, header.hash, e
+                );
+                AccountCommitmentComputeFailed
+            })?;
 
+        let parent_root: sahyadri_smt::H256 = self.parent_account_root(parent_hash, &parent_header);
         let txs_for_effects = self
+
             .block_transactions_store
             .get(header.hash)
             .map_err(|_| AccountCommitmentComputeFailed)?;
@@ -235,7 +245,7 @@ impl VirtualStateProcessor {
         let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
         let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
 
-        let (my_root, _) = crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+        let (my_root, changes) = crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
             parent_root,
             &mut smt_overlay,
             &*self.account_states_store,
@@ -247,6 +257,21 @@ impl VirtualStateProcessor {
             log::error!("SAHYADRI: account commitment compute failed during verify: {:?}", e);
             AccountCommitmentComputeFailed
         })?;
+
+        // SAHYADRI: sync-persist SMT nodes AND state snapshots. Both are
+        // content-addressed (idempotent), so writes from even a disqualified
+        // block are harmless — they only make subsequent blocks' reads
+        // resolve correctly. This closes the race with async commit flush.
+        let pending: Vec<_> = smt_overlay.into_pending().collect();
+        if let Err(e) = self.smt_nodes_store.insert_sync_many(pending) {
+            log::error!("SAHYADRI: sync SMT write failed in verify: {:?}", e);
+        }
+        for (_spk, state) in &changes {
+            let state_hash = state.content_hash();
+            if let Err(e) = self.account_states_store.insert_sync(state_hash, state) {
+                log::error!("SAHYADRI: sync state write failed in verify: {:?}", e);
+            }
+        }
 
         let expected_commitment = sahyadri_hashes::Hash::from_bytes(my_root);
         if expected_commitment != header.utxo_commitment {

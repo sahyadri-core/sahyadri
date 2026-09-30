@@ -18,9 +18,9 @@ use crate::{
             DB,
             acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
             account_store::{AccountStore, AccountStoreReader, DbAccountStore},
-            account_roots::{AccountRootsStore, AccountRootsStoreReader, DbAccountRootsStore},
+            account_roots::{AccountRootsStore, DbAccountRootsStore},
             account_states::{AccountStatesStore, DbAccountStatesStore},
-            smt_nodes::{DbSmtNodeStore, SmtNodeStore},
+            smt_nodes::DbSmtNodeStore,
             did_store::{DidDocument, DidStore, DidStoreReader, DbDidStore},
             block_transactions::{BlockTransactionsStoreReader, DbBlockTransactionsStore},
             block_window_cache::{BlockWindowCacheStore, BlockWindowCacheWriter},
@@ -684,61 +684,6 @@ impl VirtualStateProcessor {
         // 1. REORG HANDLING: Deduct everything from blocks that are removed from the main chain
         for &hash in chain_path.removed.iter() {
             if let Ok(txs) = self.block_transactions_store.get(hash) {
-            // ─── SMT commitment persist (per added block) ───
-            {
-                // Block ka selected parent nikaalo
-                let selected_parent = self
-                    .sahyadri_consensus_store
-                    .get_data(hash)
-                    .ok()
-                    .map(|d| d.selected_parent);
-
-                let parent_root = selected_parent
-                    .and_then(|sp| self.account_roots_store.get(sp).ok())
-                    .unwrap_or(sahyadri_smt::EMPTY);
-
-                let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
-
-                let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
-                    &txs,
-                    &self.coinbase_manager,
-                    SAHYADRI_TREASURY_PUBKEY_HEX,
-                );
-
-                let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
-                let mut overlay = sahyadri_smt::OverlayStore::new(&db_base);
-
-                match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
-                    parent_root,
-                    &mut overlay,
-                    &*self.account_states_store,
-                    &flash_txs,
-                    &rewards,
-                    daa,
-                ) {
-                    Ok((new_root, changes)) => {
-                        // Overlay ke naye SMT nodes persist karo
-                        let pending_nodes: Vec<_> = overlay.into_pending().collect();
-                        if let Err(e) = self.smt_nodes_store.insert_batch_many(&mut batch, pending_nodes) {
-                            log::error!("SAHYADRI: smt_nodes persist failed for {}: {:?}", hash, e);
-                        }
-                        // Block ka root store karo
-                        if let Err(e) = self.account_roots_store.insert_batch(&mut batch, hash, new_root) {
-                            log::error!("SAHYADRI: account_root persist failed for {}: {:?}", hash, e);
-                        }
-                        // State snapshots store karo
-                        for (_spk, state) in changes {
-                            let state_hash = state.content_hash();
-                            if let Err(e) = self.account_states_store.insert_batch(&mut batch, state_hash, &state) {
-                                log::error!("SAHYADRI: account_state persist failed: {:?}", e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("SAHYADRI: account commitment compute failed for {}: {:?}", hash, e);
-                    }
-                }
-            }
                 for (i, tx) in txs.iter().enumerate() {
                     // ──── FLASH TX BYPASS ────
                     // FlashTransactions use the FLASH_V1 prefix. Their payload
@@ -836,6 +781,65 @@ impl VirtualStateProcessor {
         // 2. NEW BLOCKS: Process Miners & User Transactions
         for &hash in chain_path.added.iter() {
             if let Ok(txs) = self.block_transactions_store.get(hash) {
+                // ─── SMT commitment persist (per added block) ───
+                {
+                    // Block ka selected parent nikaalo
+                    let selected_parent = self
+                        .sahyadri_consensus_store
+                        .get_data(hash)
+                        .ok()
+                        .map(|d| d.selected_parent);
+
+                    // SAHYADRI: read from the parent header — guaranteed available.
+                    let parent_root: sahyadri_smt::H256 = selected_parent
+                        .and_then(|sp| {
+                            self.headers_store
+                                .get_header(sp)
+                                .ok()
+                                .map(|h| self.parent_account_root(sp, &h))
+                        })
+                        .unwrap_or(sahyadri_smt::EMPTY);
+
+                    let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
+
+                    let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
+                        &txs,
+                        &self.coinbase_manager,
+                        SAHYADRI_TREASURY_PUBKEY_HEX,
+                    );
+
+                    let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
+                    let mut overlay = sahyadri_smt::OverlayStore::new(&db_base);
+
+                    match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+                        parent_root,
+                        &mut overlay,
+                        &*self.account_states_store,
+                        &flash_txs,
+                        &rewards,
+                        daa,
+                    ) {
+                        Ok((new_root, changes)) => {
+                            let pending_nodes: Vec<_> = overlay.into_pending().collect();
+                            if let Err(e) = self.smt_nodes_store.insert_sync_many(pending_nodes) {
+                                log::error!("SAHYADRI: sync SMT write failed in commit for {}: {:?}", hash, e);
+                            }
+                            if let Err(e) = self.account_roots_store.insert_batch(&mut batch, hash, new_root) {
+                                log::error!("SAHYADRI: account_root persist failed for {}: {:?}", hash, e);
+                            }
+                            for (_spk, state) in changes {
+                                let state_hash = state.content_hash();
+                                if let Err(e) = self.account_states_store.insert_batch(&mut batch, state_hash, &state) {
+                                    log::error!("SAHYADRI: account_state persist failed: {:?}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("SAHYADRI: account commitment compute failed for {}: {:?}", hash, e);
+                        }
+                    }
+                }
+
                 for (i, tx) in txs.iter().enumerate() {
                     // ==========================================
                     // FIX 1: MINER REWARD
@@ -1285,6 +1289,19 @@ impl VirtualStateProcessor {
                 return;
             }
 
+        // SAHYADRI: periodically bound the SMT mem_pool. Every 10_000
+        // committed blocks, drop everything — by then every node the
+        // pool holds is safely in the persistent store.
+        {
+            static COMMIT_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let n = COMMIT_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if n % 10_000 == 9_999 {
+                let before = self.smt_nodes_store.mem_len();
+                self.smt_nodes_store.mem_clear();
+                log::info!("SAHYADRI: cleared SMT mem_pool ({} entries) after 10k blocks", before);
+            }
+        }
+
         // Calling the drops explicitly after the batch is written in order to avoid possible errors.
         drop(virtual_write);
         drop(selected_chain_write);
@@ -1729,13 +1746,22 @@ impl VirtualStateProcessor {
         // ─── Account commitment ───
         // Parent root + block ke effects → naya root → header me daalo
         let selected_parent = virtual_state.sahyadri_consensus_data.selected_parent;
-        let parent_root = self
-            .account_roots_store
-            .get(selected_parent)
-            .unwrap_or(sahyadri_smt::EMPTY);
+        // SAHYADRI: read from the parent header — guaranteed available.
+        let parent_header = match self.headers_store.get_header(selected_parent) {
+            Ok(h) => h,
+            Err(e) => {
+                log::error!(
+                    "SAHYADRI: selected parent header missing while building template: {} — {:?}",
+                    selected_parent, e
+                );
+                return Err(RuleError::AccountCommitmentComputeFailed);
+            }
+        };
+        let parent_root: sahyadri_smt::H256 = self.parent_account_root(selected_parent, &parent_header);
 
         let (template_flash_txs, template_rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
             &txs,
+
             &self.coinbase_manager,
             SAHYADRI_TREASURY_PUBKEY_HEX,
         );
@@ -1750,7 +1776,21 @@ impl VirtualStateProcessor {
             &template_rewards,
             virtual_state.daa_score,
         ) {
-            Ok((root, _changes)) => root,
+            Ok((root, changes)) => {
+                // SAHYADRI: sync-persist SMT nodes AND state snapshots.
+                // Same rationale as verify path.
+                let pending: Vec<_> = smt_overlay.into_pending().collect();
+                if let Err(e) = self.smt_nodes_store.insert_sync_many(pending) {
+                    log::error!("SAHYADRI: sync SMT write failed in build: {:?}", e);
+                }
+                for (_spk, state) in &changes {
+                    let state_hash = state.content_hash();
+                    if let Err(e) = self.account_states_store.insert_sync(state_hash, state) {
+                        log::error!("SAHYADRI: sync state write failed in build: {:?}", e);
+                    }
+                }
+                root
+            }
             Err(e) => {
                 log::error!("SAHYADRI: account commitment compute failed in build: {:?}", e);
                 sahyadri_smt::EMPTY
@@ -1828,6 +1868,26 @@ impl VirtualStateProcessor {
             &Default::default(),
             &Default::default(),
         );
+    }
+
+    /// SAHYADRI: resolve the account (SMT) root of a parent block.
+    ///
+    /// - For the genesis block, its header's `utxo_commitment` is a legacy
+    ///   UTXO multiset hash (hardcoded in config/genesis.rs), NOT an SMT
+    ///   root. The correct SMT root at genesis is `EMPTY`.
+    /// - For every other block, the header's `utxo_commitment` field is
+    ///   the SMT root produced by this node's own commitment function,
+    ///   so it can be read directly.
+    pub(super) fn parent_account_root(
+        &self,
+        parent_hash: Hash,
+        parent_header: &Header,
+    ) -> sahyadri_smt::H256 {
+        if parent_hash == self.genesis.hash {
+            sahyadri_smt::EMPTY
+        } else {
+            parent_header.utxo_commitment.as_bytes()
+        }
     }
 
     /// Finalizes the pruning point utxoset state and imports the pruning point utxoset *to* virtual utxoset
