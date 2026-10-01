@@ -30,9 +30,9 @@ async fn main() -> ExitCode {
 fn first_input_sender_address(tx: &RpcOptionalTransaction) -> Option<&Address> {
     let first_input = tx.inputs.first()?;
 
-    let utxo_entry = first_input.verbose_data.as_ref()?.utxo_entry.as_ref()?;
+    let registry_unit_entry = first_input.verbose_data.as_ref()?.registry_unit_entry.as_ref()?;
 
-    utxo_entry.verbose_data.as_ref()?.script_public_key_address.as_ref()
+    registry_unit_entry.verbose_data.as_ref()?.script_public_key_address.as_ref()
 }
 
 async fn get_vcc_v2() -> Result<()> {

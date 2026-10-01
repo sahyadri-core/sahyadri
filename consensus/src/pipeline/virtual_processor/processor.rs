@@ -73,7 +73,7 @@ use sahyadri_consensus_core::{
     acceptance_data::AcceptanceData,
     api::args::{TransactionValidationArgs, TransactionValidationBatchArgs},
     block::{BlockTemplate, MutableBlock, TemplateBuildMode, TemplateTransactionSelector},
-    blockstatus::BlockStatus::{StatusDisqualifiedFromChain, StatusUTXOValid},
+    blockstatus::BlockStatus::{StatusDisqualifiedFromChain, StatusStateValid},
     coinbase::MinerData,
     config::genesis::GenesisBlock,
     header::Header,
@@ -427,7 +427,7 @@ impl VirtualStateProcessor {
         self.notification_root
             .notify(Notification::NewBlockTemplate(NewBlockTemplateNotification {}))
             .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
-        let _ = virtual_parents;  // reserved for future UtxosChanged-equivalent
+        let _ = virtual_parents;  // reserved for future RegistryChanged-equivalent
         self.notification_root
             .notify(Notification::SinkBlueScoreChanged(SinkBlueScoreChangedNotification::new(
                 compact_sink_sahyadri_consensus_data.blue_score,
@@ -461,13 +461,13 @@ impl VirtualStateProcessor {
         }
     }
 
-    /// SAHYADRI: UTXO diff no longer tracked, but chain validation must
+    /// SAHYADRI: REGISTRY_UNIT diff no longer tracked, but chain validation must
     /// still run. This function walks the selected chain from `from` to
     /// `to` and, for each block that isn't already validated, calls
     /// `calculate_block_state` + `verify_block_state` (account
     /// commitment, coinbase, pruning point) and, on success,
     /// `commit_block_state`. Failing blocks are marked disqualified.
-    fn calculate_utxo_state_relatively(
+    fn calculate_registry_unit_state_relatively(
         &self,
         from: Hash,
         to: Hash,
@@ -517,7 +517,7 @@ impl VirtualStateProcessor {
             let status = self.statuses_store.read().get(current).unwrap();
 
             // Already validated -> advance without re-checking.
-            if status == StatusUTXOValid {
+            if status == StatusStateValid {
                 diff_point = current;
                 continue;
             }
@@ -542,7 +542,7 @@ impl VirtualStateProcessor {
                 self.statuses_store.write().set(current, StatusDisqualifiedFromChain).unwrap();
                 chain_disqualified_counter += 1;
             } else {
-                debug!("VIRTUAL PROCESSOR, UTXO validated for {current}");
+                debug!("VIRTUAL PROCESSOR, REGISTRY_UNIT validated for {current}");
                 diff_point = current;
                 self.commit_block_state(
                     current,
@@ -574,7 +574,7 @@ impl VirtualStateProcessor {
         self.acceptance_data_store.insert_batch(&mut batch, current, Arc::new(acceptance_data)).unwrap();
         // Note we call idempotent since this field can be populated during IBD with headers proof
         self.pruning_samples_store.insert_batch(&mut batch, current, pruning_sample_from_pov).idempotent().unwrap();
-        let write_guard = self.statuses_store.set_batch(&mut batch, current, StatusUTXOValid).unwrap();
+        let write_guard = self.statuses_store.set_batch(&mut batch, current, StatusStateValid).unwrap();
         self.db.write(batch).unwrap();
         // Calling the drops explicitly after the batch is written in order to avoid possible errors.
         drop(write_guard);
@@ -1355,7 +1355,7 @@ impl VirtualStateProcessor {
 
     /// Searches for the next valid sink block (SINK = Virtual selected parent). The search is performed
     /// in the inclusive past of `tips`.
-    /// The provided `diff` is assumed to initially hold the UTXO diff of `prev_sink` from virtual.
+    /// The provided `diff` is assumed to initially hold the REGISTRY_UNIT diff of `prev_sink` from virtual.
     /// The function returns with `diff` being the diff of the new sink from previous virtual.
     /// In addition to the found sink the function also returns a queue of additional virtual
     /// parent candidates ordered in descending blue work order.
@@ -1389,9 +1389,9 @@ impl VirtualStateProcessor {
                 }
             };
             if self.reachability_service.is_chain_ancestor_of(finality_point, candidate) {
-                diff_point = self.calculate_utxo_state_relatively(diff_point, candidate);
+                diff_point = self.calculate_registry_unit_state_relatively(diff_point, candidate);
                 if diff_point == candidate {
-                    // This indicates that candidate has valid UTXO state and that `diff` represents its diff from virtual
+                    // This indicates that candidate has valid REGISTRY_UNIT state and that `diff` represents its diff from virtual
 
                     // All blocks with lower blue work than filtering_root are:
                     // 1. not in its future (bcs blue work is monotonic),
@@ -1404,7 +1404,7 @@ impl VirtualStateProcessor {
                         heap.into_sorted_iter().take_while(|s| s.blue_work >= filtering_blue_work).map(|s| s.hash).collect(),
                     );
                 } else {
-                    debug!("Block candidate {} has invalid UTXO state and is ignored from Virtual chain.", candidate)
+                    debug!("Block candidate {} has invalid REGISTRY_UNIT state and is ignored from Virtual chain.", candidate)
                 }
             } else if finality_point != pruning_point {
                 // `finality_point == pruning_point` indicates we are at IBD start hence no warning required
@@ -1425,7 +1425,7 @@ impl VirtualStateProcessor {
 
     /// Picks the virtual parents according to virtual parent selection pruning constrains.
     /// Assumes:
-    ///     1. `selected_parent` is a UTXO-valid block
+    ///     1. `selected_parent` is a REGISTRY_UNIT-valid block
     ///     2. `candidates` are an antichain ordered in descending blue work order
     ///     3. `candidates` do not contain `selected_parent` and `selected_parent.blue work > max(candidates.blue_work)`  
     pub(super) fn pick_virtual_parents(
@@ -1793,7 +1793,7 @@ impl VirtualStateProcessor {
                 sahyadri_smt::EMPTY
             }
         };
-        let utxo_commitment = sahyadri_hashes::Hash::from_bytes(account_commitment_h256);
+        let registry_unit_commitment = sahyadri_hashes::Hash::from_bytes(account_commitment_h256);
         // Past median time is the exclusive lower bound for valid block time, so we increase by 1 to get the valid min
         let min_block_time = virtual_state.past_median_time + 1;
         let header = Header::new_finalized(
@@ -1801,7 +1801,7 @@ impl VirtualStateProcessor {
             parents_by_level,
             hash_merkle_root,
             accepted_id_merkle_root,
-            utxo_commitment,
+            registry_unit_commitment,
             u64::max(min_block_time, unix_now()),
             virtual_state.bits,
             0,
@@ -1835,14 +1835,14 @@ impl VirtualStateProcessor {
             pruning_point_write.set_batch(&mut batch, self.genesis.hash, 0).unwrap();
             pruning_point_write.set_retention_checkpoint(&mut batch, self.genesis.hash).unwrap();
             pruning_point_write.set_retention_period_root(&mut batch, self.genesis.hash).unwrap();
-            pruning_meta_write.set_utxoset_position(&mut batch, self.genesis.hash).unwrap();
+            pruning_meta_write.set_registry_unitset_position(&mut batch, self.genesis.hash).unwrap();
             self.db.write(batch).unwrap();
             drop(pruning_point_write);
             drop(pruning_meta_write);
         }
     }
 
-    /// Initializes UTXO state of genesis and points virtual at genesis.
+    /// Initializes REGISTRY_UNIT state of genesis and points virtual at genesis.
     /// Note that pruning point-related stores are initialized by `init`
     pub fn process_genesis(self: &Arc<Self>) {
         self.commit_block_state(self.genesis.hash, AcceptanceData::default(), Default::default());
@@ -1867,10 +1867,10 @@ impl VirtualStateProcessor {
 
     /// SAHYADRI: resolve the account (SMT) root of a parent block.
     ///
-    /// - For the genesis block, its header's `utxo_commitment` is a legacy
-    ///   UTXO multiset hash (hardcoded in config/genesis.rs), NOT an SMT
+    /// - For the genesis block, its header's `registry_unit_commitment` is a legacy
+    ///   REGISTRY_UNIT multiset hash (hardcoded in config/genesis.rs), NOT an SMT
     ///   root. The correct SMT root at genesis is `EMPTY`.
-    /// - For every other block, the header's `utxo_commitment` field is
+    /// - For every other block, the header's `registry_unit_commitment` field is
     ///   the SMT root produced by this node's own commitment function,
     ///   so it can be read directly.
     pub(super) fn parent_account_root(
@@ -1881,31 +1881,31 @@ impl VirtualStateProcessor {
         if parent_hash == self.genesis.hash {
             sahyadri_smt::EMPTY
         } else {
-            parent_header.utxo_commitment.as_bytes()
+            parent_header.registry_unit_commitment.as_bytes()
         }
     }
 
-    /// Finalizes the pruning point utxoset state and imports the pruning point utxoset *to* virtual utxoset
-    pub fn import_pruning_point_utxo_set(
+    /// Finalizes the pruning point registry_unitset state and imports the pruning point registry_unitset *to* virtual registry_unitset
+    pub fn import_pruning_point_registry_unit_set(
         &self,
         new_pruning_point: Hash,
-        mut imported_utxo_multiset: MuHash,
+        mut imported_registry_unit_multiset: MuHash,
     ) -> PruningImportResult<()> {
-        info!("Importing the UTXO set of the pruning point {}", new_pruning_point);
+        info!("Importing the REGISTRY_UNIT set of the pruning point {}", new_pruning_point);
         let new_pruning_point_header = self.headers_store.get_header(new_pruning_point).unwrap();
-        let imported_utxo_multiset_hash = imported_utxo_multiset.finalize();
-        if imported_utxo_multiset_hash != new_pruning_point_header.utxo_commitment {
+        let imported_registry_unit_multiset_hash = imported_registry_unit_multiset.finalize();
+        if imported_registry_unit_multiset_hash != new_pruning_point_header.registry_unit_commitment {
             return Err(PruningImportError::ImportedMultisetHashMismatch(
-                new_pruning_point_header.utxo_commitment,
-                imported_utxo_multiset_hash,
+                new_pruning_point_header.registry_unit_commitment,
+                imported_registry_unit_multiset_hash,
             ));
         }
 
         {
-            // Set the pruning point utxoset position to the new point we just verified
+            // Set the pruning point registry_unitset position to the new point we just verified
             let mut batch = WriteBatch::default();
             let mut pruning_meta_write = self.pruning_meta_stores.write();
-            pruning_meta_write.set_utxoset_position(&mut batch, new_pruning_point).unwrap();
+            pruning_meta_write.set_registry_unitset_position(&mut batch, new_pruning_point).unwrap();
             self.db.write(batch).unwrap();
             drop(pruning_meta_write);
         }
@@ -1926,9 +1926,9 @@ impl VirtualStateProcessor {
         }
 
         {
-            // Submit partial UTXO state for the pruning point.
+            // Submit partial REGISTRY_UNIT state for the pruning point.
             let mut batch = WriteBatch::default();
-            let statuses_write = self.statuses_store.set_batch(&mut batch, new_pruning_point, StatusUTXOValid).unwrap();
+            let statuses_write = self.statuses_store.set_batch(&mut batch, new_pruning_point, StatusStateValid).unwrap();
             self.db.write(batch).unwrap();
             drop(statuses_write);
         }

@@ -3,7 +3,7 @@ use criterion::{Criterion, SamplingMode, Throughput, black_box, criterion_group,
 use sahyadri_consensus::model::stores::account_store::{AccountStore, DbAccountStore};
 use sahyadri_consensus::processes::transaction_validator::TransactionValidator;
 use sahyadri_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
-use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput};
+use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput};
 use sahyadri_database::create_temp_db;
 use sahyadri_database::prelude::ConnBuilder;
 use smallvec::smallvec;
@@ -28,7 +28,7 @@ fn mock_payment_tx(payload_size: usize) -> Transaction {
     Transaction::new(
         0,
         vec![TransactionInput {
-            previous_outpoint: TransactionOutpoint::new(sahyadri_consensus_core::tx::TransactionId::from_bytes([0u8; 32]), 0),
+            previous_outpoint: RegistryRef::new(sahyadri_consensus_core::tx::TransactionId::from_bytes([0u8; 32]), 0),
             signature_script: vec![0u8; 2420],
             sequence: 0,
             sig_op_count: 1,

@@ -147,23 +147,23 @@ impl TestConsensus {
     ///
     /// Panics if block builder validation rules are violated.
     /// See `sahyadri_consensus_core::errors::block::RuleError` for the complete list of possible validation rules.
-    pub fn add_utxo_valid_block_with_parents(
+    pub fn add_registry_unit_valid_block_with_parents(
         &self,
         hash: Hash,
         parents: Vec<Hash>,
         txs: Vec<Transaction>,
     ) -> impl Future<Output = BlockProcessResult<BlockStatus>> {
         let miner_data = MinerData::new(ScriptPublicKey::from_vec(0, vec![]), vec![]);
-        self.validate_and_insert_block(self.build_utxo_valid_block_with_parents(hash, parents, miner_data, txs).to_immutable())
+        self.validate_and_insert_block(self.build_registry_unit_valid_block_with_parents(hash, parents, miner_data, txs).to_immutable())
             .virtual_state_task
     }
 
-    pub fn add_empty_utxo_valid_block_with_parents(
+    pub fn add_empty_registry_unit_valid_block_with_parents(
         &self,
         hash: Hash,
         parents: Vec<Hash>,
     ) -> impl Future<Output = BlockProcessResult<BlockStatus>> {
-        self.add_utxo_valid_block_with_parents(hash, parents, vec![])
+        self.add_registry_unit_valid_block_with_parents(hash, parents, vec![])
     }
 
     /// Builds a valid block with the given transactions, parents, and miner data.
@@ -172,7 +172,7 @@ impl TestConsensus {
     ///
     /// Panics if block builder validation rules are violated.
     /// See `sahyadri_consensus_core::errors::block::RuleError` for the complete list of possible validation rules.
-    pub fn build_utxo_valid_block_with_parents(
+    pub fn build_registry_unit_valid_block_with_parents(
         &self,
         hash: Hash,
         parents: Vec<Hash>,

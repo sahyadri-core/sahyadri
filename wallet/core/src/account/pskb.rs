@@ -9,17 +9,17 @@ use crate::tx::PaymentOutput;
 use crate::tx::PaymentOutputs;
 use futures::stream;
 use sahyadri_bip32::{DerivationPath, KeyFingerprint, PrivateKey};
-use sahyadri_consensus_client::UtxoEntry as ClientUTXO;
+use sahyadri_consensus_client::RegistryUnit as ClientREGISTRY_UNIT;
 use sahyadri_consensus_core::hashing::sighash::{SigHashReusedValuesUnsync, calc_signature_hash};
 use sahyadri_consensus_core::tx::VerifiableTransaction;
-use sahyadri_consensus_core::tx::{TransactionInput, UtxoEntry};
+use sahyadri_consensus_core::tx::{TransactionInput, RegistryUnit};
 use sahyadri_dilithium::{generate_keypair_from_seed, sign_bytes};
 use sahyadri_txscript::extract_script_pub_key_address;
 use sahyadri_txscript::opcodes::codes::OpData65;
 use sahyadri_txscript::script_builder::ScriptBuilder;
 use sahyadri_wallet_core::tx::{Generator, GeneratorSettings, PaymentDestination, PendingTransaction};
 pub use sahyadri_wallet_pskt::bundle::Bundle;
-use sahyadri_wallet_pskt::bundle::{script_sig_to_address, unlock_utxo_outputs_as_batch_transaction_pskb};
+use sahyadri_wallet_pskt::bundle::{script_sig_to_address, unlock_registry_unit_outputs_as_batch_transaction_pskb};
 use sahyadri_wallet_pskt::prelude::KeySource;
 use sahyadri_wallet_pskt::prelude::lock_script_sig_templating_bytes;
 use sahyadri_wallet_pskt::prelude::{Finalizer, Inner, SignInputOk, Signature, Signer};
@@ -140,7 +140,7 @@ impl Stream for PSKTStream {
 fn convert_pending_tx_to_pskt(pending_tx: PendingTransaction) -> Result<PSKT<Signer>, Error> {
     let signable_tx = pending_tx.signable_transaction();
     let verifiable_tx = signable_tx.as_verifiable();
-    let populated_inputs: Vec<(&TransactionInput, &UtxoEntry)> = verifiable_tx.populated_inputs().collect();
+    let populated_inputs: Vec<(&TransactionInput, &RegistryUnit)> = verifiable_tx.populated_inputs().collect();
     let pskt_inner = Inner::try_from((pending_tx.transaction(), populated_inputs.to_owned()))?;
     Ok(PSKT::<Signer>::from(pskt_inner))
 }
@@ -181,9 +181,9 @@ pub async fn pskb_signer_for_address(
                 inner
                     .inputs
                     .iter()
-                    .filter_map(|input| input.utxo_entry.as_ref())
-                    .filter_map(|utxo_entry| {
-                        extract_script_pub_key_address(&utxo_entry.script_public_key.clone(), network_id.into()).ok()
+                    .filter_map(|input| input.registry_unit_entry.as_ref())
+                    .filter_map(|registry_unit_entry| {
+                        extract_script_pub_key_address(&registry_unit_entry.script_public_key.clone(), network_id.into()).ok()
                     })
                     .collect()
             })
@@ -317,17 +317,17 @@ pub fn pskt_to_pending_transaction(
     finalized_pskt: PSKT<Finalizer>,
     network_id: NetworkId,
     change_address: Address,
-    source_utxo_context: Option<UtxoContext>,
+    source_registry_unit_context: Option<RegistryUnitContext>,
 ) -> Result<PendingTransaction, Error> {
     let inner_pskt = finalized_pskt.deref();
-    let (utxo_entries_ref, aggregate_input_value): (Vec<UtxoEntryReference>, u64) = inner_pskt
+    let (registry_unit_entries_ref, aggregate_input_value): (Vec<RegistryUnitRef>, u64) = inner_pskt
         .inputs
         .iter()
         .filter_map(|input| {
-            input.utxo_entry.as_ref().map(|ue| {
+            input.registry_unit_entry.as_ref().map(|ue| {
                 (
-                    UtxoEntryReference {
-                        utxo: Arc::new(ClientUTXO {
+                    RegistryUnitRef {
+                        registry_unit: Arc::new(ClientREGISTRY_UNIT {
                             address: Some(extract_script_pub_key_address(&ue.script_public_key, network_id.into()).unwrap()),
                             amount: ue.amount,
                             outpoint: input.previous_outpoint.into(),
@@ -359,8 +359,8 @@ pub fn pskt_to_pending_transaction(
     let recipient = extract_script_pub_key_address(&output[0].script_public_key, network_id.into())?;
     let fee_u: u64 = 0;
 
-    let utxo_iterator: Box<dyn Iterator<Item = UtxoEntryReference> + Send + Sync + 'static> =
-        Box::new(utxo_entries_ref.clone().into_iter());
+    let registry_unit_iterator: Box<dyn Iterator<Item = RegistryUnitRef> + Send + Sync + 'static> =
+        Box::new(registry_unit_entries_ref.clone().into_iter());
 
     let final_transaction_destination = PaymentDestination::PaymentOutputs(PaymentOutputs::from((recipient, output[0].value)));
 
@@ -370,10 +370,10 @@ pub fn pskt_to_pending_transaction(
         sig_op_count: 1,
         minimum_signatures: 1,
         change_address: change_address.clone(),
-        utxo_iterator,
-        priority_utxo_entries: None,
-        source_utxo_context,
-        destination_utxo_context: None,
+        registry_unit_iterator,
+        priority_registry_unit_entries: None,
+        source_registry_unit_context,
+        destination_registry_unit_context: None,
         fee_rate: None,
         final_transaction_priority_fee: fee_u.into(),
         final_transaction_destination,
@@ -398,12 +398,12 @@ pub fn pskt_to_pending_transaction(
         .unwrap_or((None, 0));
 
     // Create PendingTransaction (WIP)
-    let addresses = utxo_entries_ref.iter().filter_map(|a| a.address()).collect();
+    let addresses = registry_unit_entries_ref.iter().filter_map(|a| a.address()).collect();
     // todo where the source of mass and fees. why does it equal to zero?
     let pending_tx = PendingTransaction::try_new(
         &generator,
         signed_tx,
-        utxo_entries_ref,
+        registry_unit_entries_ref,
         addresses,
         Some(aggregate_output_value),
         change_output_index,
@@ -514,7 +514,7 @@ pub async fn commit_reveal_batch_bundle(
     let bundle_commit = bundle_from_pskt_generator(pskt_generator).await.map_err(|e| Error::PSKTGenerationError(e.to_string()))?;
 
     // Generate reveal transaction
-    let bundle_unlock = unlock_utxo_outputs_as_batch_transaction_pskb(
+    let bundle_unlock = unlock_registry_unit_outputs_as_batch_transaction_pskb(
         conf.commit_destination.amount().unwrap(),
         &conf.address_commit,
         &conf.redeem_script,
@@ -541,7 +541,7 @@ pub async fn commit_reveal_batch_bundle(
             pskt_finalizer.clone(),
             network_id,
             account.change_address()?,
-            account.utxo_context().clone().into(),
+            account.registry_unit_context().clone().into(),
         )
         .map_err(|_| Error::CommitTransactionIdExtractionError)?
         .id();

@@ -14,7 +14,7 @@ use sahyadri_consensus_core::{
     mass::{ContextualMasses, NonContextualMasses},
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList},
     trusted::{ExternalSahyadriConsensusData, TrustedBlock},
-    tx::{MutableTransaction, Transaction, TransactionId, TransactionOutpoint, TransactionQueryResult, TransactionType, UtxoEntry},
+    tx::{MutableTransaction, Transaction, TransactionId, RegistryRef, TransactionQueryResult, TransactionType, RegistryUnit},
 };
 use sahyadri_utils::sync::rwlock::*;
 use std::{ops::Deref, sync::Arc};
@@ -290,13 +290,13 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.get_virtual_chain_from_block(low, chain_path_added_limit)).await
     }
 
-    pub async fn async_get_virtual_utxos(
+    pub async fn async_get_virtual_registry(
         &self,
-        from_outpoint: Option<TransactionOutpoint>,
+        from_outpoint: Option<RegistryRef>,
         chunk_size: usize,
         skip_first: bool,
-    ) -> Vec<(TransactionOutpoint, UtxoEntry)> {
-        self.clone().spawn_blocking(move |c| c.get_virtual_utxos(from_outpoint, chunk_size, skip_first)).await
+    ) -> Vec<(RegistryRef, RegistryUnit)> {
+        self.clone().spawn_blocking(move |c| c.get_virtual_registry(from_outpoint, chunk_size, skip_first)).await
     }
 
     pub async fn async_get_tips(&self) -> Vec<Hash> {
@@ -438,15 +438,15 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.is_chain_block(hash)).await
     }
 
-    pub async fn async_get_pruning_point_utxos(
+    pub async fn async_get_pruning_point_registry(
         &self,
         expected_pruning_point: Hash,
-        from_outpoint: Option<TransactionOutpoint>,
+        from_outpoint: Option<RegistryRef>,
         chunk_size: usize,
         skip_first: bool,
-    ) -> ConsensusResult<Vec<(TransactionOutpoint, UtxoEntry)>> {
+    ) -> ConsensusResult<Vec<(RegistryRef, RegistryUnit)>> {
         self.clone()
-            .spawn_blocking(move |c| c.get_pruning_point_utxos(expected_pruning_point, from_outpoint, chunk_size, skip_first))
+            .spawn_blocking(move |c| c.get_pruning_point_registry(expected_pruning_point, from_outpoint, chunk_size, skip_first))
             .await
     }
 
@@ -489,11 +489,11 @@ impl ConsensusSessionOwned {
     pub async fn async_finality_point(&self) -> Hash {
         self.clone().spawn_blocking(move |c| c.finality_point()).await
     }
-    pub async fn async_clear_pruning_utxo_set(&self) {
-        self.clone().spawn_blocking(move |c| c.clear_pruning_utxo_set()).await
+    pub async fn async_clear_pruning_registry_set(&self) {
+        self.clone().spawn_blocking(move |c| c.clear_pruning_registry_set()).await
     }
-    pub async fn async_is_pruning_utxoset_stable(&self) -> bool {
-        self.clone().spawn_blocking(move |c| c.is_pruning_utxoset_stable()).await
+    pub async fn async_is_pruning_registry_stable(&self) -> bool {
+        self.clone().spawn_blocking(move |c| c.is_pruning_registry_stable()).await
     }
     pub async fn async_is_pruning_point_anticone_fully_synced(&self) -> bool {
         self.clone().spawn_blocking(move |c| c.is_pruning_point_anticone_fully_synced()).await
@@ -501,11 +501,11 @@ impl ConsensusSessionOwned {
     pub async fn async_is_consensus_in_transitional_ibd_state(&self) -> bool {
         self.clone().spawn_blocking(move |c| c.is_consensus_in_transitional_ibd_state()).await
     }
-    pub async fn async_set_pruning_utxoset_unstable(&self) {
-        self.clone().spawn_blocking(move |c| c.set_pruning_utxoset_stable_flag(false)).await
+    pub async fn async_set_pruning_registry_unstable(&self) {
+        self.clone().spawn_blocking(move |c| c.set_pruning_registry_stable_flag(false)).await
     }
-    pub async fn async_set_pruning_utxoset_stable(&self) {
-        self.clone().spawn_blocking(move |c| c.set_pruning_utxoset_stable_flag(true)).await
+    pub async fn async_set_pruning_registry_stable(&self) {
+        self.clone().spawn_blocking(move |c| c.set_pruning_registry_stable_flag(true)).await
     }
     pub async fn async_intrusive_pruning_point_update(&self, new_pruning_point: Hash, syncer_sink: Hash) -> ConsensusResult<()> {
         self.clone().spawn_blocking(move |c| c.intrusive_pruning_point_update(new_pruning_point, syncer_sink)).await

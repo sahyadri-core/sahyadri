@@ -23,7 +23,7 @@ pub enum Error {
     FasterHexError(#[from] faster_hex::Error),
 
     #[error("invalid transaction outpoint: {0}")]
-    InvalidTransactionOutpoint(String),
+    InvalidRegistryRef(String),
 
     #[error(transparent)]
     Dilithium(#[from] sahyadri_dilithium::DilithiumError),

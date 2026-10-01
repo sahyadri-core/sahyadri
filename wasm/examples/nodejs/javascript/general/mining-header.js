@@ -9,7 +9,7 @@ sahyadri.initConsolePanicHook();
         // hash : "8e40af02265360d59f4ecf9ae9ebf8f00a3118408f5a9cdcbcc9c0f93642f3af",
         hashMerkleRoot: "bbb490cbce5dc392608000d3aa40e2bfb814c415eac7788237f4eb3467b82059",
         acceptedIdMerkleRoot: "ab7f8fd73cc7f55c3598de5cdd27ef697161879c3edf52488f2ce23054a3e2ed",
-        utxoCommitment: "2c2d36bf20940ae59858af89a5acba841cafaf84722174e9136077d3c79d9a44",
+        registry_unitCommitment: "2c2d36bf20940ae59858af89a5acba841cafaf84722174e9136077d3c79d9a44",
         pruningPoint: "8e40af02265360d59f4ecf9ae9ebf8f00a3118408f5a9cdcbcc9c0f93642f3af",
         timestamp: 1n,
         version: 1,

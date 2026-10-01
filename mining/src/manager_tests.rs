@@ -25,8 +25,8 @@ mod tests {
         mass::{NonContextualMasses, transaction_estimated_serialized_size},
         subnets::SUBNETWORK_ID_NATIVE,
         tx::{
-            MutableTransaction, ScriptPublicKey, Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput,
-            UtxoEntry, scriptvec,
+            MutableTransaction, ScriptPublicKey, Transaction, TransactionId, TransactionInput, RegistryRef, TransactionOutput,
+            RegistryUnit, scriptvec,
         },
     };
     use sahyadri_hashes::Hash;
@@ -52,7 +52,7 @@ mod tests {
             let consensus = Arc::new(ConsensusMock::new());
             let counters = Arc::new(MiningCounters::default());
             let mining_manager = MiningManager::new(TARGET_TIME_PER_BLOCK, false, MAX_BLOCK_MASS, None, counters);
-            let transactions_to_insert = (0..TX_COUNT).map(|i| create_transaction_with_utxo_entry(i, 0)).collect::<Vec<_>>();
+            let transactions_to_insert = (0..TX_COUNT).map(|i| create_transaction_with_registry_unit_entry(i, 0)).collect::<Vec<_>>();
             for transaction in transactions_to_insert.iter() {
                 let result = into_mempool_result(mining_manager.validate_and_insert_mutable_transaction(
                     consensus.as_ref(),
@@ -82,7 +82,7 @@ mod tests {
                 }
             }
 
-            // The UtxoEntry was filled manually for those transactions, so the transactions won't be considered orphans.
+            // The RegistryUnit was filled manually for those transactions, so the transactions won't be considered orphans.
             // Therefore, all the transactions expected to be contained in the mempool if replace by fee policy allowed it.
             let (transactions_from_pool, _) = mining_manager.get_all_transactions(TransactionQuery::TransactionsOnly);
             let transactions_inserted = match rbf_policy {
@@ -164,7 +164,7 @@ mod tests {
 
             // Build an invalid transaction with some gas and inform the consensus mock about the result it should return
             // when the mempool will submit this transaction for validation.
-            let mut transaction = create_transaction_with_utxo_entry(0, 1);
+            let mut transaction = create_transaction_with_registry_unit_entry(0, 1);
             Arc::make_mut(&mut transaction.tx).gas = 1000;
             let tx_err = TxRuleError::TxHasGas;
             let expected = match rbf_policy {
@@ -203,7 +203,7 @@ mod tests {
             let counters = Arc::new(MiningCounters::default());
             let mining_manager = MiningManager::new(TARGET_TIME_PER_BLOCK, false, MAX_BLOCK_MASS, None, counters);
 
-            let transaction = create_transaction_with_utxo_entry(0, 0);
+            let transaction = create_transaction_with_registry_unit_entry(0, 0);
 
             // submit the transaction to the mempool
             let result = mining_manager.validate_and_insert_mutable_transaction(
@@ -264,7 +264,7 @@ mod tests {
             let transaction = create_child_and_parent_txs_and_add_parent_to_consensus(&consensus);
             assert!(
                 consensus.can_finance_transaction(&MutableTransaction::from_tx(transaction.clone())),
-                "({priority:?}, {orphan:?}, {rbf_policy:?}) the consensus mock should have spendable UTXOs for the newly created transaction {}",
+                "({priority:?}, {orphan:?}, {rbf_policy:?}) the consensus mock should have spendable REGISTRY_UNITs for the newly created transaction {}",
                 transaction.id()
             );
 
@@ -277,7 +277,7 @@ mod tests {
             );
             assert!(
                 result.is_ok(),
-                "({priority:?}, {orphan:?}, {rbf_policy:?}) the mempool should accept a valid transaction when it is able to populate its UTXO entries"
+                "({priority:?}, {orphan:?}, {rbf_policy:?}) the mempool should accept a valid transaction when it is able to populate its REGISTRY_UNIT entries"
             );
 
             let mut double_spending_transaction = transaction.clone();
@@ -375,7 +375,7 @@ mod tests {
                             );
                             assert!(
                                 consensus.can_finance_transaction(&MutableTransaction::from_tx(transaction.clone())),
-                                "[{}, {:?}] the consensus should have spendable UTXOs for the newly created transaction {}",
+                                "[{}, {:?}] the consensus should have spendable REGISTRY_UNITs for the newly created transaction {}",
                                 self.name, rbf_policy, transaction.id()
                             );
                             let result = mining_manager.validate_and_insert_transaction(
@@ -387,7 +387,7 @@ mod tests {
                             );
                             assert!(
                                 result.is_ok(),
-                                "[{}, {:?}] the mempool should accept a valid transaction when it is able to populate its UTXO entries",
+                                "[{}, {:?}] the mempool should accept a valid transaction when it is able to populate its REGISTRY_UNIT entries",
                                 self.name, rbf_policy,
                             );
                             let children = create_children_tree(&transaction, tx_op.depth);
@@ -418,7 +418,7 @@ mod tests {
                 );
                 assert!(
                     consensus.can_finance_transaction(&MutableTransaction::from_tx(transaction_replacement.clone())),
-                    "[{}, {:?}] the consensus should have spendable UTXOs for the newly created transaction {}",
+                    "[{}, {:?}] the consensus should have spendable REGISTRY_UNITs for the newly created transaction {}",
                     self.name,
                     rbf_policy,
                     transaction_replacement.id()
@@ -565,7 +565,7 @@ mod tests {
         let mining_manager = MiningManager::new(TARGET_TIME_PER_BLOCK, false, MAX_BLOCK_MASS, None, counters);
 
         const TX_COUNT: u32 = 10;
-        let transactions_to_insert = (0..TX_COUNT).map(|i| create_transaction_with_utxo_entry(i, 0)).collect::<Vec<_>>();
+        let transactions_to_insert = (0..TX_COUNT).map(|i| create_transaction_with_registry_unit_entry(i, 0)).collect::<Vec<_>>();
         for transaction in transactions_to_insert.iter() {
             let result = mining_manager.validate_and_insert_transaction(
                 consensus.as_ref(),
@@ -625,7 +625,7 @@ mod tests {
         let counters = Arc::new(MiningCounters::default());
         let mining_manager = MiningManager::new(TARGET_TIME_PER_BLOCK, false, MAX_BLOCK_MASS, None, counters);
 
-        let transaction_in_the_mempool = create_transaction_with_utxo_entry(0, 0);
+        let transaction_in_the_mempool = create_transaction_with_registry_unit_entry(0, 0);
         let result = mining_manager.validate_and_insert_transaction(
             consensus.as_ref(),
             transaction_in_the_mempool.tx.as_ref().clone(),
@@ -635,7 +635,7 @@ mod tests {
         );
         assert!(result.is_ok());
 
-        let mut double_spend_transaction_in_the_block = create_transaction_with_utxo_entry(0, 0);
+        let mut double_spend_transaction_in_the_block = create_transaction_with_registry_unit_entry(0, 0);
         Arc::make_mut(&mut double_spend_transaction_in_the_block.tx).inputs[0].previous_outpoint =
             transaction_in_the_mempool.tx.inputs[0].previous_outpoint;
         let block_transactions = build_block_transactions(std::iter::once(double_spend_transaction_in_the_block.tx.as_ref()));
@@ -1148,7 +1148,7 @@ mod tests {
     #[test]
     fn test_evict() {
         const TX_COUNT: usize = 10;
-        let txs = (0..TX_COUNT).map(|i| create_transaction_with_utxo_entry(i as u32, 0)).collect_vec();
+        let txs = (0..TX_COUNT).map(|i| create_transaction_with_registry_unit_entry(i as u32, 0)).collect_vec();
 
         let consensus = Arc::new(ConsensusMock::new());
         let counters = Arc::new(MiningCounters::default());
@@ -1164,7 +1164,7 @@ mod tests {
         assert_eq!(mining_manager.get_all_transactions(TransactionQuery::TransactionsOnly).0.len(), TX_COUNT);
 
         let heavy_tx_low_fee = {
-            let mut heavy_tx = create_transaction_with_utxo_entry(TX_COUNT as u32, 0);
+            let mut heavy_tx = create_transaction_with_registry_unit_entry(TX_COUNT as u32, 0);
             let mut inner_tx = (*(heavy_tx.tx)).clone();
             inner_tx.payload = vec![0u8; TX_COUNT / 2 * tx_size - inner_tx.estimate_mem_bytes()];
             heavy_tx.tx = inner_tx.into();
@@ -1175,7 +1175,7 @@ mod tests {
         assert_eq!(mining_manager.get_all_transactions(TransactionQuery::TransactionsOnly).0.len(), TX_COUNT);
 
         let heavy_tx_high_fee = {
-            let mut heavy_tx = create_transaction_with_utxo_entry(TX_COUNT as u32 + 1, 0);
+            let mut heavy_tx = create_transaction_with_registry_unit_entry(TX_COUNT as u32 + 1, 0);
             let mut inner_tx = (*(heavy_tx.tx)).clone();
             inner_tx.payload = vec![0u8; TX_COUNT / 2 * tx_size - inner_tx.estimate_mem_bytes()];
             heavy_tx.tx = inner_tx.into();
@@ -1187,7 +1187,7 @@ mod tests {
         assert!(mining_manager.get_estimated_size() <= size_limit);
 
         let too_big_tx = {
-            let mut heavy_tx = create_transaction_with_utxo_entry(TX_COUNT as u32 + 2, 0);
+            let mut heavy_tx = create_transaction_with_registry_unit_entry(TX_COUNT as u32 + 2, 0);
             let mut inner_tx = (*(heavy_tx.tx)).clone();
             inner_tx.payload = vec![0u8; size_limit];
             heavy_tx.tx = inner_tx.into();
@@ -1358,13 +1358,13 @@ mod tests {
         }
     }
 
-    fn create_transaction_with_utxo_entry(i: u32, block_daa_score: u64) -> MutableTransaction {
-        let previous_outpoint = TransactionOutpoint::new(Hash::default(), i);
+    fn create_transaction_with_registry_unit_entry(i: u32, block_daa_score: u64) -> MutableTransaction {
+        let previous_outpoint = RegistryRef::new(Hash::default(), i);
         let (script_public_key, redeem_script) = op_true_script();
         let signature_script = pay_to_script_hash_signature_script(redeem_script, vec![]).expect("the redeem script is canonical");
 
         let input = TransactionInput::new(previous_outpoint, signature_script, MAX_TX_IN_SEQUENCE_NUM, 1);
-        let entry = UtxoEntry::new(KANA_PER_SAHYADRI, script_public_key.clone(), block_daa_score, true);
+        let entry = RegistryUnit::new(KANA_PER_SAHYADRI, script_public_key.clone(), block_daa_score, true);
         let output = TransactionOutput::new(KANA_PER_SAHYADRI - DEFAULT_MINIMUM_RELAY_TRANSACTION_FEE, script_public_key);
         let transaction = Transaction::new(TX_VERSION, vec![input], vec![output], 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
 
@@ -1438,7 +1438,7 @@ mod tests {
     ) {
         transactions.for_each(|transaction| {
             let result = mining_manager.validate_and_insert_transaction(consensus, transaction.clone(), priority, orphan, rbf_policy);
-            assert!(result.is_ok(), "the mempool should accept a valid transaction when it is able to populate its UTXO entries");
+            assert!(result.is_ok(), "the mempool should accept a valid transaction when it is able to populate its REGISTRY_UNIT entries");
         });
     }
 

@@ -25,7 +25,7 @@ pub enum Error {
     FasterHex(#[from] faster_hex::Error),
 
     #[error("invalid transaction outpoint: {0}")]
-    InvalidTransactionOutpoint(String),
+    InvalidRegistryRef(String),
 
     #[error(transparent)]
     Dilithium(#[from] sahyadri_dilithium::DilithiumError),
@@ -51,8 +51,8 @@ pub enum Error {
     #[error("Error processing JSON: {0}")]
     SerdeJson(String),
 
-    #[error("Transaction input is missing UTXO entry")]
-    MissingUtxoEntry,
+    #[error("Transaction input is missing REGISTRY_UNIT entry")]
+    MissingRegistryUnit,
 }
 
 impl Error {

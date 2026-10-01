@@ -11,8 +11,8 @@ use sahyadri_hashes::Hash;
 use sahyadri_notify::{
     connection::{ChannelConnection, ChannelType},
     scope::{
-        BlockAddedScope, FinalityConflictScope, NewBlockTemplateScope, PruningPointUtxoSetOverrideScope, Scope,
-        SinkBlueScoreChangedScope, UtxosChangedScope, VirtualChainChangedScope, VirtualDaaScoreChangedScope,
+        BlockAddedScope, FinalityConflictScope, NewBlockTemplateScope, PruningPointRegistryUnitSetOverrideScope, Scope,
+        SinkBlueScoreChangedScope, RegistryChangedScope, VirtualChainChangedScope, VirtualDaaScoreChangedScope,
     },
 };
 use sahyadri_rpc_core::{Notification, api::rpc::RpcApi, model::*};
@@ -48,7 +48,7 @@ async fn sanity_test() {
         disable_upnp: true, // UPnP registration might take some time and is not needed for this test
         enable_unsynced_mining: true,
         block_template_cache_lifetime: Some(0),
-        utxoindex: true,
+        registry_unitindex: true,
         unsafe_rpc: true,
         ..Default::default()
     };
@@ -244,7 +244,7 @@ async fn sanity_test() {
                     let response = rpc_client.get_info_call(None, GetInfoRequest {}).await.unwrap();
                     assert_eq!(response.server_version, sahyadri_core::sahyadrid_env::version().to_string());
                     assert_eq!(response.mempool_size, 0);
-                    assert!(response.is_utxo_indexed);
+                    assert!(response.is_registry_unit_indexed);
                     assert!(response.has_message_id);
                     assert!(response.has_notify_command);
                 })
@@ -417,12 +417,12 @@ async fn sanity_test() {
                 })
             }
 
-            SahyadridPayloadOps::GetUtxosByAddresses => {
+            SahyadridPayloadOps::GetRegistryByAddresses => {
                 let rpc_client = client.clone();
                 tst!(op, {
                     let addresses = vec![Address::new(Prefix::Simnet, Version::PubKey, &[0u8; 32])];
                     let response =
-                        rpc_client.get_utxos_by_addresses_call(None, GetUtxosByAddressesRequest { addresses }).await.unwrap();
+                        rpc_client.get_registry_by_addresses_call(None, GetRegistryByAddressesRequest { addresses }).await.unwrap();
                     assert!(response.entries.is_empty());
                 })
             }
@@ -607,7 +607,7 @@ async fn sanity_test() {
                 let rpc_client = client.clone();
                 tst!(op, {
                     let response = rpc_client.get_server_info_call(None, GetServerInfoRequest {}).await.unwrap();
-                    assert!(response.has_utxo_index); // we set utxoindex above
+                    assert!(response.has_registry_unit_index); // we set registry_unitindex above
                     assert_eq!(response.network_id, network_id);
                 })
             }
@@ -672,10 +672,10 @@ async fn sanity_test() {
                 })
             }
 
-            SahyadridPayloadOps::GetUtxoReturnAddress => {
+            SahyadridPayloadOps::GetRegistryUnitReturnAddress => {
                 let rpc_client = client.clone();
                 tst!(op, {
-                    let results = rpc_client.get_utxo_return_address(RpcHash::from_bytes([0; 32]), 1000).await;
+                    let results = rpc_client.get_registry_unit_return_address(RpcHash::from_bytes([0; 32]), 1000).await;
 
                     assert!(results.is_err_and(|err| {
                         match err {
@@ -731,11 +731,11 @@ async fn sanity_test() {
                     rpc_client.start_notify(id, FinalityConflictScope {}.into()).await.unwrap();
                 })
             }
-            SahyadridPayloadOps::NotifyUtxosChanged => {
+            SahyadridPayloadOps::NotifyRegistryChanged => {
                 let rpc_client = client.clone();
                 let id = listener_id;
                 tst!(op, {
-                    rpc_client.start_notify(id, UtxosChangedScope::new(vec![]).into()).await.unwrap();
+                    rpc_client.start_notify(id, RegistryChangedScope::new(vec![]).into()).await.unwrap();
                 })
             }
             SahyadridPayloadOps::NotifySinkBlueScoreChanged => {
@@ -745,11 +745,11 @@ async fn sanity_test() {
                     rpc_client.start_notify(id, SinkBlueScoreChangedScope {}.into()).await.unwrap();
                 })
             }
-            SahyadridPayloadOps::NotifyPruningPointUtxoSetOverride => {
+            SahyadridPayloadOps::NotifyPruningPointRegistryUnitSetOverride => {
                 let rpc_client = client.clone();
                 let id = listener_id;
                 tst!(op, {
-                    rpc_client.start_notify(id, PruningPointUtxoSetOverrideScope {}.into()).await.unwrap();
+                    rpc_client.start_notify(id, PruningPointRegistryUnitSetOverrideScope {}.into()).await.unwrap();
                 })
             }
             SahyadridPayloadOps::NotifyVirtualDaaScoreChanged => {
@@ -769,18 +769,18 @@ async fn sanity_test() {
                         .unwrap();
                 })
             }
-            SahyadridPayloadOps::StopNotifyingPruningPointUtxoSetOverride => {
+            SahyadridPayloadOps::StopNotifyingPruningPointRegistryUnitSetOverride => {
                 let rpc_client = client.clone();
                 let id = listener_id;
                 tst!(op, {
-                    rpc_client.stop_notify(id, PruningPointUtxoSetOverrideScope {}.into()).await.unwrap();
+                    rpc_client.stop_notify(id, PruningPointRegistryUnitSetOverrideScope {}.into()).await.unwrap();
                 })
             }
-            SahyadridPayloadOps::StopNotifyingUtxosChanged => {
+            SahyadridPayloadOps::StopNotifyingRegistryChanged => {
                 let rpc_client = client.clone();
                 let id = listener_id;
                 tst!(op, {
-                    rpc_client.stop_notify(id, UtxosChangedScope::new(vec![]).into()).await.unwrap();
+                    rpc_client.stop_notify(id, RegistryChangedScope::new(vec![]).into()).await.unwrap();
                 })
             }
             SahyadridPayloadOps::SubmitAccountTransaction => {

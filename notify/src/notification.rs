@@ -4,7 +4,7 @@ use super::{
     events::EventType,
     subscription::{
         Single,
-        single::{OverallSubscription, UtxosChangedSubscription, VirtualChainChangedSubscription},
+        single::{OverallSubscription, RegistryChangedSubscription, VirtualChainChangedSubscription},
     },
 };
 use std::fmt::{Debug, Display};
@@ -19,7 +19,7 @@ pub trait Notification: Clone + Debug + Display + Send + Sync + 'static {
         context: &SubscriptionContext,
     ) -> Option<Self>;
 
-    fn apply_utxos_changed_subscription(&self, subscription: &UtxosChangedSubscription, context: &SubscriptionContext)
+    fn apply_registry_changed_subscription(&self, subscription: &RegistryChangedSubscription, context: &SubscriptionContext)
     -> Option<Self>;
 
     fn apply_subscription(&self, subscription: &dyn Single, context: &SubscriptionContext) -> Option<Self> {
@@ -28,8 +28,8 @@ pub trait Notification: Clone + Debug + Display + Send + Sync + 'static {
                 subscription.as_any().downcast_ref::<VirtualChainChangedSubscription>().unwrap(),
                 context,
             ),
-            EventType::UtxosChanged => self
-                .apply_utxos_changed_subscription(subscription.as_any().downcast_ref::<UtxosChangedSubscription>().unwrap(), context),
+            EventType::RegistryChanged => self
+                .apply_registry_changed_subscription(subscription.as_any().downcast_ref::<RegistryChangedSubscription>().unwrap(), context),
             _ => self.apply_overall_subscription(subscription.as_any().downcast_ref::<OverallSubscription>().unwrap(), context),
         }
     }
@@ -96,7 +96,7 @@ pub mod test_helpers {
     }
 
     #[derive(Clone, Debug, Default, PartialEq, Eq)]
-    pub struct UtxosChangedNotification {
+    pub struct RegistryChangedNotification {
         pub data: u64,
         pub addresses: Arc<Vec<Address>>,
     }
@@ -108,8 +108,8 @@ pub mod test_helpers {
         BlockAdded(BlockAddedNotification),
         #[display(fmt = "VirtualChainChanged #{}", "_0.data")]
         VirtualChainChanged(VirtualChainChangedNotification),
-        #[display(fmt = "UtxosChanged #{}", "_0.data")]
-        UtxosChanged(UtxosChangedNotification),
+        #[display(fmt = "RegistryChanged #{}", "_0.data")]
+        RegistryChanged(RegistryChangedNotification),
     }
     }
 
@@ -144,19 +144,19 @@ pub mod test_helpers {
             }
         }
 
-        fn apply_utxos_changed_subscription(
+        fn apply_registry_changed_subscription(
             &self,
-            subscription: &UtxosChangedSubscription,
+            subscription: &RegistryChangedSubscription,
             context: &SubscriptionContext,
         ) -> Option<Self> {
             match subscription.active() {
                 true => {
-                    if let TestNotification::UtxosChanged(payload) = self {
+                    if let TestNotification::RegistryChanged(payload) = self {
                         let subscription = subscription.data();
                         if !subscription.to_all() {
-                            // trace!("apply_utxos_changed_subscription: Notification payload {:?}", payload);
-                            // trace!("apply_utxos_changed_subscription: Subscription content {:?}", subscription);
-                            // trace!("apply_utxos_changed_subscription: Subscription Context {}", context.address_tracker);
+                            // trace!("apply_registry_changed_subscription: Notification payload {:?}", payload);
+                            // trace!("apply_registry_changed_subscription: Subscription content {:?}", subscription);
+                            // trace!("apply_registry_changed_subscription: Subscription Context {}", context.address_tracker);
                             let addresses = payload
                                 .addresses
                                 .iter()
@@ -164,7 +164,7 @@ pub mod test_helpers {
                                 .cloned()
                                 .collect::<Vec<_>>();
                             if !addresses.is_empty() {
-                                return Some(TestNotification::UtxosChanged(UtxosChangedNotification {
+                                return Some(TestNotification::RegistryChanged(RegistryChangedNotification {
                                     data: payload.data,
                                     addresses: Arc::new(addresses),
                                 }));
@@ -207,7 +207,7 @@ pub mod test_helpers {
             &mut self.data
         }
     }
-    impl Data for UtxosChangedNotification {
+    impl Data for RegistryChangedNotification {
         fn data(&self) -> u64 {
             self.data
         }
@@ -221,7 +221,7 @@ pub mod test_helpers {
             match self {
                 TestNotification::BlockAdded(n) => n.data(),
                 TestNotification::VirtualChainChanged(n) => n.data(),
-                TestNotification::UtxosChanged(n) => n.data(),
+                TestNotification::RegistryChanged(n) => n.data(),
             }
         }
 
@@ -229,7 +229,7 @@ pub mod test_helpers {
             match self {
                 TestNotification::BlockAdded(n) => n.data_mut(),
                 TestNotification::VirtualChainChanged(n) => n.data_mut(),
-                TestNotification::UtxosChanged(n) => n.data_mut(),
+                TestNotification::RegistryChanged(n) => n.data_mut(),
             }
         }
     }

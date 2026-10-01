@@ -8,7 +8,6 @@ use sahyadri_consensus_core::api::counters::ProcessingCounters;
 use sahyadri_consensus_core::daa_score_timestamp::DaaScoreTimestamp;
 use sahyadri_consensus_core::errors::block::RuleError;
 use sahyadri_consensus_core::tx::{TransactionQueryResult, TransactionType};
-use sahyadri_consensus_core::utxo::utxo_inquirer::UtxoInquirerError;
 use sahyadri_consensus_core::{
     block::Block,
     coinbase::MinerData,
@@ -38,7 +37,7 @@ use sahyadri_mining::mempool::tx::{Orphan, Priority, RbfPolicy};
 use sahyadri_mining::model::tx_query::TransactionQuery;
 use sahyadri_notify::listener::ListenerLifespan;
 use sahyadri_notify::subscription::context::SubscriptionContext;
-use sahyadri_notify::subscription::{MutationPolicies, UtxosChangedMutationPolicy};
+use sahyadri_notify::subscription::{MutationPolicies, RegistryChangedMutationPolicy};
 use sahyadri_notify::{
     collector::DynCollector,
     connection::ChannelType,
@@ -222,8 +221,8 @@ impl RpcCoreService {
         system_info: SystemInfo,
         mining_rule_engine: Arc<MiningRuleEngine>,
     ) -> Self {
-        // SAHYADRI: UTXO index retired — no address-set mutation policy needed.
-        let policies = MutationPolicies::new(UtxosChangedMutationPolicy::Wildcard);
+        // SAHYADRI: REGISTRY_UNIT index retired — no address-set mutation policy needed.
+        let policies = MutationPolicies::new(RegistryChangedMutationPolicy::Wildcard);
 
         let relay_state = Arc::new(RelayState::new());
 
@@ -236,8 +235,8 @@ impl RpcCoreService {
 
         // Prepare the rpc-core notifier objects
         let mut consensus_events: EventSwitches = EVENT_TYPE_ARRAY[..].into();
-        consensus_events[EventType::UtxosChanged] = false;
-        consensus_events[EventType::PruningPointUtxoSetOverride] = true;
+        consensus_events[EventType::RegistryChanged] = false;
+        consensus_events[EventType::PruningPointRegistryUnitSetOverride] = true;
         let consensus_converter = Arc::new(ConsensusConverter::new(consensus_manager.clone(), config.clone()));
         let consensus_collector = Arc::new(CollectorFromConsensus::new(
             "rpc-core <= consensus",
@@ -845,7 +844,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             p2p_id: self.flow_context.node_id.to_string(),
             mempool_size: self.mining_manager.transaction_count_sample(TransactionQuery::TransactionsOnly),
             server_version: version().to_string(),
-            is_utxo_indexed: false,  // SAHYADRI: UTXO index disabled
+            is_registry_unit_indexed: false,  // SAHYADRI: REGISTRY_UNIT index disabled
             is_synced: true,
 
             has_notify_command: true,
@@ -1096,16 +1095,16 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         Ok(self.consensus_manager.consensus().unguarded_session().async_estimate_block_count().await)
     }
 
-    async fn get_utxos_by_addresses_call(
+    async fn get_registry_by_addresses_call(
         &self,
         _connection: Option<&DynRpcConnection>,
-        request: GetUtxosByAddressesRequest,
-    ) -> RpcResult<GetUtxosByAddressesResponse> {
-        // SAHYADRI: UTXO index disabled. This endpoint is preserved as a
+        request: GetRegistryByAddressesRequest,
+    ) -> RpcResult<GetRegistryByAddressesResponse> {
+        // SAHYADRI: REGISTRY_UNIT index disabled. This endpoint is preserved as a
         // compatibility shim for legacy wallets — it presents each account's
-        // balance as a single synthetic UTXO entry so that existing wallet
+        // balance as a single synthetic REGISTRY_UNIT entry so that existing wallet
         // code continues to work while the network transitions to the pure
-        // account model. Real UTXO tracking is not performed.
+        // account model. Real REGISTRY_UNIT tracking is not performed.
         let session = self.consensus_manager.consensus().unguarded_session();
         let mut entries = vec![];
 
@@ -1115,16 +1114,16 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             if balance > 0 {
                 let script_public_key = sahyadri_txscript::pay_to_address_script(&address);
 
-                let outpoint = sahyadri_rpc_core::RpcTransactionOutpoint { transaction_id: Default::default(), index: 0 };
+                let outpoint = sahyadri_rpc_core::RpcRegistryRef { transaction_id: Default::default(), index: 0 };
 
-                let utxo_entry =
-                    sahyadri_rpc_core::RpcUtxoEntry { amount: balance, script_public_key, block_daa_score: 0, is_coinbase: false };
+                let registry_unit_entry =
+                    sahyadri_rpc_core::RpcRegistryUnit { amount: balance, script_public_key, block_daa_score: 0, is_coinbase: false };
 
-                entries.push(sahyadri_rpc_core::RpcUtxosByAddressesEntry { address: Some(address.clone()), outpoint, utxo_entry });
+                entries.push(sahyadri_rpc_core::RpcRegistryByAddressesEntry { address: Some(address.clone()), outpoint, registry_unit_entry });
             }
         }
 
-        Ok(GetUtxosByAddressesResponse::new(entries))
+        Ok(GetRegistryByAddressesResponse::new(entries))
     }
 
     async fn get_balance_by_address_call(
@@ -1407,16 +1406,16 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: GetBalancesByAddressesRequest,
     ) -> RpcResult<GetBalancesByAddressesResponse> {
-        // if !self.config.utxoindex {
-        //  return Err(RpcError::NoUtxoIndex);
+        // if !self.config.registry_unitindex {
+        //  return Err(RpcError::NoRegistryUnitIndex);
         // }
         let session = self.consensus_manager.consensus().unguarded_session();
 
-        // do not retrieve utxo balances while in unstable ibd state.
+        // do not retrieve registry_unit balances while in unstable ibd state.
         if session.async_is_consensus_in_transitional_ibd_state().await {
             return Err(RpcError::ConsensusInTransitionalIbdState);
         }
-        // SAHYADRI: UTXO index retired — pull each address's balance directly
+        // SAHYADRI: REGISTRY_UNIT index retired — pull each address's balance directly
         // from the account store via the consensus session.
         let entries = request
             .addresses
@@ -1434,8 +1433,8 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         _: GetCoinSupplyRequest,
     ) -> RpcResult<GetCoinSupplyResponse> {
-        // if !self.config.utxoindex {
-        //  return Err(RpcError::NoUtxoIndex);
+        // if !self.config.registry_unitindex {
+        //  return Err(RpcError::NoRegistryUnitIndex);
         // }
         let session = self.consensus_manager.consensus().unguarded_session();
 
@@ -1443,7 +1442,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         if session.async_is_consensus_in_transitional_ibd_state().await {
             return Err(RpcError::ConsensusInTransitionalIbdState);
         }
-        // SAHYADRI: UTXO index disabled — supply from treasury/emission model (TODO)
+        // SAHYADRI: REGISTRY_UNIT index disabled — supply from treasury/emission model (TODO)
         Ok(GetCoinSupplyResponse::new(MAX_KANA, 0u64))
     }
 
@@ -1547,14 +1546,14 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         }
     }
 
-    async fn get_utxo_return_address_call(
+    async fn get_registry_unit_return_address_call(
         &self,
         _connection: Option<&DynRpcConnection>,
-        request: GetUtxoReturnAddressRequest,
-    ) -> RpcResult<GetUtxoReturnAddressResponse> {
+        request: GetRegistryUnitReturnAddressRequest,
+    ) -> RpcResult<GetRegistryUnitReturnAddressResponse> {
         let session = self.consensus_manager.consensus().session().await;
 
-        // do not retrieve utxos while in unstable ibd state.
+        // do not retrieve registry_units while in unstable ibd state.
         if session.async_is_consensus_in_transitional_ibd_state().await {
             return Err(RpcError::ConsensusInTransitionalIbdState);
         }
@@ -1569,24 +1568,24 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         {
             TransactionQueryResult::SignableTransaction(txs) => {
                 if txs.is_empty() {
-                    return Err(RpcError::ConsensusError(UtxoInquirerError::TransactionNotFound.into()));
+                    return Err(RpcError::General("account-model: registry_unit return address unavailable".to_string()));
                 };
 
                 if txs[0].tx.inputs.is_empty() || txs[0].entries.is_empty() {
-                    return Err(RpcError::ConsensusError(UtxoInquirerError::TxFromCoinbase.into()));
+                    return Err(RpcError::General("account-model: coinbase tx has no registry_unit return address".to_string()));
                 }
 
-                if let Some(utxo_entry) = &txs[0].entries[0] {
-                    if let Ok(address) = extract_script_pub_key_address(&utxo_entry.script_public_key, self.config.prefix()) {
-                        Ok(GetUtxoReturnAddressResponse { return_address: address })
+                if let Some(registry_unit_entry) = &txs[0].entries[0] {
+                    if let Ok(address) = extract_script_pub_key_address(&registry_unit_entry.script_public_key, self.config.prefix()) {
+                        Ok(GetRegistryUnitReturnAddressResponse { return_address: address })
                     } else {
-                        Err(RpcError::ConsensusError(UtxoInquirerError::NonStandard.into()))
+                        Err(RpcError::General("account-model: non-standard tx".to_string()))
                     }
                 } else {
-                    Err(RpcError::ConsensusError(UtxoInquirerError::UnfilledUtxoEntry.into()))
+                    Err(RpcError::General("account-model: registry_unit entry not available".to_string()))
                 }
             }
-            TransactionQueryResult::Transaction(_) => Err(RpcError::ConsensusError(UtxoInquirerError::TransactionNotFound.into())),
+            TransactionQueryResult::Transaction(_) => Err(RpcError::General("account-model: registry_unit return address unavailable".to_string())),
         }
     }
 
@@ -1899,7 +1898,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             rpc_api_revision: RPC_API_REVISION,
             server_version: version().to_string(),
             network_id: self.config.net,
-            has_utxo_index: false,  // SAHYADRI: UTXO index disabled
+            has_registry_unit_index: false,  // SAHYADRI: REGISTRY_UNIT index disabled
             is_synced,
             virtual_daa_score,
         })
@@ -1985,14 +1984,14 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
     /// Start sending notifications of some type to a listener.
     async fn start_notify(&self, id: ListenerId, scope: Scope) -> RpcResult<()> {
         match scope {
-            Scope::UtxosChanged(ref utxos_changed_scope) if !self.config.unsafe_rpc && utxos_changed_scope.addresses.is_empty() => {
-                // The subscription to blanket UtxosChanged notifications is restricted to unsafe mode only
+            Scope::RegistryChanged(ref registry_changed_scope) if !self.config.unsafe_rpc && registry_changed_scope.addresses.is_empty() => {
+                // The subscription to blanket RegistryChanged notifications is restricted to unsafe mode only
                 // since the notifications yielded are highly resource intensive.
                 //
-                // Please note that unsubscribing to blanket UtxosChanged is always allowed and cancels
+                // Please note that unsubscribing to blanket RegistryChanged is always allowed and cancels
                 // the whole subscription no matter if blanket or targeting specified addresses.
 
-                warn!("RPC subscription to blanket UtxosChanged called while node in safe RPC mode -- ignoring.");
+                warn!("RPC subscription to blanket RegistryChanged called while node in safe RPC mode -- ignoring.");
                 Err(RpcError::UnavailableInSafeMode)
             }
             _ => {

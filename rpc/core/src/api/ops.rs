@@ -33,8 +33,8 @@ pub enum RpcApiOps {
     // Subscription commands for starting/stopping notifications
     NotifyBlockAdded = 10,
     NotifyNewBlockTemplate = 11,
-    NotifyUtxosChanged = 12,
-    NotifyPruningPointUtxoSetOverride = 13,
+    NotifyRegistryChanged = 12,
+    NotifyPruningPointRegistryUnitSetOverride = 13,
     NotifyFinalityConflict = 14,
     NotifyFinalityConflictResolved = 15, // for uniformity purpose only since subscribing to NotifyFinalityConflict means receiving both FinalityConflict and FinalityConflictResolved
     NotifyVirtualDaaScoreChanged = 16,
@@ -49,10 +49,10 @@ pub enum RpcApiOps {
     VirtualChainChangedNotification = 61,
     FinalityConflictNotification = 62,
     FinalityConflictResolvedNotification = 63,
-    UtxosChangedNotification = 64,
+    RegistryChangedNotification = 64,
     SinkBlueScoreChangedNotification = 65,
     VirtualDaaScoreChangedNotification = 66,
-    PruningPointUtxoSetOverrideNotification = 67,
+    PruningPointRegistryUnitSetOverrideNotification = 67,
     NewBlockTemplateNotification = 68,
 
     // RPC methods
@@ -106,8 +106,8 @@ pub enum RpcApiOps {
     Shutdown = 133,
     //
     GetHeaders = 134,
-    /// Get a list of available UTXOs for a given address
-    GetUtxosByAddresses = 135,
+    /// Get a list of available REGISTRY_UNITs for a given address
+    GetRegistryByAddresses = 135,
     /// Get a balance for a given address
     GetBalanceByAddress = 136,
     GetDaaScore = 200,
@@ -137,8 +137,8 @@ pub enum RpcApiOps {
     GetFeeEstimateExperimental = 148,
     /// Block color determination by iterating DAG.
     GetCurrentBlockColor = 149,
-    /// Get UTXO Return Addresses
-    GetUtxoReturnAddress = 150,
+    /// Get REGISTRY_UNIT Return Addresses
+    GetRegistryUnitReturnAddress = 150,
     /// Get Virtual Chain from Block V2
     GetVirtualChainFromBlockV2 = 151,
     SubmitAccountTransaction,
@@ -168,9 +168,9 @@ impl RpcApiOps {
             self,
             RpcApiOps::NotifyBlockAdded
                 | RpcApiOps::NotifyNewBlockTemplate
-                | RpcApiOps::NotifyUtxosChanged
+                | RpcApiOps::NotifyRegistryChanged
                 | RpcApiOps::NotifyVirtualChainChanged
-                | RpcApiOps::NotifyPruningPointUtxoSetOverride
+                | RpcApiOps::NotifyPruningPointRegistryUnitSetOverride
                 | RpcApiOps::NotifyFinalityConflict
                 | RpcApiOps::NotifyFinalityConflictResolved
                 | RpcApiOps::NotifySinkBlueScoreChanged
@@ -196,10 +196,10 @@ impl From<EventType> for RpcApiOps {
             EventType::VirtualChainChanged => RpcApiOps::VirtualChainChangedNotification,
             EventType::FinalityConflict => RpcApiOps::FinalityConflictNotification,
             EventType::FinalityConflictResolved => RpcApiOps::FinalityConflictResolvedNotification,
-            EventType::UtxosChanged => RpcApiOps::UtxosChangedNotification,
+            EventType::RegistryChanged => RpcApiOps::RegistryChangedNotification,
             EventType::SinkBlueScoreChanged => RpcApiOps::SinkBlueScoreChangedNotification,
             EventType::VirtualDaaScoreChanged => RpcApiOps::VirtualDaaScoreChangedNotification,
-            EventType::PruningPointUtxoSetOverride => RpcApiOps::PruningPointUtxoSetOverrideNotification,
+            EventType::PruningPointRegistryUnitSetOverride => RpcApiOps::PruningPointRegistryUnitSetOverrideNotification,
             EventType::NewBlockTemplate => RpcApiOps::NewBlockTemplateNotification,
         }
     }

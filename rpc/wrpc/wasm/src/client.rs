@@ -12,7 +12,7 @@ use crate::imports::*;
 use crate::{RpcEventCallback, RpcEventType, RpcEventTypeOrCallback};
 use js_sys::{Function, Object};
 use sahyadri_addresses::{Address, AddressOrStringArrayT};
-use sahyadri_consensus_client::UtxoEntryReference;
+use sahyadri_consensus_client::RegistryUnitRef;
 use sahyadri_consensus_core::network::{NetworkType, NetworkTypeT};
 use sahyadri_notify::connection::ChannelType;
 use sahyadri_notify::events::EventType;
@@ -710,15 +710,15 @@ impl RpcClient {
                     msg = notification_receiver.recv().fuse() => {
                         if let Ok(notification) = &msg {
                             match &notification {
-                                sahyadri_rpc_core::Notification::UtxosChanged(utxos_changed_notification) => {
+                                sahyadri_rpc_core::Notification::RegistryChanged(registry_changed_notification) => {
 
-                                    let event_type = EventType::UtxosChanged;
+                                    let event_type = EventType::RegistryChanged;
                                     let notification_event = NotificationEvent::Notification(event_type);
                                     if let Some(handlers) = this.inner.notification_callbacks(notification_event) {
 
-                                        let UtxosChangedNotification { added, removed } = utxos_changed_notification;
-                                        let added = js_sys::Array::from_iter(added.iter().map(UtxoEntryReference::from).map(JsValue::from));
-                                        let removed = js_sys::Array::from_iter(removed.iter().map(UtxoEntryReference::from).map(JsValue::from));
+                                        let RegistryChangedNotification { added, removed } = registry_changed_notification;
+                                        let added = js_sys::Array::from_iter(added.iter().map(RegistryUnitRef::from).map(JsValue::from));
+                                        let removed = js_sys::Array::from_iter(removed.iter().map(RegistryUnitRef::from).map(JsValue::from));
                                         let notification = Object::new();
                                         notification.set("added", &added).unwrap();
                                         notification.set("removed", &removed).unwrap();
@@ -828,16 +828,16 @@ impl RpcClient {
         Ok(())
     }
 
-    /// Subscribe for a UTXOs changed notification event.
-    /// UTXOs changed notification event is produced when the set
-    /// of unspent transaction outputs (UTXOs) changes in the
+    /// Subscribe for a REGISTRY_UNITs changed notification event.
+    /// REGISTRY_UNITs changed notification event is produced when the set
+    /// of unspent transaction outputs (REGISTRY_UNITs) changes in the
     /// Sahyadri SahyadriDAG. The event notification will be scoped to the
     /// provided list of addresses.
-    #[wasm_bindgen(js_name = subscribeUtxosChanged)]
-    pub async fn subscribe_utxos_changed(&self, addresses: AddressOrStringArrayT) -> Result<()> {
+    #[wasm_bindgen(js_name = subscribeRegistryChanged)]
+    pub async fn subscribe_registry_changed(&self, addresses: AddressOrStringArrayT) -> Result<()> {
         if let Some(listener_id) = self.listener_id() {
             let addresses: Vec<Address> = addresses.try_into()?;
-            self.inner.client.start_notify(listener_id, Scope::UtxosChanged(UtxosChangedScope { addresses })).await?;
+            self.inner.client.start_notify(listener_id, Scope::RegistryChanged(RegistryChangedScope { addresses })).await?;
         } else {
             log_error!("RPC subscribe on a closed connection");
         }
@@ -845,13 +845,13 @@ impl RpcClient {
         Ok(())
     }
 
-    /// Unsubscribe from UTXOs changed notification event
+    /// Unsubscribe from REGISTRY_UNITs changed notification event
     /// for a specific set of addresses.
-    #[wasm_bindgen(js_name = unsubscribeUtxosChanged)]
-    pub async fn unsubscribe_utxos_changed(&self, addresses: AddressOrStringArrayT) -> Result<()> {
+    #[wasm_bindgen(js_name = unsubscribeRegistryChanged)]
+    pub async fn unsubscribe_registry_changed(&self, addresses: AddressOrStringArrayT) -> Result<()> {
         if let Some(listener_id) = self.listener_id() {
             let addresses: Vec<Address> = addresses.try_into()?;
-            self.inner.client.stop_notify(listener_id, Scope::UtxosChanged(UtxosChangedScope { addresses })).await?;
+            self.inner.client.stop_notify(listener_id, Scope::RegistryChanged(RegistryChangedScope { addresses })).await?;
         } else {
             log_error!("RPC unsubscribe on a closed connection");
         }
@@ -897,7 +897,7 @@ impl RpcClient {
 build_wrpc_wasm_bindgen_subscriptions!([
     // Manually implemented subscriptions (above)
     // - VirtualChainChanged, // can't used this here due to non-C-style enum variant
-    // - UtxosChanged, // can't used this here due to non-C-style enum variant
+    // - RegistryChanged, // can't used this here due to non-C-style enum variant
     // - VirtualDaaScoreChanged,
     /// Manage subscription for a block added notification event.
     /// Block added notification event is produced when a new
@@ -916,10 +916,10 @@ build_wrpc_wasm_bindgen_subscriptions!([
     /// Sink blue score changed notification event is produced when the blue
     /// score of the sink block changes in the Sahyadri SahyadriDAG.
     SinkBlueScoreChanged,
-    /// Manage subscription for a pruning point UTXO set override notification event.
-    /// Pruning point UTXO set override notification event is produced when the
-    /// UTXO set override for the pruning point changes in the Sahyadri SahyadriDAG.
-    PruningPointUtxoSetOverride,
+    /// Manage subscription for a pruning point REGISTRY_UNIT set override notification event.
+    /// Pruning point REGISTRY_UNIT set override notification event is produced when the
+    /// REGISTRY_UNIT set override for the pruning point changes in the Sahyadri SahyadriDAG.
+    PruningPointRegistryUnitSetOverride,
     /// Manage subscription for a new block template notification event.
     /// New block template notification event is produced when a new block
     /// template is generated for mining in the Sahyadri SahyadriDAG.
@@ -1049,10 +1049,10 @@ build_wrpc_wasm_bindgen_interface!(
         /// Retrieves information about a subnetwork in the Sahyadri SahyadriDAG.
         /// Returned information: Subnetwork information.
         GetSubnetwork,
-        /// Retrieves unspent transaction outputs (UTXOs) associated with
+        /// Retrieves unspent transaction outputs (REGISTRY_UNITs) associated with
         /// specific addresses.
-        /// Returned information: List of UTXOs.
-        GetUtxosByAddresses,
+        /// Returned information: List of REGISTRY_UNITs.
+        GetRegistryByAddresses,
         /// Retrieves the virtual chain corresponding to a specified block hash.
         /// Returned information: Virtual chain information.
         GetVirtualChainFromBlock,
@@ -1072,7 +1072,7 @@ build_wrpc_wasm_bindgen_interface!(
         /// to the Sahyadri node again.
         /// Returned information: None.
         Unban,
-        /// Get UTXO Return Addresses.
+        /// Get REGISTRY_UNIT Return Addresses.
         /// Submits an account-based transaction (CSM transfer).
         /// Returned information: Transaction ID.
         SubmitAccountTransaction,
@@ -1085,7 +1085,7 @@ build_wrpc_wasm_bindgen_interface!(
         /// Deactivates an existing DID on Sahyadri.
         /// Returned information: Transaction ID.
         SubmitDidDeactivate,
-        GetUtxoReturnAddress,
+        GetRegistryUnitReturnAddress,
         /// Retrieves the virtual chain corresponding to a specified block hash.
         /// Returned information: Virtual chain information. (Version 2)
         /// May be used to get fully populated transactions

@@ -92,7 +92,7 @@ impl TestContext {
     }
 
     pub async fn build_and_insert_disqualified_chain(&mut self, mut parents: Vec<Hash>, len: usize) -> Hash {
-        // The chain will be disqualified since build_block_with_parents builds utxo-invalid blocks
+        // The chain will be disqualified since build_block_with_parents builds registry_unit-invalid blocks
         for _ in 0..len {
             self.simulated_time += self.consensus.params().target_time_per_block();
             let b = self.build_block_with_parents(parents, 0, self.simulated_time);
@@ -146,9 +146,9 @@ impl TestContext {
         self
     }
 
-    pub fn assert_valid_utxo_tip(&mut self) -> &mut Self {
-        // Assert that at least one body tip was resolved with valid UTXO
-        assert!(self.consensus.body_tips().iter().copied().any(|h| self.consensus.block_status(h) == BlockStatus::StatusUTXOValid));
+    pub fn assert_valid_registry_unit_tip(&mut self) -> &mut Self {
+        // Assert that at least one body tip was resolved with valid REGISTRY_UNIT
+        assert!(self.consensus.body_tips().iter().copied().any(|h| self.consensus.block_status(h) == BlockStatus::StatusStateValid));
         self
     }
 }
@@ -166,7 +166,7 @@ async fn template_mining_sanity_test() {
             .await
             .assert_tips()
             .assert_virtual_parents_subset()
-            .assert_valid_utxo_tip();
+            .assert_valid_registry_unit_tip();
     }
 }
 
@@ -188,17 +188,17 @@ async fn antichain_merge_test() {
         .await
         .assert_tips()
         .assert_virtual_parents_subset()
-        .assert_valid_utxo_tip();
+        .assert_valid_registry_unit_tip();
 
     // Mine a long enough chain s.t. the antichain is fully merged
     for _ in 0..32 {
-        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_utxo_tip();
+        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_registry_unit_tip();
     }
     ctx.assert_tips_num(1);
 }
 
 #[tokio::test]
-async fn basic_utxo_disqualified_test() {
+async fn basic_registry_unit_disqualified_test() {
     sahyadri_core::log::try_init_logger("info");
     let config = ConfigBuilder::new(MAINNET_PARAMS)
         .skip_proof_of_work()
@@ -212,7 +212,7 @@ async fn basic_utxo_disqualified_test() {
 
     // Mine a valid chain
     for _ in 0..10 {
-        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_utxo_tip();
+        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_registry_unit_tip();
     }
 
     // Get current sink
@@ -248,7 +248,7 @@ async fn double_search_disqualified_test() {
         .await
         .assert_tips()
         .assert_virtual_parents_subset()
-        .assert_valid_utxo_tip();
+        .assert_valid_registry_unit_tip();
 
     // Mark the one expected to remain on virtual chain
     let original_sink = ctx.consensus.get_sink();
@@ -263,7 +263,7 @@ async fn double_search_disqualified_test() {
 
     // Mine a valid chain
     for _ in 0..10 {
-        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_utxo_tip();
+        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_registry_unit_tip();
     }
 
     // Get current sink
@@ -277,8 +277,8 @@ async fn double_search_disqualified_test() {
     // And another shorter disqualified chain
     let disqualified_tip_2 = ctx.build_and_insert_disqualified_chain(vec![root_2], 20).await;
 
-    assert_eq!(ctx.consensus.get_block_status(root_1), Some(BlockStatus::StatusUTXOValid));
-    assert_eq!(ctx.consensus.get_block_status(root_2), Some(BlockStatus::StatusUTXOValid));
+    assert_eq!(ctx.consensus.get_block_status(root_1), Some(BlockStatus::StatusStateValid));
+    assert_eq!(ctx.consensus.get_block_status(root_2), Some(BlockStatus::StatusStateValid));
 
     assert_ne!(sink, disqualified_tip_1);
     assert_ne!(sink, disqualified_tip_2);
@@ -292,7 +292,7 @@ async fn double_search_disqualified_test() {
 
     // Mine a long enough valid chain s.t. both disqualified chains are fully merged
     for _ in 0..30 {
-        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_utxo_tip();
+        ctx.build_block_template_row(0..1).validate_and_insert_row().await.assert_valid_registry_unit_tip();
     }
     ctx.assert_tips_num(1);
 }

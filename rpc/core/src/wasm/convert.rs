@@ -6,23 +6,23 @@ use crate::model::*;
 use sahyadri_consensus_client::*;
 use std::sync::Arc;
 
-impl From<RpcUtxosByAddressesEntry> for UtxoEntry {
-    fn from(entry: RpcUtxosByAddressesEntry) -> UtxoEntry {
-        let RpcUtxosByAddressesEntry { address, outpoint, utxo_entry } = entry;
-        let RpcUtxoEntry { amount, script_public_key, block_daa_score, is_coinbase } = utxo_entry;
-        UtxoEntry { address, outpoint: outpoint.into(), amount, script_public_key, block_daa_score, is_coinbase }
+impl From<RpcRegistryByAddressesEntry> for RegistryUnit {
+    fn from(entry: RpcRegistryByAddressesEntry) -> RegistryUnit {
+        let RpcRegistryByAddressesEntry { address, outpoint, registry_unit_entry } = entry;
+        let RpcRegistryUnit { amount, script_public_key, block_daa_score, is_coinbase } = registry_unit_entry;
+        RegistryUnit { address, outpoint: outpoint.into(), amount, script_public_key, block_daa_score, is_coinbase }
     }
 }
 
-impl From<RpcUtxosByAddressesEntry> for UtxoEntryReference {
-    fn from(entry: RpcUtxosByAddressesEntry) -> Self {
-        Self { utxo: Arc::new(entry.into()) }
+impl From<RpcRegistryByAddressesEntry> for RegistryUnitRef {
+    fn from(entry: RpcRegistryByAddressesEntry) -> Self {
+        Self { registry_unit: Arc::new(entry.into()) }
     }
 }
 
-impl From<&RpcUtxosByAddressesEntry> for UtxoEntryReference {
-    fn from(entry: &RpcUtxosByAddressesEntry) -> Self {
-        Self { utxo: Arc::new(entry.clone().into()) }
+impl From<&RpcRegistryByAddressesEntry> for RegistryUnitRef {
+    fn from(entry: &RpcRegistryByAddressesEntry) -> Self {
+        Self { registry_unit: Arc::new(entry.clone().into()) }
     }
 }
 
@@ -37,7 +37,7 @@ cfg_if::cfg_if! {
                     header.parents_by_level.map(CompressedParents::from),
                     header.hash_merkle_root,
                     header.accepted_id_merkle_root,
-                    header.utxo_commitment,
+                    header.registry_unit_commitment,
                     header.timestamp,
                     header.bits,
                     header.nonce,
@@ -57,7 +57,7 @@ cfg_if::cfg_if! {
                     header.parents_by_level.clone().map(CompressedParents::from),
                     header.hash_merkle_root,
                     header.accepted_id_merkle_root,
-                    header.utxo_commitment,
+                    header.registry_unit_commitment,
                     header.timestamp,
                     header.bits,
                     header.nonce,

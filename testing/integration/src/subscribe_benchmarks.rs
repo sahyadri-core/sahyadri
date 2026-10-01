@@ -60,7 +60,7 @@ fn create_client_addresses(index: usize, network_id: &NetworkId) -> Vec<Address>
     // between notifiers and from notifier to broadcasters at grpc server and rpc core levels
     let max_address = ((NOTIFY_CLIENTS - index) * MAX_ADDRESSES / NOTIFY_CLIENTS) + 1;
     let min_address = if (NOTIFY_CLIENTS - index) % (NOTIFY_CLIENTS / 5) == 0 {
-        // Create a typical UTXOs monitoring service subscription scope
+        // Create a typical REGISTRY_UNITs monitoring service subscription scope
         0
     } else {
         // Create a typical wallet subscription scope
@@ -77,10 +77,10 @@ fn create_client_addresses(index: usize, network_id: &NetworkId) -> Vec<Address>
         .collect_vec()
 }
 
-/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::utxos_changed_subscriptions_sanity_check --exact --nocapture --ignored`
+/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::registry_changed_subscriptions_sanity_check --exact --nocapture --ignored`
 #[tokio::test]
 #[ignore = "bmk"]
-async fn utxos_changed_subscriptions_sanity_check() {
+async fn registry_changed_subscriptions_sanity_check() {
     init_allocator_with_default_settings();
     sahyadri_core::log::try_init_logger(
         "INFO, sahyadri_core::time=debug, sahyadri_rpc_core=debug, sahyadri_grpc_client=debug, sahyadri_notify=info, sahyadri_notify::address::tracker=debug, sahyadri_notify::listener=debug, sahyadri_notify::subscription::single=debug, sahyadri_mining::monitor=debug, sahyadri_testing_integration::subscribe_benchmarks=trace",
@@ -107,7 +107,7 @@ async fn utxos_changed_subscriptions_sanity_check() {
     );
     let server_start_time = std::time::Instant::now();
     let mut daemon_process = tokio::process::Command::new("cargo")
-        .args(daemon_args.to_command_args("subscribe_benchmarks::bench_utxos_changed_subscriptions_daemon"))
+        .args(daemon_args.to_command_args("subscribe_benchmarks::bench_registry_changed_subscriptions_daemon"))
         .spawn()
         .expect("failed to start daemon process");
 
@@ -133,13 +133,13 @@ async fn utxos_changed_subscriptions_sanity_check() {
     daemon_process.wait().await.expect("failed to wait for the daemon process");
 }
 
-/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_utxos_changed_subscriptions_daemon --exact --nocapture --ignored -- --rpc=16610 --p2p=16611 --private-key=a2760251adb5b6e8d4514d23397f1631893e168c33f92ff8a7a24f397d355d62 --max-tracked-addresses=1000000 --utxoindex`
+/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_registry_changed_subscriptions_daemon --exact --nocapture --ignored -- --rpc=16610 --p2p=16611 --private-key=a2760251adb5b6e8d4514d23397f1631893e168c33f92ff8a7a24f397d355d62 --max-tracked-addresses=1000000 --registry_unitindex`
 ///
 /// This test is designed to be run as a child process, with the parent process eventually shutting it down.
 /// Do not run it directly.
 #[tokio::test]
 #[ignore = "bmk"]
-async fn bench_utxos_changed_subscriptions_daemon() {
+async fn bench_registry_changed_subscriptions_daemon() {
     init_allocator_with_default_settings();
     sahyadri_core::log::try_init_logger(
         "INFO, sahyadri_core::core=trace, sahyadri_core::time=debug, sahyadri_rpc_core=debug, sahyadri_grpc_client=debug, sahyadri_notify=info, sahyadri_notify::address::tracker=debug, sahyadri_notify::listener=debug, sahyadri_notify::subscription::single=debug, sahyadri_mining::monitor=debug, sahyadri_testing_integration::subscribe_benchmarks=trace",
@@ -166,7 +166,7 @@ async fn bench_utxos_changed_subscriptions_daemon() {
     trace!("Daemon was successfully shut down");
 }
 
-async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_max_cycles: usize) {
+async fn registry_changed_subscriptions_client(address_cycle_seconds: u64, address_max_cycles: usize) {
     init_allocator_with_default_settings();
     sahyadri_core::log::try_init_logger(
         "INFO, sahyadri_core::time=debug, sahyadri_rpc_core=debug, sahyadri_grpc_client=debug, sahyadri_notify=info, sahyadri_notify::address::tracker=debug, sahyadri_notify::listener=debug, sahyadri_notify::subscription::single=debug, sahyadri_mining::monitor=debug, sahyadri_testing_integration::subscribe_benchmarks=trace",
@@ -196,21 +196,21 @@ async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, PREALLOC_AMOUNT)
         .prealloc_address(prealloc_address)
         .max_tracked_addresses(MAX_ADDRESSES)
-        .utxoindex(true)
+        .registry_unitindex(true)
         .apply_args(Daemon::fill_args_with_random_ports)
         .build();
     let network = args.network();
     let params: Params = network.into();
 
-    let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
+    let registry_unitset = args.generate_prealloc_registry_units(args.num_prealloc_registry_units.unwrap());
     let txs = common::utils::generate_tx_dag(
-        utxoset.clone(),
+        registry_unitset.clone(),
         prealloc_kp.clone(),
         spk,
         (TX_COUNT + TX_LEVEL_WIDTH - 1) / TX_LEVEL_WIDTH,
         TX_LEVEL_WIDTH,
     );
-    common::utils::verify_tx_dag(&utxoset, &txs);
+    common::utils::verify_tx_dag(&registry_unitset, &txs);
     info!("Generated overall {} txs", txs.len());
 
     // Start the daemon
@@ -225,7 +225,7 @@ async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_
     );
     let server_start_time = std::time::Instant::now();
     let mut daemon_process = tokio::process::Command::new("cargo")
-        .args(daemon_args.to_command_args("subscribe_benchmarks::bench_utxos_changed_subscriptions_daemon"))
+        .args(daemon_args.to_command_args("subscribe_benchmarks::bench_registry_changed_subscriptions_daemon"))
         .spawn()
         .expect("failed to start daemon process");
 
@@ -290,42 +290,42 @@ async fn utxos_changed_subscriptions_client(address_cycle_seconds: u64, address_
     daemon_process.wait().await.expect("failed to wait for the daemon process");
 }
 
-/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_utxos_changed_subscriptions_footprint_a --exact --nocapture --ignored`
+/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_registry_changed_subscriptions_footprint_a --exact --nocapture --ignored`
 #[tokio::test]
 #[ignore = "bmk"]
-async fn bench_utxos_changed_subscriptions_footprint_a() {
+async fn bench_registry_changed_subscriptions_footprint_a() {
     // No subscriptions
-    utxos_changed_subscriptions_client(1200, 0).await;
+    registry_changed_subscriptions_client(1200, 0).await;
 }
 
-/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_utxos_changed_subscriptions_footprint_b --exact --nocapture --ignored`
+/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_registry_changed_subscriptions_footprint_b --exact --nocapture --ignored`
 #[tokio::test]
 #[ignore = "bmk"]
-async fn bench_utxos_changed_subscriptions_footprint_b() {
+async fn bench_registry_changed_subscriptions_footprint_b() {
     // Single initial subscriptions, no cycles
-    utxos_changed_subscriptions_client(60, 1).await;
+    registry_changed_subscriptions_client(60, 1).await;
 }
 
-/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_utxos_changed_subscriptions_footprint_c --exact --nocapture --ignored`
+/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_registry_changed_subscriptions_footprint_c --exact --nocapture --ignored`
 #[tokio::test]
 #[ignore = "bmk"]
-async fn bench_utxos_changed_subscriptions_footprint_c() {
+async fn bench_registry_changed_subscriptions_footprint_c() {
     // 2 hours subscription cycles
-    utxos_changed_subscriptions_client(7200, usize::MAX).await;
+    registry_changed_subscriptions_client(7200, usize::MAX).await;
 }
 
-/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_utxos_changed_subscriptions_footprint_d --exact --nocapture --ignored`
+/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_registry_changed_subscriptions_footprint_d --exact --nocapture --ignored`
 #[tokio::test]
 #[ignore = "bmk"]
-async fn bench_utxos_changed_subscriptions_footprint_d() {
+async fn bench_registry_changed_subscriptions_footprint_d() {
     // 30 minutes subscription cycles
-    utxos_changed_subscriptions_client(1800, usize::MAX).await;
+    registry_changed_subscriptions_client(1800, usize::MAX).await;
 }
 
-/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_utxos_changed_subscriptions_footprint_e --exact --nocapture --ignored`
+/// `cargo test --package sahyadri-testing-integration --lib --features devnet-prealloc -- subscribe_benchmarks::bench_registry_changed_subscriptions_footprint_e --exact --nocapture --ignored`
 #[tokio::test]
 #[ignore = "bmk"]
-async fn bench_utxos_changed_subscriptions_footprint_e() {
+async fn bench_registry_changed_subscriptions_footprint_e() {
     // 3 minutes subscription cycles
-    utxos_changed_subscriptions_client(180, usize::MAX).await;
+    registry_changed_subscriptions_client(180, usize::MAX).await;
 }

@@ -3,11 +3,11 @@ use crate::protowire::{
     sahyadrid_response::Payload,
 };
 use crate::protowire::{
-    FinalityConflictNotificationMessage, FinalityConflictResolvedNotificationMessage, NotifyPruningPointUtxoSetOverrideRequestMessage,
-    NotifyPruningPointUtxoSetOverrideResponseMessage, NotifyUtxosChangedRequestMessage, NotifyUtxosChangedResponseMessage,
-    PruningPointUtxoSetOverrideNotificationMessage, SinkBlueScoreChangedNotificationMessage,
-    StopNotifyingPruningPointUtxoSetOverrideRequestMessage, StopNotifyingPruningPointUtxoSetOverrideResponseMessage,
-    StopNotifyingUtxosChangedRequestMessage, StopNotifyingUtxosChangedResponseMessage, UtxosChangedNotificationMessage,
+    FinalityConflictNotificationMessage, FinalityConflictResolvedNotificationMessage, NotifyPruningPointRegistryUnitSetOverrideRequestMessage,
+    NotifyPruningPointRegistryUnitSetOverrideResponseMessage, NotifyRegistryChangedRequestMessage, NotifyRegistryChangedResponseMessage,
+    PruningPointRegistryUnitSetOverrideNotificationMessage, SinkBlueScoreChangedNotificationMessage,
+    StopNotifyingPruningPointRegistryUnitSetOverrideRequestMessage, StopNotifyingPruningPointRegistryUnitSetOverrideResponseMessage,
+    StopNotifyingRegistryChangedRequestMessage, StopNotifyingRegistryChangedResponseMessage, RegistryChangedNotificationMessage,
     VirtualChainChangedNotificationMessage, VirtualDaaScoreChangedNotificationMessage,
 };
 use crate::{from, try_from};
@@ -29,11 +29,11 @@ from!(item: &sahyadri_rpc_core::Notification, Payload, {
         Notification::VirtualChainChanged(notification) => Payload::VirtualChainChangedNotification(notification.into()),
         Notification::FinalityConflict(notification) => Payload::FinalityConflictNotification(notification.into()),
         Notification::FinalityConflictResolved(notification) => Payload::FinalityConflictResolvedNotification(notification.into()),
-        Notification::UtxosChanged(notification) => Payload::UtxosChangedNotification(notification.into()),
+        Notification::RegistryChanged(notification) => Payload::RegistryChangedNotification(notification.into()),
         Notification::SinkBlueScoreChanged(notification) => Payload::SinkBlueScoreChangedNotification(notification.into()),
         Notification::VirtualDaaScoreChanged(notification) => Payload::VirtualDaaScoreChangedNotification(notification.into()),
-        Notification::PruningPointUtxoSetOverride(notification) => {
-            Payload::PruningPointUtxoSetOverrideNotification(notification.into())
+        Notification::PruningPointRegistryUnitSetOverride(notification) => {
+            Payload::PruningPointRegistryUnitSetOverrideNotification(notification.into())
         },
     }
 });
@@ -58,7 +58,7 @@ from!(item: &sahyadri_rpc_core::FinalityConflictResolvedNotification, FinalityCo
     Self { finality_block_hash: item.finality_block_hash.to_string() }
 });
 
-from!(item: &sahyadri_rpc_core::UtxosChangedNotification, UtxosChangedNotificationMessage, {
+from!(item: &sahyadri_rpc_core::RegistryChangedNotification, RegistryChangedNotificationMessage, {
     Self {
         added: item.added.iter().map(|x| x.into()).collect::<Vec<_>>(),
         removed: item.removed.iter().map(|x| x.into()).collect::<Vec<_>>(),
@@ -73,7 +73,7 @@ from!(item: &sahyadri_rpc_core::VirtualDaaScoreChangedNotification, VirtualDaaSc
     Self { virtual_daa_score: item.virtual_daa_score }
 });
 
-from!(&sahyadri_rpc_core::PruningPointUtxoSetOverrideNotification, PruningPointUtxoSetOverrideNotificationMessage);
+from!(&sahyadri_rpc_core::PruningPointRegistryUnitSetOverrideNotification, PruningPointRegistryUnitSetOverrideNotificationMessage);
 
 from!(item: Command, RpcNotifyCommand, {
     match item {
@@ -82,11 +82,11 @@ from!(item: Command, RpcNotifyCommand, {
     }
 });
 
-from!(item: &StopNotifyingUtxosChangedRequestMessage, NotifyUtxosChangedRequestMessage, {
+from!(item: &StopNotifyingRegistryChangedRequestMessage, NotifyRegistryChangedRequestMessage, {
     Self { addresses: item.addresses.clone(), command: Command::Stop.into() }
 });
 
-from!(_item: &StopNotifyingPruningPointUtxoSetOverrideRequestMessage, NotifyPruningPointUtxoSetOverrideRequestMessage, {
+from!(_item: &StopNotifyingPruningPointRegistryUnitSetOverrideRequestMessage, NotifyPruningPointRegistryUnitSetOverrideRequestMessage, {
     Self { command: Command::Stop.into() }
 });
 
@@ -110,13 +110,13 @@ try_from!(item: &Payload, sahyadri_rpc_core::Notification, {
         Payload::FinalityConflictResolvedNotification(notification) => {
             Notification::FinalityConflictResolved(notification.try_into()?)
         }
-        Payload::UtxosChangedNotification(notification) => Notification::UtxosChanged(notification.try_into()?),
+        Payload::RegistryChangedNotification(notification) => Notification::RegistryChanged(notification.try_into()?),
         Payload::SinkBlueScoreChangedNotification(notification) => Notification::SinkBlueScoreChanged(notification.try_into()?),
         Payload::VirtualDaaScoreChangedNotification(notification) => {
             Notification::VirtualDaaScoreChanged(notification.try_into()?)
         }
-        Payload::PruningPointUtxoSetOverrideNotification(notification) => {
-            Notification::PruningPointUtxoSetOverride(notification.try_into()?)
+        Payload::PruningPointRegistryUnitSetOverrideNotification(notification) => {
+            Notification::PruningPointRegistryUnitSetOverride(notification.try_into()?)
         }
         _ => Err(RpcError::UnsupportedFeature)?,
     }
@@ -155,7 +155,7 @@ try_from!(item: &FinalityConflictResolvedNotificationMessage, sahyadri_rpc_core:
     Self { finality_block_hash: RpcHash::from_str(&item.finality_block_hash)? }
 });
 
-try_from!(item: &UtxosChangedNotificationMessage, sahyadri_rpc_core::UtxosChangedNotification, {
+try_from!(item: &RegistryChangedNotificationMessage, sahyadri_rpc_core::RegistryChangedNotification, {
     Self {
         added: Arc::new(item.added.iter().map(|x| x.try_into()).collect::<Result<Vec<_>, _>>()?),
         removed: Arc::new(item.removed.iter().map(|x| x.try_into()).collect::<Result<Vec<_>, _>>()?),
@@ -170,7 +170,7 @@ try_from!(item: &VirtualDaaScoreChangedNotificationMessage, sahyadri_rpc_core::V
     Self { virtual_daa_score: item.virtual_daa_score }
 });
 
-try_from!(&PruningPointUtxoSetOverrideNotificationMessage, sahyadri_rpc_core::PruningPointUtxoSetOverrideNotification);
+try_from!(&PruningPointRegistryUnitSetOverrideNotificationMessage, sahyadri_rpc_core::PruningPointRegistryUnitSetOverrideNotification);
 
 from!(item: RpcNotifyCommand, Command, {
     match item {
@@ -179,8 +179,8 @@ from!(item: RpcNotifyCommand, Command, {
     }
 });
 
-from!(item: NotifyUtxosChangedResponseMessage, StopNotifyingUtxosChangedResponseMessage, { Self { error: item.error } });
+from!(item: NotifyRegistryChangedResponseMessage, StopNotifyingRegistryChangedResponseMessage, { Self { error: item.error } });
 
-from!(item: NotifyPruningPointUtxoSetOverrideResponseMessage, StopNotifyingPruningPointUtxoSetOverrideResponseMessage, {
+from!(item: NotifyPruningPointRegistryUnitSetOverrideResponseMessage, StopNotifyingPruningPointRegistryUnitSetOverrideResponseMessage, {
     Self { error: item.error }
 });

@@ -3,7 +3,7 @@ globalThis.WebSocket = require('websocket').w3cwebsocket; // W3C WebSocket modul
 let sahyadri = require('../sahyadri/sahyadri_wasm');
 const { parseArgs, guardRpcIsSynced } = require("../utils");
 let {
-    RpcClient, UtxoSet, Address, Encoding, UtxoOrdering,
+    RpcClient, RegistryUnitSet, Address, Encoding, RegistryUnitOrdering,
     PaymentOutputs, PaymentOutput,
     XPrivateKey,
     VirtualTransaction,
@@ -43,20 +43,20 @@ sahyadri.init_console_panic_hook();
 
     console.log("\nJSON.stringify(addresses):", JSON.stringify(addresses));
 
-    console.log("\ngetting UTXOs...");
-    const utxosByAddress = await rpc.getUtxosByAddresses({ addresses });
-    console.log("Creating UtxoSet...");
-    //console.log("utxos_by_address", utxos_by_address)
-    const utxoSet = UtxoSet.from(utxosByAddress);
+    console.log("\ngetting REGISTRY_UNITs...");
+    const registry_unitsByAddress = await rpc.getRegistryUnitsByAddresses({ addresses });
+    console.log("Creating RegistryUnitSet...");
+    //console.log("registry_units_by_address", registry_units_by_address)
+    const registry_unitSet = RegistryUnitSet.from(registry_unitsByAddress);
 
-    //console.log("utxos_by_address", utxos_by_address)
+    //console.log("registry_units_by_address", registry_units_by_address)
 
     const amount = 1000n;
 
-    const utxoSelection = await utxoSet.select(amount + 100n, UtxoOrdering.AscendingAmount);
+    const registry_unitSelection = await registry_unitSet.select(amount + 100n, RegistryUnitOrdering.AscendingAmount);
 
-    console.log("utxo_selection.amount", utxoSelection.amount)
-    console.log("utxo_selection.totalAmount", utxoSelection.totalAmount)
+    console.log("registry_unit_selection.amount", registry_unitSelection.amount)
+    console.log("registry_unit_selection.totalAmount", registry_unitSelection.totalAmount)
 
     const outputs = [
         [
@@ -70,7 +70,7 @@ sahyadri.init_console_panic_hook();
     const changeAddress = addr;
 
     const priorityFee = 1500;
-    const tx = createTransaction(utxoSelection, outputs, changeAddress, priorityFee);
+    const tx = createTransaction(registry_unitSelection, outputs, changeAddress, priorityFee);
     const scriptHashes = tx.getScriptHashes();
     console.log("scriptHashes", scriptHashes)
 

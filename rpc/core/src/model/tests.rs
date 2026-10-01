@@ -146,7 +146,7 @@ mod mockery {
                 nonce: mock(),
                 hash_merkle_root: mock(),
                 accepted_id_merkle_root: mock(),
-                utxo_commitment: mock(),
+                registry_unit_commitment: mock(),
                 hash: mock(),
                 parents_by_level: vec![mock()],
                 daa_score: mock(),
@@ -166,7 +166,7 @@ mod mockery {
                 nonce: mock(),
                 hash_merkle_root: mock(),
                 accepted_id_merkle_root: mock(),
-                utxo_commitment: mock(),
+                registry_unit_commitment: mock(),
                 parents_by_level: vec![mock()],
                 daa_score: mock(),
                 blue_score: mock(),
@@ -207,7 +207,7 @@ mod mockery {
 
     impl Mock for RpcOptionalTransactionInputVerboseData {
         fn mock() -> Self {
-            RpcOptionalTransactionInputVerboseData { utxo_entry: mock() }
+            RpcOptionalTransactionInputVerboseData { registry_unit_entry: mock() }
         }
     }
 
@@ -235,9 +235,9 @@ mod mockery {
         }
     }
 
-    impl Mock for RpcOptionalTransactionOutpoint {
+    impl Mock for RpcOptionalRegistryRef {
         fn mock() -> Self {
-            RpcOptionalTransactionOutpoint { transaction_id: mock(), index: mock() }
+            RpcOptionalRegistryRef { transaction_id: mock(), index: mock() }
         }
     }
 
@@ -289,9 +289,9 @@ mod mockery {
         }
     }
 
-    impl Mock for RpcUtxoEntryVerbosity {
+    impl Mock for RpcRegistryUnitVerbosity {
         fn mock() -> Self {
-            RpcUtxoEntryVerbosity {
+            RpcRegistryUnitVerbosity {
                 include_amount: mock(),
                 include_script_public_key: mock(),
                 include_block_daa_score: mock(),
@@ -301,15 +301,15 @@ mod mockery {
         }
     }
 
-    impl Mock for RpcUtxoEntryVerboseDataVerbosity {
+    impl Mock for RpcRegistryUnitVerboseDataVerbosity {
         fn mock() -> Self {
-            RpcUtxoEntryVerboseDataVerbosity { include_script_public_key_type: mock(), include_script_public_key_address: mock() }
+            RpcRegistryUnitVerboseDataVerbosity { include_script_public_key_type: mock(), include_script_public_key_address: mock() }
         }
     }
 
     impl Mock for RpcTransactionInputVerboseDataVerbosity {
         fn mock() -> Self {
-            RpcTransactionInputVerboseDataVerbosity { utxo_entry_verbosity: mock() }
+            RpcTransactionInputVerboseDataVerbosity { registry_unit_entry_verbosity: mock() }
         }
     }
 
@@ -415,7 +415,7 @@ mod mockery {
                 nonce: mock(),
                 hash_merkle_root: mock(),
                 accepted_id_merkle_root: mock(),
-                utxo_commitment: mock(),
+                registry_unit_commitment: mock(),
                 hash: mock(),
                 parents_by_level: mock(),
                 daa_score: mock(),
@@ -499,15 +499,15 @@ mod mockery {
         }
     }
 
-    impl Mock for RpcUtxoEntry {
+    impl Mock for RpcRegistryUnit {
         fn mock() -> Self {
-            RpcUtxoEntry { amount: mock(), script_public_key: mock(), block_daa_score: mock(), is_coinbase: mock() }
+            RpcRegistryUnit { amount: mock(), script_public_key: mock(), block_daa_score: mock(), is_coinbase: mock() }
         }
     }
 
-    impl Mock for RpcOptionalUtxoEntry {
+    impl Mock for RpcOptionalRegistryUnit {
         fn mock() -> Self {
-            RpcOptionalUtxoEntry {
+            RpcOptionalRegistryUnit {
                 amount: mock(),
                 script_public_key: mock(),
                 block_daa_score: mock(),
@@ -517,9 +517,9 @@ mod mockery {
         }
     }
 
-    impl Mock for RpcOptionalUtxoEntryVerboseData {
+    impl Mock for RpcOptionalRegistryUnitVerboseData {
         fn mock() -> Self {
-            RpcOptionalUtxoEntryVerboseData { script_public_key_type: mock(), script_public_key_address: mock() }
+            RpcOptionalRegistryUnitVerboseData { script_public_key_type: mock(), script_public_key_address: mock() }
         }
     }
 
@@ -534,15 +534,15 @@ mod mockery {
         }
     }
 
-    impl Mock for RpcTransactionOutpoint {
+    impl Mock for RpcRegistryRef {
         fn mock() -> Self {
-            RpcTransactionOutpoint { transaction_id: mock(), index: mock() }
+            RpcRegistryRef { transaction_id: mock(), index: mock() }
         }
     }
 
-    impl Mock for RpcUtxosByAddressesEntry {
+    impl Mock for RpcRegistryByAddressesEntry {
         fn mock() -> Self {
-            RpcUtxosByAddressesEntry { address: mock(), outpoint: mock(), utxo_entry: mock() }
+            RpcRegistryByAddressesEntry { address: mock(), outpoint: mock(), registry_unit_entry: mock() }
         }
     }
 
@@ -685,7 +685,7 @@ mod mockery {
                 p2p_id: Hash::mock().to_string(),
                 mempool_size: mock(),
                 server_version: "0.4.2".to_string(),
-                is_utxo_indexed: true,
+                is_registry_unit_indexed: true,
                 is_synced: false,
                 has_notify_command: true,
                 has_message_id: false,
@@ -1030,21 +1030,21 @@ mod mockery {
 
     test!(GetSinkBlueScoreResponse);
 
-    impl Mock for GetUtxosByAddressesRequest {
+    impl Mock for GetRegistryByAddressesRequest {
         fn mock() -> Self {
-            GetUtxosByAddressesRequest { addresses: mock() }
+            GetRegistryByAddressesRequest { addresses: mock() }
         }
     }
 
-    test!(GetUtxosByAddressesRequest);
+    test!(GetRegistryByAddressesRequest);
 
-    impl Mock for GetUtxosByAddressesResponse {
+    impl Mock for GetRegistryByAddressesResponse {
         fn mock() -> Self {
-            GetUtxosByAddressesResponse { entries: mock() }
+            GetRegistryByAddressesResponse { entries: mock() }
         }
     }
 
-    test!(GetUtxosByAddressesResponse);
+    test!(GetRegistryByAddressesResponse);
 
     impl Mock for BanRequest {
         fn mock() -> Self {
@@ -1228,7 +1228,7 @@ mod mockery {
                 rpc_api_revision: mock(),
                 server_version: "0.4.2".to_string(),
                 network_id: NetworkType::Mainnet.try_into().unwrap(),
-                has_utxo_index: true,
+                has_registry_unit_index: true,
                 is_synced: false,
                 virtual_daa_score: mock(),
             }
@@ -1395,29 +1395,29 @@ mod mockery {
 
     test!(FinalityConflictResolvedNotification);
 
-    impl Mock for NotifyUtxosChangedRequest {
+    impl Mock for NotifyRegistryChangedRequest {
         fn mock() -> Self {
-            NotifyUtxosChangedRequest { addresses: mock(), command: Command::Start }
+            NotifyRegistryChangedRequest { addresses: mock(), command: Command::Start }
         }
     }
 
-    test!(NotifyUtxosChangedRequest);
+    test!(NotifyRegistryChangedRequest);
 
-    impl Mock for NotifyUtxosChangedResponse {
+    impl Mock for NotifyRegistryChangedResponse {
         fn mock() -> Self {
-            NotifyUtxosChangedResponse {}
+            NotifyRegistryChangedResponse {}
         }
     }
 
-    test!(NotifyUtxosChangedResponse);
+    test!(NotifyRegistryChangedResponse);
 
-    impl Mock for UtxosChangedNotification {
+    impl Mock for RegistryChangedNotification {
         fn mock() -> Self {
-            UtxosChangedNotification { added: mock(), removed: mock() }
+            RegistryChangedNotification { added: mock(), removed: mock() }
         }
     }
 
-    test!(UtxosChangedNotification);
+    test!(RegistryChangedNotification);
 
     impl Mock for NotifySinkBlueScoreChangedRequest {
         fn mock() -> Self {
@@ -1467,29 +1467,29 @@ mod mockery {
 
     test!(VirtualDaaScoreChangedNotification);
 
-    impl Mock for NotifyPruningPointUtxoSetOverrideRequest {
+    impl Mock for NotifyPruningPointRegistryUnitSetOverrideRequest {
         fn mock() -> Self {
-            NotifyPruningPointUtxoSetOverrideRequest { command: Command::Start }
+            NotifyPruningPointRegistryUnitSetOverrideRequest { command: Command::Start }
         }
     }
 
-    test!(NotifyPruningPointUtxoSetOverrideRequest);
+    test!(NotifyPruningPointRegistryUnitSetOverrideRequest);
 
-    impl Mock for NotifyPruningPointUtxoSetOverrideResponse {
+    impl Mock for NotifyPruningPointRegistryUnitSetOverrideResponse {
         fn mock() -> Self {
-            NotifyPruningPointUtxoSetOverrideResponse {}
+            NotifyPruningPointRegistryUnitSetOverrideResponse {}
         }
     }
 
-    test!(NotifyPruningPointUtxoSetOverrideResponse);
+    test!(NotifyPruningPointRegistryUnitSetOverrideResponse);
 
-    impl Mock for PruningPointUtxoSetOverrideNotification {
+    impl Mock for PruningPointRegistryUnitSetOverrideNotification {
         fn mock() -> Self {
-            PruningPointUtxoSetOverrideNotification {}
+            PruningPointRegistryUnitSetOverrideNotification {}
         }
     }
 
-    test!(PruningPointUtxoSetOverrideNotification);
+    test!(PruningPointRegistryUnitSetOverrideNotification);
 
     impl Mock for NotifyNewBlockTemplateRequest {
         fn mock() -> Self {

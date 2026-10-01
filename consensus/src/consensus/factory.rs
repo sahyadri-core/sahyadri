@@ -1,5 +1,3 @@
-#[cfg(feature = "devnet-prealloc")]
-use super::utxo_set_override::{set_genesis_utxo_commitment_from_config, set_initial_utxo_set};
 use super::{Consensus, ctl::Ctl};
 use crate::{model::stores::U64Key, pipeline::ProcessingCounters};
 use itertools::Itertools;
@@ -279,8 +277,7 @@ impl Factory {
     ) -> Self {
         assert!(fd_budget > 0, "fd_budget has to be positive");
         let mut config = config.clone();
-        #[cfg(feature = "devnet-prealloc")]
-        set_genesis_utxo_commitment_from_config(&mut config);
+        // SAHYADRI: REGISTRY_UNIT set override removed (account model).
         config.process_genesis = false;
         let management_store = Arc::new(RwLock::new(MultiConsensusManagementStore::new(management_db)));
         management_store.write().set_is_archival_node(config.is_archival);
@@ -348,9 +345,6 @@ impl ConsensusFactory for Factory {
         // We write the new active entry only once the instance was created successfully.
         // This way we can safely avoid processing genesis in future process runs
         if is_new_consensus {
-            #[cfg(feature = "devnet-prealloc")]
-            set_initial_utxo_set(&self.config.initial_utxo_set, consensus.clone(), self.config.params.genesis.hash);
-            self.management_store.write().save_new_active_consensus(entry).unwrap();
         }
 
         (ConsensusInstance::new(session_lock, consensus.clone()), Arc::new(Ctl::new(self.management_store.clone(), db, consensus)))
@@ -384,8 +378,8 @@ impl ConsensusFactory for Factory {
         ));
 
         // The default for the body_missing_anticone_set is an empty vector, which corresponds precisely to the state before a consensus commit
-        // But The default value for the pruning_utxoset_stable_flag is true, but a staging consensus does not have a utxo and hence the flag is dropped explicitly
-        consensus.set_pruning_utxoset_stable_flag(false);
+        // But The default value for the pruning_registry_unitset_stable_flag is true, but a staging consensus does not have a registry_unit and hence the flag is dropped explicitly
+        consensus.set_pruning_registry_stable_flag(false);
 
         (ConsensusInstance::new(session_lock, consensus.clone()), Arc::new(Ctl::new(self.management_store.clone(), db, consensus)))
     }

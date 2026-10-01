@@ -12,7 +12,7 @@ use crate::mempool::{
 use sahyadri_consensus_core::{
     api::ConsensusApi,
     constants::UNACCEPTED_DAA_SCORE,
-    tx::{MutableTransaction, Transaction, TransactionId, TransactionOutpoint, UtxoEntry},
+    tx::{MutableTransaction, Transaction, TransactionId, RegistryRef, RegistryUnit},
 };
 use sahyadri_core::{debug, info};
 
@@ -85,7 +85,7 @@ impl Mempool {
         let mempool_fullness = current_tx_count / max_tx_count;
         let is_emergency_mode = mempool_fullness > 0.80; // 80% Full
 
-        // 2. Extract Sender's Wallet Address (From the first input's UTXO entry)
+        // 2. Extract Sender's Wallet Address (From the first input's REGISTRY_UNIT entry)
         let mut sender_address = String::new();
         if let Some(Some(entry)) = transaction.entries.first() {
             let script = entry.script_public_key.script();
@@ -206,7 +206,7 @@ impl Mempool {
     ) -> Vec<MempoolTransaction> {
         let mut unorphaned_transactions = Vec::new();
         let transaction_id = transaction.id();
-        let mut outpoint = TransactionOutpoint::new(transaction_id, 0);
+        let mut outpoint = RegistryRef::new(transaction_id, 0);
         for (i, output) in transaction.outputs.iter().enumerate() {
             outpoint.index = i as u32;
             let mut orphan_id = None;
@@ -214,7 +214,7 @@ impl Mempool {
                 for (i, input) in orphan.mtx.tx.inputs.iter().enumerate() {
                     if input.previous_outpoint == outpoint {
                         if orphan.mtx.entries[i].is_none() {
-                            let entry = UtxoEntry::new(output.value, output.script_public_key.clone(), UNACCEPTED_DAA_SCORE, false);
+                            let entry = RegistryUnit::new(output.value, output.script_public_key.clone(), UNACCEPTED_DAA_SCORE, false);
                             orphan.mtx.entries[i] = Some(entry);
                             if orphan.mtx.is_verifiable() {
                                 orphan_id = Some(orphan.id());

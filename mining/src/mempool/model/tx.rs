@@ -1,5 +1,5 @@
 use crate::mempool::tx::{Priority, RbfPolicy};
-use sahyadri_consensus_core::tx::{MutableTransaction, Transaction, TransactionId, TransactionOutpoint};
+use sahyadri_consensus_core::tx::{MutableTransaction, Transaction, TransactionId, RegistryRef};
 use sahyadri_mining_errors::mempool::RuleError;
 use std::{
     fmt::{Display, Formatter},
@@ -39,12 +39,12 @@ impl RbfPolicy {
 }
 
 pub(crate) struct DoubleSpend {
-    pub outpoint: TransactionOutpoint,
+    pub outpoint: RegistryRef,
     pub owner_id: TransactionId,
 }
 
 impl DoubleSpend {
-    pub fn new(outpoint: TransactionOutpoint, owner_id: TransactionId) -> Self {
+    pub fn new(outpoint: RegistryRef, owner_id: TransactionId) -> Self {
         Self { outpoint, owner_id }
     }
 }

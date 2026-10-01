@@ -71,15 +71,15 @@ from!(item: &sahyadri_rpc_core::RpcOptionalTransactionOutput, protowire::RpcTran
     }
 });
 
-from!(item: &sahyadri_rpc_core::RpcTransactionOutpoint, protowire::RpcOutpoint, {
+from!(item: &sahyadri_rpc_core::RpcRegistryRef, protowire::RpcOutpoint, {
     Self { transaction_id: item.transaction_id.to_string(), index: item.index }
 });
 
-from!(item: &sahyadri_rpc_core::RpcOptionalTransactionOutpoint, protowire::RpcOutpoint, {
+from!(item: &sahyadri_rpc_core::RpcOptionalRegistryRef, protowire::RpcOutpoint, {
     Self { transaction_id: item.transaction_id.as_ref().map(|x| x.to_string()).unwrap_or_default(), index: item.index.unwrap_or_default() }
 });
 
-from!(item: &sahyadri_rpc_core::RpcUtxoEntry, protowire::RpcUtxoEntry, {
+from!(item: &sahyadri_rpc_core::RpcRegistryUnit, protowire::RpcRegistryUnit, {
     Self {
         amount: item.amount,
         script_public_key: Some((&item.script_public_key).into()),
@@ -89,7 +89,7 @@ from!(item: &sahyadri_rpc_core::RpcUtxoEntry, protowire::RpcUtxoEntry, {
     }
 });
 
-from!(item: &sahyadri_rpc_core::RpcOptionalUtxoEntry, protowire::RpcUtxoEntry, {
+from!(item: &sahyadri_rpc_core::RpcOptionalRegistryUnit, protowire::RpcRegistryUnit, {
     Self {
         amount: item.amount.unwrap_or_default(),
         script_public_key: item.script_public_key.as_ref().map(|x| x.into()),
@@ -99,7 +99,7 @@ from!(item: &sahyadri_rpc_core::RpcOptionalUtxoEntry, protowire::RpcUtxoEntry, {
     }
 });
 
-from!(item: &sahyadri_rpc_core::RpcOptionalUtxoEntryVerboseData, protowire::RpcUtxoEntryVerboseData, {
+from!(item: &sahyadri_rpc_core::RpcOptionalRegistryUnitVerboseData, protowire::RpcRegistryUnitVerboseData, {
     Self {
         script_public_key_type: item.script_public_key_type.as_ref().map(|x| x.to_string()).unwrap_or_default(),
         script_public_key_address: item.script_public_key_address.as_ref().map(|x| x.to_string()).unwrap_or_default(),
@@ -139,13 +139,13 @@ from!(item: &sahyadri_rpc_core::RpcTransactionVerboseData, protowire::RpcTransac
 
 from!(item: &sahyadri_rpc_core::RpcOptionalTransactionInputVerboseData, protowire::RpcTransactionInputVerboseData, {
     Self {
-        utxo_entry: item.utxo_entry.as_ref().map(|x| x.into()),
+        registry_unit_entry: item.registry_unit_entry.as_ref().map(|x| x.into()),
     }
 });
 
 from!(_item: &sahyadri_rpc_core::RpcTransactionInputVerboseData, protowire::RpcTransactionInputVerboseData, {
     Self {
-        utxo_entry: None,
+        registry_unit_entry: None,
     }
 });
 
@@ -170,11 +170,11 @@ from!(item: &sahyadri_rpc_core::RpcAcceptedTransactionIds, protowire::RpcAccepte
     }
 });
 
-from!(item: &sahyadri_rpc_core::RpcUtxosByAddressesEntry, protowire::RpcUtxosByAddressesEntry, {
+from!(item: &sahyadri_rpc_core::RpcRegistryByAddressesEntry, protowire::RpcRegistryByAddressesEntry, {
     Self {
         address: item.address.as_ref().map_or("".to_string(), |x| x.into()),
         outpoint: Some((&item.outpoint).into()),
-        utxo_entry: Some((&item.utxo_entry).into()),
+        registry_unit_entry: Some((&item.registry_unit_entry).into()),
     }
 });
 
@@ -232,7 +232,7 @@ try_from!(item: &protowire::RpcTransactionInput, sahyadri_rpc_core::RpcOptionalT
         previous_outpoint: item
             .previous_outpoint
             .as_ref()
-            .map(sahyadri_rpc_core::RpcOptionalTransactionOutpoint::try_from)
+            .map(sahyadri_rpc_core::RpcOptionalRegistryRef::try_from)
             .transpose()?,
         signature_script: Some(Vec::from_rpc_hex(&item
             .signature_script)?),
@@ -280,18 +280,18 @@ try_from!(item: &protowire::RpcTransactionOutput, sahyadri_rpc_core::RpcOptional
     }
 });
 
-try_from!(item: &protowire::RpcOutpoint, sahyadri_rpc_core::RpcOptionalTransactionOutpoint, {
+try_from!(item: &protowire::RpcOutpoint, sahyadri_rpc_core::RpcOptionalRegistryRef, {
     Self {
         transaction_id: Some(RpcHash::from_str(&item.transaction_id)?),
         index: Some(item.index),
         }
 });
 
-try_from!(item: &protowire::RpcOutpoint, sahyadri_rpc_core::RpcTransactionOutpoint, {
+try_from!(item: &protowire::RpcOutpoint, sahyadri_rpc_core::RpcRegistryRef, {
     Self { transaction_id: RpcHash::from_str(&item.transaction_id)?, index: item.index }
 });
 
-try_from!(item: &protowire::RpcUtxoEntry, sahyadri_rpc_core::RpcUtxoEntry, {
+try_from!(item: &protowire::RpcRegistryUnit, sahyadri_rpc_core::RpcRegistryUnit, {
     Self {
         amount: item.amount,
         script_public_key: item
@@ -304,7 +304,7 @@ try_from!(item: &protowire::RpcUtxoEntry, sahyadri_rpc_core::RpcUtxoEntry, {
     }
 });
 
-try_from!(item: &protowire::RpcUtxoEntry, sahyadri_rpc_core::RpcOptionalUtxoEntry, {
+try_from!(item: &protowire::RpcRegistryUnit, sahyadri_rpc_core::RpcOptionalRegistryUnit, {
     Self {
         amount: Some(item.amount),
         script_public_key: item
@@ -314,11 +314,11 @@ try_from!(item: &protowire::RpcUtxoEntry, sahyadri_rpc_core::RpcOptionalUtxoEntr
             .transpose()?,
         block_daa_score: Some(item.block_daa_score),
         is_coinbase: Some(item.is_coinbase),
-        verbose_data: item.verbose_data.as_ref().map(sahyadri_rpc_core::RpcOptionalUtxoEntryVerboseData::try_from).transpose()?,
+        verbose_data: item.verbose_data.as_ref().map(sahyadri_rpc_core::RpcOptionalRegistryUnitVerboseData::try_from).transpose()?,
     }
 });
 
-try_from!(item: &protowire::RpcUtxoEntryVerboseData, sahyadri_rpc_core::RpcOptionalUtxoEntryVerboseData, {
+try_from!(item: &protowire::RpcRegistryUnitVerboseData, sahyadri_rpc_core::RpcOptionalRegistryUnitVerboseData, {
     Self {
         script_public_key_type: Some(RpcScriptClass::from_str(&item.script_public_key_type)?),
         script_public_key_address: Some(RpcAddress::try_from(item.script_public_key_address.as_ref())?),
@@ -357,7 +357,7 @@ try_from!(&protowire::RpcTransactionInputVerboseData, sahyadri_rpc_core::RpcTran
 
 try_from!(item: &protowire::RpcTransactionInputVerboseData, sahyadri_rpc_core::RpcOptionalTransactionInputVerboseData, {
     Self {
-        utxo_entry: item.utxo_entry.as_ref().map(sahyadri_rpc_core::RpcOptionalUtxoEntry::try_from).transpose()?,
+        registry_unit_entry: item.registry_unit_entry.as_ref().map(sahyadri_rpc_core::RpcOptionalRegistryUnit::try_from).transpose()?,
     }
 });
 
@@ -394,19 +394,19 @@ try_from!(item: &protowire::RpcChainBlockAcceptedTransactions, sahyadri_rpc_core
     }
 });
 
-try_from!(item: &protowire::RpcUtxosByAddressesEntry, sahyadri_rpc_core::RpcUtxosByAddressesEntry, {
+try_from!(item: &protowire::RpcRegistryByAddressesEntry, sahyadri_rpc_core::RpcRegistryByAddressesEntry, {
     let address = if item.address.is_empty() { None } else { Some(item.address.as_str().try_into()?) };
     Self {
         address,
         outpoint: item
             .outpoint
             .as_ref()
-            .ok_or_else(|| RpcError::MissingRpcFieldError("UtxosByAddressesEntry".to_string(), "outpoint".to_string()))?
+            .ok_or_else(|| RpcError::MissingRpcFieldError("RegistryByAddressesEntry".to_string(), "outpoint".to_string()))?
             .try_into()?,
-        utxo_entry: item
-            .utxo_entry
+        registry_unit_entry: item
+            .registry_unit_entry
             .as_ref()
-            .ok_or_else(|| RpcError::MissingRpcFieldError("UtxosByAddressesEntry".to_string(), "utxo_entry".to_string()))?
+            .ok_or_else(|| RpcError::MissingRpcFieldError("RegistryByAddressesEntry".to_string(), "registry_unit_entry".to_string()))?
             .try_into()?,
     }
 });

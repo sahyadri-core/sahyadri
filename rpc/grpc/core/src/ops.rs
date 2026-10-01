@@ -73,7 +73,7 @@ pub enum SahyadridPayloadOps {
     GetSahyadriDagInfo,
     ResolveFinalityConflict,
     GetHeaders,
-    GetUtxosByAddresses,
+    GetRegistryByAddresses,
     GetBalanceByAddress,
     GetDaaScore,
     GetBalancesByAddresses,
@@ -93,22 +93,22 @@ pub enum SahyadridPayloadOps {
     GetFeeEstimate,
     GetFeeEstimateExperimental,
     GetCurrentBlockColor,
-    GetUtxoReturnAddress,
+    GetRegistryUnitReturnAddress,
     GetVirtualChainFromBlockV2,
 
     // Subscription commands for starting/stopping notifications
     NotifyBlockAdded,
     NotifyNewBlockTemplate,
     NotifyFinalityConflict,
-    NotifyUtxosChanged,
+    NotifyRegistryChanged,
     NotifySinkBlueScoreChanged,
-    NotifyPruningPointUtxoSetOverride,
+    NotifyPruningPointRegistryUnitSetOverride,
     NotifyVirtualDaaScoreChanged,
     NotifyVirtualChainChanged,
 
     // Legacy stop subscription commands
-    StopNotifyingUtxosChanged,
-    StopNotifyingPruningPointUtxoSetOverride,
+    StopNotifyingRegistryChanged,
+    StopNotifyingPruningPointRegistryUnitSetOverride,
 
     // Please note:
     // Notification payloads existing in ResponsePayload are not considered valid ops.

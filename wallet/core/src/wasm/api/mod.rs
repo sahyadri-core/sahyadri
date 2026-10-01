@@ -49,7 +49,7 @@ declare_wasm_handlers!([
     AccountsPskbSign,
     AccountsPskbBroadcast,
     AccountsPskbSend,
-    AccountsGetUtxos,
+    AccountsGetRegistryUnits,
     AccountsTransfer,
     AccountsEstimate,
     TransactionsDataGet,

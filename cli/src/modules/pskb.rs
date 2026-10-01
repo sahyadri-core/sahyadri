@@ -2,10 +2,10 @@
 
 use crate::imports::*;
 use sahyadri_addresses::Prefix;
-use sahyadri_consensus_core::tx::{TransactionOutpoint, UtxoEntry};
+use sahyadri_consensus_core::tx::{RegistryRef, RegistryUnit};
 use sahyadri_wallet_core::account::pskb::finalize_pskt_one_or_more_sig_and_redeem_script;
 use sahyadri_wallet_pskt::{
-    prelude::{Bundle, PSKT, Signer, lock_script_sig_templating, script_sig_to_address, unlock_utxos_as_pskb},
+    prelude::{Bundle, PSKT, Signer, lock_script_sig_templating, script_sig_to_address, unlock_registry_units_as_pskb},
     pskt::Inner,
 };
 
@@ -118,31 +118,31 @@ impl Pskb {
                             return self.display_help(ctx, argv).await;
                         }
 
-                        // Get locked UTXO set.
-                        let spend_utxos: Vec<sahyadri_rpc_core::RpcUtxosByAddressesEntry> =
-                            ctx.wallet().rpc_api().get_utxos_by_addresses(vec![script_p2sh.clone()]).await?;
+                        // Get locked REGISTRY_UNIT set.
+                        let spend_registry_units: Vec<sahyadri_rpc_core::RpcRegistryByAddressesEntry> =
+                            ctx.wallet().rpc_api().get_registry_by_addresses(vec![script_p2sh.clone()]).await?;
                         let priority_fee_kana = try_parse_optional_sahyadri_as_kana_i64(argv.first())?.unwrap_or(0) as u64;
 
-                        if spend_utxos.is_empty() {
-                            twarnln!(ctx, "No locked UTXO set found.");
+                        if spend_registry_units.is_empty() {
+                            twarnln!(ctx, "No locked REGISTRY_UNIT set found.");
                             return Ok(());
                         }
 
-                        let references: Vec<(UtxoEntry, TransactionOutpoint)> =
-                            spend_utxos.iter().map(|entry| (entry.utxo_entry.clone().into(), entry.outpoint.into())).collect();
+                        let references: Vec<(RegistryUnit, RegistryRef)> =
+                            spend_registry_units.iter().map(|entry| (entry.registry_unit_entry.clone().into(), entry.outpoint.into())).collect();
 
-                        let total_locked_kana: u64 = spend_utxos.iter().map(|entry| entry.utxo_entry.amount).sum();
+                        let total_locked_kana: u64 = spend_registry_units.iter().map(|entry| entry.registry_unit_entry.amount).sum();
 
                         tprintln!(
                             ctx,
-                            "{} locked UTXO{} found with total amount of {} CSM",
-                            spend_utxos.len(),
-                            if spend_utxos.len() == 1 { "" } else { "s" },
+                            "{} locked REGISTRY_UNIT{} found with total amount of {} CSM",
+                            spend_registry_units.len(),
+                            if spend_registry_units.len() == 1 { "" } else { "s" },
                             kana_to_sahyadri(total_locked_kana)
                         );
 
-                        // Sweep UTXO set.
-                        match unlock_utxos_as_pskb(references, &receive_address, script_sig, priority_fee_kana as u64) {
+                        // Sweep REGISTRY_UNIT set.
+                        match unlock_registry_units_as_pskb(references, &receive_address, script_sig, priority_fee_kana as u64) {
                             Ok(pskb) => {
                                 let pskb_hex = pskb.serialize()?;
                                 tprintln!(ctx, "{pskb_hex}");
@@ -257,7 +257,7 @@ impl Pskb {
                 ("pskb debug <payload>", "Print PSKB debug view"),
                 ("pskb parse <payload>", "Print PSKB formatted view"),
                 ("pskb script lock <payload> <amount> [priority fee]", "Generate a PSKB with one send transaction to given P2SH payload. Optional public key placeholder in payload: {{pubkey}}"),
-                ("pskb script unlock <payload> <fee>", "Generate a PSKB to unlock UTXOS one by one from given P2SH payload. Fee amount will be applied to every spent UTXO, meaning every transaction. Optional public key placeholder in payload: {{pubkey}}"),
+                ("pskb script unlock <payload> <fee>", "Generate a PSKB to unlock REGISTRY_UNITS one by one from given P2SH payload. Fee amount will be applied to every spent REGISTRY_UNIT, meaning every transaction. Optional public key placeholder in payload: {{pubkey}}"),
                 ("pskb script sign <pskb>", "Sign all PSKB's P2SH locked inputs"),
                 ("pskb script sign <pskb>", "Sign all PSKB's P2SH locked inputs"),
                 ("pskb script address <pskb>", "Prints P2SH address"),

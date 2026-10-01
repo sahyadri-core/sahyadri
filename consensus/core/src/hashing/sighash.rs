@@ -3,7 +3,7 @@ use sahyadri_hashes::{Hash, Hasher, HasherBase, TransactionSigningHash, Transact
 use std::cell::Cell;
 use std::sync::Arc;
 
-use crate::tx::{ScriptPublicKey, Transaction, TransactionOutpoint, TransactionOutput, VerifiableTransaction};
+use crate::tx::{ScriptPublicKey, Transaction, RegistryRef, TransactionOutput, VerifiableTransaction};
 
 use super::{HasherExtensions, sighash_type::SigHashType};
 
@@ -220,7 +220,7 @@ pub fn outputs_hash(tx: &Transaction, hash_type: SigHashType, reused_values: &im
     reused_values.outputs_hash(hash)
 }
 
-pub fn hash_outpoint(hasher: &mut impl Hasher, outpoint: TransactionOutpoint) {
+pub fn hash_outpoint(hasher: &mut impl Hasher, outpoint: RegistryRef) {
     hasher.update(outpoint.transaction_id);
     hasher.write_u32(outpoint.index);
 }
@@ -285,7 +285,7 @@ mod tests {
     use crate::{
         hashing::sighash_type::{SIG_HASH_ALL, SIG_HASH_ANY_ONE_CAN_PAY, SIG_HASH_NONE, SIG_HASH_SINGLE},
         subnets::{SUBNETWORK_ID_NATIVE, SubnetworkId},
-        tx::{PopulatedTransaction, Transaction, TransactionId, TransactionInput, UtxoEntry},
+        tx::{PopulatedTransaction, Transaction, TransactionId, TransactionInput, RegistryUnit},
     };
 
     use super::*;
@@ -306,19 +306,19 @@ mod tests {
             0,
             vec![
                 TransactionInput {
-                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: 0 },
+                    previous_outpoint: RegistryRef { transaction_id: prev_tx_id, index: 0 },
                     signature_script: vec![],
                     sequence: 0,
                     sig_op_count: 0,
                 },
                 TransactionInput {
-                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: 1 },
+                    previous_outpoint: RegistryRef { transaction_id: prev_tx_id, index: 1 },
                     signature_script: vec![],
                     sequence: 1,
                     sig_op_count: 0,
                 },
                 TransactionInput {
-                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: 2 },
+                    previous_outpoint: RegistryRef { transaction_id: prev_tx_id, index: 2 },
                     signature_script: vec![],
                     sequence: 2,
                     sig_op_count: 0,
@@ -337,19 +337,19 @@ mod tests {
         let native_populated_tx = PopulatedTransaction::new(
             &native_tx,
             vec![
-                UtxoEntry {
+                RegistryUnit {
                     amount: 100,
                     script_public_key: ScriptPublicKey::new(0, script_pub_key_1.clone()),
                     block_daa_score: 0,
                     is_coinbase: false,
                 },
-                UtxoEntry {
+                RegistryUnit {
                     amount: 200,
                     script_public_key: ScriptPublicKey::new(0, script_pub_key_2.clone()),
                     block_daa_score: 0,
                     is_coinbase: false,
                 },
-                UtxoEntry {
+                RegistryUnit {
                     amount: 300,
                     script_public_key: ScriptPublicKey::new(0, script_pub_key_2.clone()),
                     block_daa_score: 0,
@@ -365,19 +365,19 @@ mod tests {
         let subnetwork_populated_tx = PopulatedTransaction::new(
             &subnetwork_tx,
             vec![
-                UtxoEntry {
+                RegistryUnit {
                     amount: 100,
                     script_public_key: ScriptPublicKey::new(0, script_pub_key_1),
                     block_daa_score: 0,
                     is_coinbase: false,
                 },
-                UtxoEntry {
+                RegistryUnit {
                     amount: 200,
                     script_public_key: ScriptPublicKey::new(0, script_pub_key_2.clone()),
                     block_daa_score: 0,
                     is_coinbase: false,
                 },
-                UtxoEntry {
+                RegistryUnit {
                     amount: 300,
                     script_public_key: ScriptPublicKey::new(0, script_pub_key_2),
                     block_daa_score: 0,

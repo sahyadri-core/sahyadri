@@ -25,7 +25,7 @@ pub struct DaemonArgs {
     #[arg(long)]
     pub p2p: u16,
 
-    /// Preallocated UTXOs private key
+    /// Preallocated REGISTRY_UNITs private key
     #[arg(long, name = "private-key")]
     pub private_key: String,
 
@@ -36,7 +36,7 @@ pub struct DaemonArgs {
     pub max_tracked_addresses: usize,
 
     #[arg(long)]
-    pub utxoindex: bool,
+    pub registry_unitindex: bool,
 }
 
 impl DaemonArgs {
@@ -46,9 +46,9 @@ impl DaemonArgs {
         private_key: String,
         stat_file_prefix: Option<String>,
         max_tracked_addresses: usize,
-        utxoindex: bool,
+        registry_unitindex: bool,
     ) -> Self {
-        Self { rpc, p2p, private_key, stat_file_prefix, max_tracked_addresses, utxoindex }
+        Self { rpc, p2p, private_key, stat_file_prefix, max_tracked_addresses, registry_unitindex }
     }
 
     pub fn from_env_args() -> Self {
@@ -91,8 +91,8 @@ impl DaemonArgs {
             args.push("--stat-file-prefix".to_owned());
             args.push(stat_file_prefix.clone());
         }
-        if self.utxoindex {
-            args.push("--utxoindex".to_owned());
+        if self.registry_unitindex {
+            args.push("--registry_unitindex".to_owned());
         }
         args
     }
@@ -114,7 +114,7 @@ impl DaemonArgs {
         args.listen = Some(format!("0.0.0.0:{}", self.p2p).try_into().unwrap());
         args.prealloc_address = Some(self.prealloc_address().to_string());
         args.max_tracked_addresses = self.max_tracked_addresses;
-        args.utxoindex = self.utxoindex;
+        args.registry_unitindex = self.registry_unitindex;
     }
 
     #[cfg(not(feature = "devnet-prealloc"))]
@@ -122,7 +122,7 @@ impl DaemonArgs {
         args.rpclisten = Some(format!("0.0.0.0:{}", self.rpc).try_into().unwrap());
         args.listen = Some(format!("0.0.0.0:{}", self.p2p).try_into().unwrap());
         args.max_tracked_addresses = self.max_tracked_addresses;
-        args.utxoindex = self.utxoindex;
+        args.registry_unitindex = self.registry_unitindex;
     }
 }
 

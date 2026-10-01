@@ -1,5 +1,5 @@
 use derive_more::Display;
-use sahyadri_consensus_core::{acceptance_data::AcceptanceData, block::Block, utxo::utxo_diff::UtxoDiff};
+use sahyadri_consensus_core::{acceptance_data::AcceptanceData, block::Block};
 use sahyadri_hashes::Hash;
 use sahyadri_notify::{
     events::EventType,
@@ -8,7 +8,7 @@ use sahyadri_notify::{
     subscription::{
         Subscription,
         context::SubscriptionContext,
-        single::{OverallSubscription, UtxosChangedSubscription, VirtualChainChangedSubscription},
+        single::{OverallSubscription, RegistryChangedSubscription, VirtualChainChangedSubscription},
     },
 };
 use std::sync::Arc;
@@ -28,17 +28,14 @@ pub enum Notification {
     #[display(fmt = "FinalityConflict notification: violating block hash {}", "_0.finality_block_hash")]
     FinalityConflictResolved(FinalityConflictResolvedNotification),
 
-    #[display(fmt = "UtxosChanged notification")]
-    UtxosChanged(UtxosChangedNotification),
-
     #[display(fmt = "SinkBlueScoreChanged notification: virtual selected parent blue score {}", "_0.sink_blue_score")]
     SinkBlueScoreChanged(SinkBlueScoreChangedNotification),
 
     #[display(fmt = "VirtualDaaScoreChanged notification: virtual DAA score {}", "_0.virtual_daa_score")]
     VirtualDaaScoreChanged(VirtualDaaScoreChangedNotification),
 
-    #[display(fmt = "PruningPointUtxoSetOverride notification")]
-    PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification),
+    #[display(fmt = "PruningPointRegistryUnitSetOverride notification")]
+    PruningPointRegistryUnitSetOverride(PruningPointRegistryUnitSetOverrideNotification),
 
     #[display(fmt = "NewBlockTemplate notification")]
     NewBlockTemplate(NewBlockTemplateNotification),
@@ -78,9 +75,9 @@ impl NotificationTrait for Notification {
         }
     }
 
-    fn apply_utxos_changed_subscription(
+    fn apply_registry_changed_subscription(
         &self,
-        _subscription: &UtxosChangedSubscription,
+        _subscription: &RegistryChangedSubscription,
         _context: &SubscriptionContext,
     ) -> Option<Self> {
         // No effort is made here to apply the subscription addresses.
@@ -143,19 +140,6 @@ impl FinalityConflictResolvedNotification {
 }
 
 #[derive(Debug, Clone)]
-pub struct UtxosChangedNotification {
-    /// Accumulated UTXO diff between the last virtual state and the current virtual state
-    pub accumulated_utxo_diff: Arc<UtxoDiff>,
-    pub virtual_parents: Arc<Vec<Hash>>,
-}
-
-impl UtxosChangedNotification {
-    pub fn new(accumulated_utxo_diff: Arc<UtxoDiff>, virtual_parents: Arc<Vec<Hash>>) -> Self {
-        Self { accumulated_utxo_diff, virtual_parents }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct SinkBlueScoreChangedNotification {
     pub sink_blue_score: u64,
 }
@@ -178,7 +162,7 @@ impl VirtualDaaScoreChangedNotification {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct PruningPointUtxoSetOverrideNotification {}
+pub struct PruningPointRegistryUnitSetOverrideNotification {}
 
 #[derive(Debug, Clone)]
 pub struct NewBlockTemplateNotification {}

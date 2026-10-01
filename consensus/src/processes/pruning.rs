@@ -241,7 +241,7 @@ impl<
             let current_header = self.headers_store.get_header(current).unwrap();
             // Post-raigad: expected header pruning point is no longer part of header validity, but we want to make sure
             // the syncer's virtual chain indeed coincides with the pruning point and past pruning points before downloading
-            // the UTXO set and resolving virtual. Hence we perform the check over this chain here.
+            // the REGISTRY_UNIT set and resolving virtual. Hence we perform the check over this chain here.
             let reply = self.expected_header_pruning_point(self.sahyadri_consensus_store.get_compact_data(current).unwrap());
             if reply.pruning_point != current_header.pruning_point {
                 return Err(PruningImportError::WrongHeaderPruningPoint(current_header.pruning_point, current));

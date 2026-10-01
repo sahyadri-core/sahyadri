@@ -921,15 +921,15 @@ opcode_list! {
     opcode OpOutpointIndex<0xbb, 1>(self, vm) Err(TxScriptError::OpcodeReserved(format!("{self:?}")))
     opcode OpTxInputScriptSig<0xbc, 1>(self, vm) Err(TxScriptError::OpcodeReserved(format!("{self:?}")))
     opcode OpTxInputSeq<0xbd, 1>(self, vm) Err(TxScriptError::OpcodeReserved(format!("{self:?}")))
-    // UTXO related opcodes (following UtxoEntry struct field order)
+    // REGISTRY_UNIT related opcodes (following RegistryUnit struct field order)
     opcode OpTxInputAmount<0xbe, 1>(self, vm) {
         match vm.script_source {
             ScriptSource::TxInput{tx, ..} => {
                 let [idx]: [i32; 1] = vm.dstack.pop_items()?;
-                let utxo = usize::try_from(idx).ok()
-                    .and_then(|idx| tx.utxo(idx))
+                let registry_unit = usize::try_from(idx).ok()
+                    .and_then(|idx| tx.registry_unit(idx))
                     .ok_or_else(|| TxScriptError::InvalidInputIndex(idx, tx.inputs().len()))?;
-                push_number(utxo.amount.try_into().map_err(|e: TryFromIntError| TxScriptError::NumberTooBig(e.to_string()))?, vm)
+                push_number(registry_unit.amount.try_into().map_err(|e: TryFromIntError| TxScriptError::NumberTooBig(e.to_string()))?, vm)
             },
             _ => Err(TxScriptError::InvalidSource("OpInputAmount only applies to transaction inputs".to_string()))
         }
@@ -938,10 +938,10 @@ opcode_list! {
         match vm.script_source {
             ScriptSource::TxInput{tx, ..} => {
                 let [idx]: [i32; 1] = vm.dstack.pop_items()?;
-                let utxo = usize::try_from(idx).ok()
-                    .and_then(|idx| tx.utxo(idx))
+                let registry_unit = usize::try_from(idx).ok()
+                    .and_then(|idx| tx.registry_unit(idx))
                     .ok_or_else(|| TxScriptError::InvalidInputIndex(idx, tx.inputs().len()))?;
-                vm.dstack.push(utxo.script_public_key.to_bytes());
+                vm.dstack.push(registry_unit.script_public_key.to_bytes());
                 Ok(())
             },
             _ => Err(TxScriptError::InvalidSource("OpInputSpk only applies to transaction inputs".to_string()))
@@ -1062,7 +1062,7 @@ mod test {
     use sahyadri_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
     use sahyadri_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
     use sahyadri_consensus_core::tx::{
-        PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
+        PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput, RegistryUnit,
         VerifiableTransaction,
     };
 
@@ -2781,16 +2781,16 @@ mod test {
             &self.0
         }
 
-        fn populated_input(&self, _index: usize) -> (&TransactionInput, &UtxoEntry) {
+        fn populated_input(&self, _index: usize) -> (&TransactionInput, &RegistryUnit) {
             unimplemented!()
         }
-        fn utxo(&self, _index: usize) -> Option<&UtxoEntry> {
+        fn registry_unit(&self, _index: usize) -> Option<&RegistryUnit> {
             unimplemented!()
         }
     }
 
-    fn make_mock_transaction(lock_time: u64) -> (VerifiableTransactionMock, TransactionInput, UtxoEntry) {
-        let dummy_prev_out = TransactionOutpoint::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
+    fn make_mock_transaction(lock_time: u64) -> (VerifiableTransactionMock, TransactionInput, RegistryUnit) {
+        let dummy_prev_out = RegistryRef::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
         let dummy_sig_script = vec![0u8; 65];
         let dummy_tx_input = TransactionInput::new(dummy_prev_out, dummy_sig_script, 10, 1);
         let addr_hash = vec![1u8; 32];
@@ -2808,14 +2808,14 @@ mod test {
             0,
             vec![],
         ));
-        let utxo_entry = UtxoEntry::new(0, ScriptPublicKey::default(), 0, false);
-        (tx, dummy_tx_input, utxo_entry)
+        let registry_unit_entry = RegistryUnit::new(0, ScriptPublicKey::default(), 0, false);
+        (tx, dummy_tx_input, registry_unit_entry)
     }
 
     #[test]
     fn test_opchecklocktimeverify() {
         // Everything we need to build a script source
-        let (base_tx, input, utxo_entry) = make_mock_transaction(1);
+        let (base_tx, input, registry_unit_entry) = make_mock_transaction(1);
 
         let sig_cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
@@ -2830,7 +2830,7 @@ mod test {
         ] {
             let mut tx = base_tx.clone();
             tx.0.lock_time = tx_lock_time;
-            let mut vm = TxScriptEngine::from_transaction_input(&tx, &input, 0, &utxo_entry, &reused_values, &sig_cache);
+            let mut vm = TxScriptEngine::from_transaction_input(&tx, &input, 0, &registry_unit_entry, &reused_values, &sig_cache);
             vm.dstack = vec![lock_time.clone()];
             match code.execute(&mut vm) {
                 // Message is based on the should_fail values
@@ -2856,7 +2856,7 @@ mod test {
     #[test]
     fn test_opchecksequencerify() {
         // Everything we need to build a script source
-        let (tx, base_input, utxo_entry) = make_mock_transaction(1);
+        let (tx, base_input, registry_unit_entry) = make_mock_transaction(1);
 
         let sig_cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
@@ -2872,7 +2872,7 @@ mod test {
         ] {
             let mut input = base_input.clone();
             input.sequence = tx_sequence;
-            let mut vm = TxScriptEngine::from_transaction_input(&tx, &input, 0, &utxo_entry, &reused_values, &sig_cache);
+            let mut vm = TxScriptEngine::from_transaction_input(&tx, &input, 0, &registry_unit_entry, &reused_values, &sig_cache);
             vm.dstack = vec![sequence.clone()];
             match code.execute(&mut vm) {
                 // Message is based on the should_fail values
@@ -2998,20 +2998,20 @@ mod test {
             pay_to_address_script(&addr)
         }
 
-        fn kip_10_tx_mock(inputs: Vec<Kip10Mock>, outputs: Vec<Kip10Mock>) -> (Transaction, Vec<UtxoEntry>) {
-            let dummy_prev_out = TransactionOutpoint::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
+        fn kip_10_tx_mock(inputs: Vec<Kip10Mock>, outputs: Vec<Kip10Mock>) -> (Transaction, Vec<RegistryUnit>) {
+            let dummy_prev_out = RegistryRef::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
             let dummy_sig_script = vec![0u8; 65];
-            let (utxos, tx_inputs) = inputs
+            let (registry_units, tx_inputs) = inputs
                 .into_iter()
                 .map(|Kip10Mock { spk, amount }| {
-                    (UtxoEntry::new(amount, spk, 0, false), TransactionInput::new(dummy_prev_out, dummy_sig_script.clone(), 10, 0))
+                    (RegistryUnit::new(amount, spk, 0, false), TransactionInput::new(dummy_prev_out, dummy_sig_script.clone(), 10, 0))
                 })
                 .unzip();
 
             let tx_out = outputs.into_iter().map(|Kip10Mock { spk, amount }| TransactionOutput::new(amount, spk));
 
             let tx = Transaction::new(TX_VERSION + 1, tx_inputs, tx_out.collect(), 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
-            (tx, utxos)
+            (tx, registry_units)
         }
 
         #[derive(Debug)]
@@ -3051,8 +3051,8 @@ mod test {
             let outputs =
                 vec![Kip10Mock { spk: output_spk1.clone(), amount: 3333 }, Kip10Mock { spk: output_spk2.clone(), amount: 4444 }];
 
-            let (tx, utxo_entries) = kip_10_tx_mock(inputs, outputs);
-            let tx = PopulatedTransaction::new(&tx, utxo_entries);
+            let (tx, registry_unit_entries) = kip_10_tx_mock(inputs, outputs);
+            let tx = PopulatedTransaction::new(&tx, registry_unit_entries);
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
 
@@ -3061,7 +3061,7 @@ mod test {
                     &tx,
                     &tx.inputs()[current_idx],
                     current_idx,
-                    tx.utxo(current_idx).unwrap(),
+                    tx.registry_unit(current_idx).unwrap(),
                     &reused_values,
                     &sig_cache,
                 );
@@ -3244,8 +3244,8 @@ mod test {
                 execute_test_group(&group);
             }
         }
-        fn create_mock_tx(input_count: usize, output_count: usize) -> (Transaction, Vec<UtxoEntry>) {
-            let dummy_prev_out = TransactionOutpoint::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
+        fn create_mock_tx(input_count: usize, output_count: usize) -> (Transaction, Vec<RegistryUnit>) {
+            let dummy_prev_out = RegistryRef::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
             let dummy_sig_script = vec![0u8; 65];
 
             // Create inputs with different SPKs and amounts
@@ -3256,10 +3256,10 @@ mod test {
             let outputs: Vec<Kip10Mock> =
                 (0..output_count).map(|i| Kip10Mock { spk: create_mock_spk((100 + i) as u8), amount: 2000 + i as u64 }).collect();
 
-            let (utxos, tx_inputs): (Vec<_>, Vec<_>) = inputs
+            let (registry_units, tx_inputs): (Vec<_>, Vec<_>) = inputs
                 .into_iter()
                 .map(|Kip10Mock { spk, amount }| {
-                    (UtxoEntry::new(amount, spk, 0, false), TransactionInput::new(dummy_prev_out, dummy_sig_script.clone(), 10, 0))
+                    (RegistryUnit::new(amount, spk, 0, false), TransactionInput::new(dummy_prev_out, dummy_sig_script.clone(), 10, 0))
                 })
                 .unzip();
 
@@ -3268,7 +3268,7 @@ mod test {
 
             let tx = Transaction::new(TX_VERSION + 1, tx_inputs, tx_outputs, 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
 
-            (tx, utxos)
+            (tx, registry_units)
         }
 
         #[test]
@@ -3285,8 +3285,8 @@ mod test {
             ];
 
             for (input_count, output_count) in test_cases {
-                let (tx, utxo_entries) = create_mock_tx(input_count, output_count);
-                let tx = PopulatedTransaction::new(&tx, utxo_entries);
+                let (tx, registry_unit_entries) = create_mock_tx(input_count, output_count);
+                let tx = PopulatedTransaction::new(&tx, registry_unit_entries);
                 let sig_cache = Cache::new(10_000);
                 let reused_values = SigHashReusedValuesUnsync::new();
 
@@ -3294,7 +3294,7 @@ mod test {
                     &tx,
                     &tx.inputs()[0], // Use first input
                     0,
-                    tx.utxo(0).unwrap(),
+                    tx.registry_unit(0).unwrap(),
                     &reused_values,
                     &sig_cache,
                 );
@@ -3344,8 +3344,8 @@ mod test {
             let input_mock = Kip10Mock { spk: spk.clone(), amount: 200 };
             let output_mock = Kip10Mock { spk: create_mock_spk(1), amount: 100 };
 
-            let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock.clone()], vec![output_mock]);
-            let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+            let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock.clone()], vec![output_mock]);
+            let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
 
             // Set signature script to push redeem script
             tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
@@ -3357,7 +3357,7 @@ mod test {
             // Test success case
             {
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -3368,13 +3368,13 @@ mod test {
                     spk: create_mock_spk(1),
                     amount: 99, // Wrong amount
                 };
-                let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock.clone()], vec![output_mock]);
-                let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+                let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock.clone()], vec![output_mock]);
+                let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -3402,12 +3402,12 @@ mod test {
                 let input_mock = Kip10Mock { spk: spk.clone(), amount: 200 };
                 let output_mock = Kip10Mock { spk: create_mock_spk(1), amount: 100 };
 
-                let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
-                let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+                let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
+                let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -3420,13 +3420,13 @@ mod test {
                 };
                 let output_mock = Kip10Mock { spk: create_mock_spk(1), amount: 100 };
 
-                let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
-                let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+                let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
+                let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -3442,13 +3442,13 @@ mod test {
             let redeem_script = ScriptBuilder::new().add_ops(&[Op0, OpTxInputSpk, OpNop]).unwrap().drain();
             let spk = pay_to_script_hash_script(&redeem_script);
 
-            let (tx, utxo_entries) = kip_10_tx_mock(vec![Kip10Mock { spk, amount: 100 }], vec![]);
-            let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+            let (tx, registry_unit_entries) = kip_10_tx_mock(vec![Kip10Mock { spk, amount: 100 }], vec![]);
+            let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
             tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
             let tx = tx.as_verifiable();
             let mut vm =
-                TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
             // OpInputSpk should push input's SPK onto stack, making it non-empty
             assert_eq!(vm.execute(), Ok(()));
@@ -3466,13 +3466,13 @@ mod test {
             let input_mock1 = Kip10Mock { spk, amount: 100 };
             let input_mock2 = Kip10Mock { spk: create_mock_spk(2), amount: 100 }; // Different SPK
 
-            let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock1, input_mock2], vec![]);
-            let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+            let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock1, input_mock2], vec![]);
+            let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
             tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
             let tx = tx.as_verifiable();
             let mut vm =
-                TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
             // Should succeed because the SPKs are different
             assert_eq!(vm.execute(), Ok(()));
@@ -3491,13 +3491,13 @@ mod test {
             let input_mock1 = Kip10Mock { spk: spk.clone(), amount: 100 };
             let input_mock2 = Kip10Mock { spk, amount: 100 };
 
-            let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock1, input_mock2], vec![]);
-            let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+            let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock1, input_mock2], vec![]);
+            let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
             tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
             let tx = tx.as_verifiable();
             let mut vm =
-                TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
             // Should succeed because both SPKs are identical
             assert_eq!(vm.execute(), Ok(()));
@@ -3529,13 +3529,13 @@ mod test {
                 let input_mock = Kip10Mock { spk: spk.clone(), amount: 200 };
                 let output_mock = Kip10Mock { spk: expected_spk.clone(), amount: 100 };
 
-                let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
-                let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+                let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
+                let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -3548,13 +3548,13 @@ mod test {
                     amount: 100,
                 };
 
-                let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
-                let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+                let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
+                let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -3574,13 +3574,13 @@ mod test {
                 let input_mock = Kip10Mock { spk: spk.clone(), amount: 200 };
                 let output_mock = Kip10Mock { spk: create_mock_spk(1), amount: 100 };
 
-                let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
-                let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+                let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock], vec![output_mock]);
+                let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -3591,13 +3591,13 @@ mod test {
                 let input_mock2 = Kip10Mock { spk: spk.clone(), amount: 200 };
                 let output_mock = Kip10Mock { spk: create_mock_spk(2), amount: 100 };
 
-                let (tx, utxo_entries) = kip_10_tx_mock(vec![input_mock1, input_mock2], vec![output_mock]);
-                let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
+                let (tx, registry_unit_entries) = kip_10_tx_mock(vec![input_mock1, input_mock2], vec![output_mock]);
+                let mut tx = MutableTransaction::with_entries(tx, registry_unit_entries);
                 tx.tx.inputs[1].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.utxo(1).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.registry_unit(1).unwrap(), &reused_values, &sig_cache);
 
                 // Should fail because script expects index 0 but we're at index 1
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
@@ -3626,29 +3626,29 @@ mod test {
             let output_mock2 = Kip10Mock { spk: create_mock_spk(2), amount: 100 };
             let output_mock3 = Kip10Mock { spk: create_mock_spk(3), amount: 150 };
 
-            let (tx, utxo_entries) =
+            let (tx, registry_unit_entries) =
                 kip_10_tx_mock(vec![input_mock1.clone(), input_mock2.clone()], vec![output_mock1, output_mock2, output_mock3]);
 
             // Test InputCount
             {
-                let mut tx = MutableTransaction::with_entries(tx.clone(), utxo_entries.clone());
+                let mut tx = MutableTransaction::with_entries(tx.clone(), registry_unit_entries.clone());
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&input_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Ok(()));
             }
 
             // Test OutputCount
             {
-                let mut tx = MutableTransaction::with_entries(tx.clone(), utxo_entries.clone());
+                let mut tx = MutableTransaction::with_entries(tx.clone(), registry_unit_entries.clone());
                 tx.tx.inputs[1].signature_script = ScriptBuilder::new().add_data(&output_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.utxo(1).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.registry_unit(1).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -3659,12 +3659,12 @@ mod test {
                 let wrong_input_count_script =
                     ScriptBuilder::new().add_op(OpTxInputCount).unwrap().add_i64(3).unwrap().add_op(OpEqual).unwrap().drain();
 
-                let mut tx = MutableTransaction::with_entries(tx.clone(), utxo_entries.clone());
+                let mut tx = MutableTransaction::with_entries(tx.clone(), registry_unit_entries.clone());
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&wrong_input_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.registry_unit(0).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -3674,12 +3674,12 @@ mod test {
                 let wrong_output_count_script =
                     ScriptBuilder::new().add_op(OpTxOutputCount).unwrap().add_i64(2).unwrap().add_op(OpEqual).unwrap().drain();
 
-                let mut tx = MutableTransaction::with_entries(tx.clone(), utxo_entries.clone());
+                let mut tx = MutableTransaction::with_entries(tx.clone(), registry_unit_entries.clone());
                 tx.tx.inputs[1].signature_script = ScriptBuilder::new().add_data(&wrong_output_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
                 let mut vm =
-                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.utxo(1).unwrap(), &reused_values, &sig_cache);
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.registry_unit(1).unwrap(), &reused_values, &sig_cache);
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }

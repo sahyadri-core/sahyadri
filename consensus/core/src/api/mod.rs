@@ -22,8 +22,8 @@ use crate::{
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList, PruningProofMetadata},
     trusted::{ExternalSahyadriConsensusData, TrustedBlock},
     tx::{
-        MutableTransaction, Transaction, TransactionId, TransactionIndexType, TransactionOutpoint, TransactionQueryResult,
-        TransactionType, UtxoEntry,
+        MutableTransaction, Transaction, TransactionId, TransactionIndexType, RegistryRef, TransactionQueryResult,
+        TransactionType, RegistryUnit,
     },
 };
 use sahyadri_hashes::Hash;
@@ -97,13 +97,13 @@ pub trait ConsensusApi: Send + Sync {
 
     /// Resolve a DID document by its associated CSM address
     fn get_did_by_address(&self, address: &str) -> Option<DidDocumentDto>;
-    /// Populates the mempool transaction with maximally found UTXO entry data and proceeds to full transaction
+    /// Populates the mempool transaction with maximally found REGISTRY_UNIT entry data and proceeds to full transaction
     /// validation if all are found. If validation is successful, also `transaction.calculated_fee` is expected to be populated.
     fn validate_mempool_transaction(&self, _transaction: &mut MutableTransaction, _args: &TransactionValidationArgs) -> TxResult<()> {
         unimplemented!()
     }
 
-    /// Populates the mempool transactions with maximally found UTXO entry data and proceeds to full transactions
+    /// Populates the mempool transactions with maximally found REGISTRY_UNIT entry data and proceeds to full transactions
     /// validation if all are found. If validation is successful, also `transaction.calculated_fee` is expected to be populated.
     fn validate_mempool_transactions_in_parallel(
         &self,
@@ -113,12 +113,12 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    /// Populates the mempool transaction with maximally found UTXO entry data.
+    /// Populates the mempool transaction with maximally found REGISTRY_UNIT entry data.
     fn populate_mempool_transaction(&self, _transaction: &mut MutableTransaction) -> TxResult<()> {
         unimplemented!()
     }
 
-    /// Populates the mempool transactions with maximally found UTXO entry data.
+    /// Populates the mempool transactions with maximally found REGISTRY_UNIT entry data.
     fn populate_mempool_transactions_in_parallel(&self, _transactions: &mut [MutableTransaction]) -> Vec<TxResult<()>> {
         unimplemented!()
     }
@@ -244,12 +244,12 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn get_virtual_utxos(
+    fn get_virtual_registry(
         &self,
-        _from_outpoint: Option<TransactionOutpoint>,
+        _from_outpoint: Option<RegistryRef>,
         _chunk_size: usize,
         _skip_first: bool,
-    ) -> Vec<(TransactionOutpoint, UtxoEntry)> {
+    ) -> Vec<(RegistryRef, RegistryUnit)> {
         unimplemented!()
     }
 
@@ -281,11 +281,11 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn append_imported_pruning_point_utxos(&self, _utxoset_chunk: &[(TransactionOutpoint, UtxoEntry)], _current_multiset: &mut MuHash) {
+    fn append_imported_pruning_point_registry_units(&self, _registry_unitset_chunk: &[(RegistryRef, RegistryUnit)], _current_multiset: &mut MuHash) {
         unimplemented!()
     }
 
-    fn import_pruning_point_utxo_set(&self, _new_pruning_point: Hash, _imported_utxo_multiset: MuHash) -> PruningImportResult<()> {
+    fn import_pruning_point_registry_unit_set(&self, _new_pruning_point: Hash, _imported_registry_unit_multiset: MuHash) -> PruningImportResult<()> {
         unimplemented!()
     }
 
@@ -388,13 +388,13 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn get_pruning_point_utxos(
+    fn get_pruning_point_registry(
         &self,
         _expected_pruning_point: Hash,
-        _from_outpoint: Option<TransactionOutpoint>,
+        _from_outpoint: Option<RegistryRef>,
         _chunk_size: usize,
         _skip_first: bool,
-    ) -> ConsensusResult<Vec<(TransactionOutpoint, UtxoEntry)>> {
+    ) -> ConsensusResult<Vec<(RegistryRef, RegistryUnit)>> {
         unimplemented!()
     }
 
@@ -432,15 +432,15 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
-    fn clear_pruning_utxo_set(&self) {
+    fn clear_pruning_registry_set(&self) {
         unimplemented!()
     }
 
-    fn set_pruning_utxoset_stable_flag(&self, _val: bool) {
+    fn set_pruning_registry_stable_flag(&self, _val: bool) {
         unimplemented!()
     }
 
-    fn is_pruning_utxoset_stable(&self) -> bool {
+    fn is_pruning_registry_stable(&self) -> bool {
         unimplemented!()
     }
 

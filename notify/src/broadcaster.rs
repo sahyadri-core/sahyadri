@@ -262,7 +262,7 @@ mod tests {
         listener::Listener,
         notification::test_helpers::*,
         notifier::test_helpers::{
-            SYNC_MAX_DELAY, Step, TestConnection, overall_test_steps, utxos_changed_test_steps, virtual_chain_changed_test_steps,
+            SYNC_MAX_DELAY, Step, TestConnection, overall_test_steps, registry_changed_test_steps, virtual_chain_changed_test_steps,
         },
         subscription::context::SubscriptionContext,
     };
@@ -440,9 +440,9 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    async fn test_utxos_changed() {
+    async fn test_registry_changed() {
         sahyadri_core::log::try_init_logger("trace,sahyadri_notify=trace");
-        let mut test = Test::new("UtxosChanged broadcast", 3, utxos_changed_test_steps(0));
+        let mut test = Test::new("RegistryChanged broadcast", 3, registry_changed_test_steps(0));
         test.run().await;
     }
 }

@@ -19,8 +19,8 @@ pub enum DatabaseStorePrefixes {
     Headers = 8,
     HeadersCompact = 9,
     PastPruningPoints = 10,
-    PruningUtxoset = 11,
-    PruningUtxosetPosition = 12,
+    PruningRegistryUnitset = 11,
+    PruningRegistryUnitsetPosition = 12,
     PruningPoint = 13,
     RetentionCheckpoint = 14,
     Reachability = 15,
@@ -33,9 +33,9 @@ pub enum DatabaseStorePrefixes {
     ChainHighestIndex = 22,
     Statuses = 23,
     Tips = 24,
-    UtxoDiffs = 25,
-    UtxoMultisets = 26,
-    VirtualUtxoset = 27,
+    RegistryUnitDiffs = 25,
+    RegistryUnitMultisets = 26,
+    VirtualRegistryUnitset = 27,
     VirtualState = 28,
     PruningSamples = 29,
 
@@ -64,7 +64,7 @@ pub enum DatabaseStorePrefixes {
     RetentionPeriodRoot = 50,
 
     // ---- Pruning metadata ----
-    PruningUtxosetSyncFlag = 60,
+    PruningRegistryUnitsetSyncFlag = 60,
     BodyMissingAnticone = 61,
 
     // ---- Metadata ----
@@ -76,8 +76,8 @@ pub enum DatabaseStorePrefixes {
     BannedAddresses = 129,
 
     // ---- Indexes ----
-    UtxoIndex = 192,
-    UtxoIndexTips = 193,
+    RegistryUnitIndex = 192,
+    RegistryUnitIndexTips = 193,
     CirculatingSupply = 194,
 
     // ---- Separator ----

@@ -38,15 +38,15 @@ pub const COINBASE_TRANSACTION_INDEX: usize = 0;
 /// A 32-byte Sahyadri transaction identifier.
 pub type TransactionId = sahyadri_hashes::Hash;
 
-/// Holds details about an individual transaction output in a utxo
+/// Holds details about an individual transaction output in a registry_unit
 /// set such as whether or not it was contained in a coinbase tx, the daa
 /// score of the block that accepts the tx, its public key script, and how
 /// much it pays.
 /// @category Consensus
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-#[wasm_bindgen(inspectable, js_name = TransactionUtxoEntry)]
-pub struct UtxoEntry {
+#[wasm_bindgen(inspectable, js_name = TransactionRegistryUnit)]
+pub struct RegistryUnit {
     pub amount: u64,
     #[wasm_bindgen(js_name = scriptPublicKey, getter_with_clone)]
     pub script_public_key: ScriptPublicKey,
@@ -56,32 +56,32 @@ pub struct UtxoEntry {
     pub is_coinbase: bool,
 }
 
-impl UtxoEntry {
+impl RegistryUnit {
     pub fn new(amount: u64, script_public_key: ScriptPublicKey, block_daa_score: u64, is_coinbase: bool) -> Self {
         Self { amount, script_public_key, block_daa_score, is_coinbase }
     }
 }
 
-impl MemSizeEstimator for UtxoEntry {}
+impl MemSizeEstimator for RegistryUnit {}
 
 pub type TransactionIndexType = u32;
 
 /// Represents a Sahyadri transaction outpoint
 #[derive(Eq, Default, Hash, PartialEq, Debug, Copy, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TransactionOutpoint {
+pub struct RegistryRef {
     #[serde(with = "serde_bytes_fixed_ref")]
     pub transaction_id: TransactionId,
     pub index: TransactionIndexType,
 }
 
-impl TransactionOutpoint {
+impl RegistryRef {
     pub fn new(transaction_id: TransactionId, index: u32) -> Self {
         Self { transaction_id, index }
     }
 }
 
-impl Display for TransactionOutpoint {
+impl Display for RegistryRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.transaction_id, self.index)
     }
@@ -91,7 +91,7 @@ impl Display for TransactionOutpoint {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionInput {
-    pub previous_outpoint: TransactionOutpoint,
+    pub previous_outpoint: RegistryRef,
     #[serde(with = "serde_bytes")]
     pub signature_script: Vec<u8>, // TODO: Consider using SmallVec
     pub sequence: u64,
@@ -99,7 +99,7 @@ pub struct TransactionInput {
 }
 
 impl TransactionInput {
-    pub fn new(previous_outpoint: TransactionOutpoint, signature_script: Vec<u8>, sequence: u64, sig_op_count: u8) -> Self {
+    pub fn new(previous_outpoint: RegistryRef, signature_script: Vec<u8>, sequence: u64, sig_op_count: u8) -> Self {
         Self { previous_outpoint, signature_script, sequence, sig_op_count }
     }
 }
@@ -300,12 +300,12 @@ impl MemSizeEstimator for Transaction {
     }
 }
 
-/// Represents any kind of transaction which has populated UTXO entry data and can be verified/signed etc
+/// Represents any kind of transaction which has populated REGISTRY_UNIT entry data and can be verified/signed etc
 pub trait VerifiableTransaction {
     fn tx(&self) -> &Transaction;
 
     /// Returns the `i`'th populated input
-    fn populated_input(&self, index: usize) -> (&TransactionInput, &UtxoEntry);
+    fn populated_input(&self, index: usize) -> (&TransactionInput, &RegistryUnit);
 
     /// Returns an iterator over populated `(input, entry)` pairs
     fn populated_inputs(&self) -> PopulatedInputIterator<'_, Self>
@@ -331,7 +331,7 @@ pub trait VerifiableTransaction {
         self.tx().id()
     }
 
-    fn utxo(&self, index: usize) -> Option<&UtxoEntry>;
+    fn registry_unit(&self, index: usize) -> Option<&RegistryUnit>;
 }
 
 /// A custom iterator written only so that `populated_inputs` has a known return type and can de defined on the trait level
@@ -353,7 +353,7 @@ impl<'a, T: VerifiableTransaction> PopulatedInputIterator<'a, T> {
 }
 
 impl<'a, T: VerifiableTransaction> Iterator for PopulatedInputIterator<'a, T> {
-    type Item = (&'a TransactionInput, &'a UtxoEntry);
+    type Item = (&'a TransactionInput, &'a RegistryUnit);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.r.next().map(|i| self.tx.populated_input(i))
@@ -366,14 +366,14 @@ impl<'a, T: VerifiableTransaction> Iterator for PopulatedInputIterator<'a, T> {
 
 impl<T: VerifiableTransaction> ExactSizeIterator for PopulatedInputIterator<'_, T> {}
 
-/// Represents a read-only referenced transaction along with fully populated UTXO entry data
+/// Represents a read-only referenced transaction along with fully populated REGISTRY_UNIT entry data
 pub struct PopulatedTransaction<'a> {
     pub tx: &'a Transaction,
-    pub entries: Vec<UtxoEntry>,
+    pub entries: Vec<RegistryUnit>,
 }
 
 impl<'a> PopulatedTransaction<'a> {
-    pub fn new(tx: &'a Transaction, entries: Vec<UtxoEntry>) -> Self {
+    pub fn new(tx: &'a Transaction, entries: Vec<RegistryUnit>) -> Self {
         assert_eq!(tx.inputs.len(), entries.len());
         Self { tx, entries }
     }
@@ -384,19 +384,19 @@ impl VerifiableTransaction for PopulatedTransaction<'_> {
         self.tx
     }
 
-    fn populated_input(&self, index: usize) -> (&TransactionInput, &UtxoEntry) {
+    fn populated_input(&self, index: usize) -> (&TransactionInput, &RegistryUnit) {
         (&self.tx.inputs[index], &self.entries[index])
     }
 
-    fn utxo(&self, index: usize) -> Option<&UtxoEntry> {
+    fn registry_unit(&self, index: usize) -> Option<&RegistryUnit> {
         self.entries.get(index)
     }
 }
 
-/// Represents a validated transaction with populated UTXO entry data and a calculated fee
+/// Represents a validated transaction with populated REGISTRY_UNIT entry data and a calculated fee
 pub struct ValidatedTransaction<'a> {
     pub tx: &'a Transaction,
-    pub entries: Vec<UtxoEntry>,
+    pub entries: Vec<RegistryUnit>,
     pub calculated_fee: u64,
 }
 
@@ -411,7 +411,7 @@ impl<'a> ValidatedTransaction<'a> {
     }
 
     /// SAHYADRI ACCOUNT MODEL BYPASS:
-    /// Builds a ValidatedTransaction with no UTXO context and zero fee, for
+    /// Builds a ValidatedTransaction with no REGISTRY_UNIT context and zero fee, for
     /// non-coinbase account-model transactions during the migration period.
     /// Unlike new_coinbase(), this does NOT assert tx.is_coinbase() — callers
     /// are responsible for knowing this tx is an account-model tx, not a coinbase.
@@ -425,11 +425,11 @@ impl VerifiableTransaction for ValidatedTransaction<'_> {
         self.tx
     }
 
-    fn populated_input(&self, index: usize) -> (&TransactionInput, &UtxoEntry) {
+    fn populated_input(&self, index: usize) -> (&TransactionInput, &RegistryUnit) {
         (&self.tx.inputs[index], &self.entries[index])
     }
 
-    fn utxo(&self, index: usize) -> Option<&UtxoEntry> {
+    fn registry_unit(&self, index: usize) -> Option<&RegistryUnit> {
         self.entries.get(index)
     }
 }
@@ -441,13 +441,13 @@ impl AsRef<Transaction> for Transaction {
 }
 
 /// Represents a generic mutable/readonly/pointer transaction type along
-/// with partially filled UTXO entry data and optional fee and mass
+/// with partially filled REGISTRY_UNIT entry data and optional fee and mass
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MutableTransaction<T: AsRef<Transaction> = std::sync::Arc<Transaction>> {
     /// The inner transaction
     pub tx: T,
-    /// Partially filled UTXO entry data
-    pub entries: Vec<Option<UtxoEntry>>,
+    /// Partially filled REGISTRY_UNIT entry data
+    pub entries: Vec<Option<RegistryUnit>>,
     /// Populated fee
     pub calculated_fee: Option<u64>,
     /// Populated non-contextual masses (does not include the storage mass)
@@ -464,13 +464,13 @@ impl<T: AsRef<Transaction>> MutableTransaction<T> {
         self.tx.as_ref().id()
     }
 
-    pub fn with_entries(tx: T, entries: Vec<UtxoEntry>) -> Self {
+    pub fn with_entries(tx: T, entries: Vec<RegistryUnit>) -> Self {
         assert_eq!(tx.as_ref().inputs.len(), entries.len());
         Self { tx, entries: entries.into_iter().map(Some).collect(), calculated_fee: None, calculated_non_contextual_masses: None }
     }
 
     /// Returns the tx wrapped as a [`VerifiableTransaction`]. Note that this function
-    /// must be called only once all UTXO entries are populated, otherwise it panics.
+    /// must be called only once all REGISTRY_UNIT entries are populated, otherwise it panics.
     pub fn as_verifiable(&self) -> impl VerifiableTransaction + '_ {
         assert!(self.is_verifiable());
         MutableTransactionVerifiableWrapper { inner: self }
@@ -485,7 +485,7 @@ impl<T: AsRef<Transaction>> MutableTransaction<T> {
         self.is_verifiable() && self.calculated_fee.is_some() && self.calculated_non_contextual_masses.is_some()
     }
 
-    pub fn missing_outpoints(&self) -> impl Iterator<Item = TransactionOutpoint> + '_ {
+    pub fn missing_outpoints(&self) -> impl Iterator<Item = RegistryRef> + '_ {
         assert_eq!(self.entries.len(), self.tx.as_ref().inputs.len());
         self.entries
             .iter()
@@ -532,8 +532,8 @@ impl<T: AsRef<Transaction>> MemSizeEstimator for MutableTransaction<T> {
                 .entries
                 .iter()
                 .map(|op| {
-                    // size_of::<Option<UtxoEntry>>() already counts SCRIPT_VECTOR_SIZE bytes within, so we only add the delta
-                    size_of::<Option<UtxoEntry>>()
+                    // size_of::<Option<RegistryUnit>>() already counts SCRIPT_VECTOR_SIZE bytes within, so we only add the delta
+                    size_of::<Option<RegistryUnit>>()
                         + op.as_ref().map_or(0, |e| e.script_public_key.script().len().saturating_sub(SCRIPT_VECTOR_SIZE))
                 })
                 .sum::<usize>()
@@ -557,14 +557,14 @@ impl<T: AsRef<Transaction>> VerifiableTransaction for MutableTransactionVerifiab
         self.inner.tx.as_ref()
     }
 
-    fn populated_input(&self, index: usize) -> (&TransactionInput, &UtxoEntry) {
+    fn populated_input(&self, index: usize) -> (&TransactionInput, &RegistryUnit) {
         (
             &self.inner.tx.as_ref().inputs[index],
-            self.inner.entries[index].as_ref().expect("expected to be called only following full UTXO population"),
+            self.inner.entries[index].as_ref().expect("expected to be called only following full REGISTRY_UNIT population"),
         )
     }
 
-    fn utxo(&self, index: usize) -> Option<&UtxoEntry> {
+    fn registry_unit(&self, index: usize) -> Option<&RegistryUnit> {
         self.inner.entries.get(index).and_then(Option::as_ref)
     }
 }
@@ -747,7 +747,7 @@ mod tests {
             1,
             vec![
                 TransactionInput {
-                    previous_outpoint: TransactionOutpoint {
+                    previous_outpoint: RegistryRef {
                         transaction_id: TransactionId::from_slice(&[
                             0x16, 0x5e, 0x38, 0xe8, 0xb3, 0x91, 0x45, 0x95, 0xd9, 0xc6, 0x41, 0xf3, 0xb8, 0xee, 0xc2, 0xf3, 0x46,
                             0x11, 0x89, 0x6b, 0x82, 0x1a, 0x68, 0x3b, 0x7a, 0x4e, 0xde, 0xfe, 0x2c, 0x00, 0x00, 0x00,
@@ -762,7 +762,7 @@ mod tests {
                     sig_op_count: 3,
                 },
                 TransactionInput {
-                    previous_outpoint: TransactionOutpoint {
+                    previous_outpoint: RegistryRef {
                         transaction_id: TransactionId::from_slice(&[
                             0x4b, 0xb0, 0x75, 0x35, 0xdf, 0xd5, 0x8e, 0x0b, 0x3c, 0xd6, 0x4f, 0xd7, 0x15, 0x52, 0x80, 0x87, 0x2a,
                             0x04, 0x71, 0xbc, 0xf8, 0x30, 0x95, 0x52, 0x6a, 0xce, 0x0e, 0x38, 0xc6, 0x00, 0x00, 0x00,

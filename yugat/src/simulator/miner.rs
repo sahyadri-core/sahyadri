@@ -10,11 +10,7 @@ use sahyadri_consensus_core::api::ConsensusApi;
 use sahyadri_consensus_core::block::{Block, TemplateBuildMode, TemplateTransactionSelector};
 use sahyadri_consensus_core::coinbase::MinerData;
 use sahyadri_consensus_core::mass::MassCalculator;
-use sahyadri_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
-use sahyadri_consensus_core::tx::{
-    ScriptPublicKey, ScriptVec, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
-};
-use sahyadri_consensus_core::utxo::utxo_view::UtxoView;
+use sahyadri_consensus_core::tx::{ScriptPublicKey, ScriptVec, Transaction, TransactionId};
 use sahyadri_core::trace;
 use sahyadri_utils::sim::{Environment, Process, Resumption, Suspension};
 use sha2::Digest;
@@ -36,7 +32,7 @@ impl TemplateTransactionSelector for OnetimeTxSelector {
         self.txs.take().unwrap()
     }
 
-    fn reject_selection(&mut self, _tx_id: sahyadri_consensus_core::tx::TransactionId) {
+    fn reject_selection(&mut self, _tx_id: TransactionId) {
         unimplemented!()
     }
 
@@ -57,8 +53,11 @@ pub struct Miner {
     miner_data: MinerData,
     _keypair: sahyadri_dilithium::DilithiumKeyPair,
 
-    // UTXO data related to this miner
-    possible_unspent_outpoints: IndexSet<TransactionOutpoint>,
+    /// Script public keys this miner controls. Populated from coinbase
+    /// outputs seen in processed blocks. In the account model there is no
+    /// per-outpoint tracking — spendability is resolved against the on-chain
+    /// `AccountState` balance at build-tx time.
+    owned_script_keys: IndexSet<ScriptPublicKey>,
 
     // Rand
     dist: Exp<f64>, // The time interval between Poisson(lambda) events distributes ~Exp(lambda)
@@ -71,7 +70,7 @@ pub struct Miner {
     // Config
     _target_txs_per_block: u64,
     target_blocks: Option<u64>,
-    max_cached_outpoints: usize,
+    max_cached_script_keys: usize,
     _long_payload: bool,
 
     // Mass calculator
@@ -100,7 +99,7 @@ impl Miner {
             _params: params.clone(),
             miner_data: MinerData::new(ScriptPublicKey::new(0, ScriptVec::from_slice(&script_pub_key_script_vec)), Vec::new()),
             _keypair: keypair,
-            possible_unspent_outpoints: IndexSet::new(),
+            owned_script_keys: IndexSet::new(),
             dist: Exp::new(bps * hashrate).unwrap(),
             rng: rand::thread_rng(),
             num_blocks: 0,
@@ -108,7 +107,7 @@ impl Miner {
             _target_txs_per_block: target_txs_per_block,
             target_blocks,
             _long_payload: long_payload,
-            max_cached_outpoints: 10_000,
+            max_cached_script_keys: 10_000,
             _mass_calculator: MassCalculator::new(
                 params.mass_per_tx_byte,
                 params.mass_per_script_pub_key_byte,
@@ -137,53 +136,24 @@ impl Miner {
         let virtual_read = self.consensus.virtual_stores.read();
         let _virtual_state = virtual_read.state.get().unwrap();
 
-        // ---------------------------------------------------------
-        // SAHYADRI ACCOUNT MODEL FIX
-        // UTXO (`utxo_set` and `possible_unspent_outpoints`) has been removed.
-        // In the Account model, transactions use Balances and Nonces.
-        // ---------------------------------------------------------
-
-        // TODO for Simulator:
-        // 1. Fetch simulator account balances from `self.consensus.account_store()`
-        // 2. Build `tx.payload` as `[sender_script_bytes][nonce_bytes]`
-        // 3. Push to `txs` vector.
-
+        // ─────────────────────────────────────────────────────────────
+        // SAHYADRI ACCOUNT MODEL
+        //
+        // In the account model there is no per-outpoint tracking. A tx is
+        // signed by the sender's ML-DSA-65 pubkey, and validation reads the
+        // sender's `AccountState` (balance + recent_flashes) directly from
+        // the SMT-backed account store.
+        //
+        // TODO(simulator):
+        //   1. For each sender in `owned_script_keys`, fetch its AccountState
+        //      via `consensus.account_store().get(&spk)`.
+        //   2. Construct a FlashTransaction (see consensus_core::tx::FlashTransaction)
+        //      with pubkey/recipient/amount/fee/expiry/salt/signature.
+        //   3. Push `flash_tx.to_transaction()` into `txs`.
+        //
+        // Until the simulator needs to actually submit txs, we return empty.
+        // ─────────────────────────────────────────────────────────────
         Vec::new()
-    }
-
-    fn _get_spendable_entry(
-        &self,
-        utxo_view: &impl UtxoView,
-        outpoint: TransactionOutpoint,
-        virtual_daa_score: u64,
-    ) -> Option<UtxoEntry> {
-        let entry = utxo_view.get(&outpoint)?;
-        if entry.amount < 2
-            || (entry.is_coinbase
-                && (virtual_daa_score as i64 - entry.block_daa_score as i64) <= self._params.coinbase_maturity() as i64)
-        {
-            return None;
-        }
-        Some(entry)
-    }
-
-    fn _create_unsigned_tx(&self, outpoint: TransactionOutpoint, input_amount: u64, multiple_outputs: bool) -> Transaction {
-        Transaction::new_non_finalized(
-            0,
-            vec![TransactionInput::new(outpoint, vec![], 0, 0)],
-            if multiple_outputs && input_amount > 4 {
-                vec![
-                    TransactionOutput::new(input_amount / 2, self.miner_data.script_public_key.clone()),
-                    TransactionOutput::new(input_amount / 2 - 1, self.miner_data.script_public_key.clone()),
-                ]
-            } else {
-                vec![TransactionOutput::new(input_amount - 1, self.miner_data.script_public_key.clone())]
-            },
-            0,
-            SUBNETWORK_ID_NATIVE,
-            0,
-            vec![],
-        )
     }
 
     pub fn mine(&mut self, env: &mut Environment<Block>) -> Suspension {
@@ -197,13 +167,15 @@ impl Miner {
     }
 
     fn process_block(&mut self, block: Block, env: &mut Environment<Block>) -> Suspension {
+        // Track coinbase outputs paid to us — in the account model this is
+        // equivalent to recording that "we own this script_public_key".
         for tx in block.transactions.iter() {
-            for (i, output) in tx.outputs.iter().enumerate() {
-                if output.script_public_key.eq(&self.miner_data.script_public_key) {
-                    if self.possible_unspent_outpoints.len() == self.max_cached_outpoints {
-                        self.possible_unspent_outpoints.swap_remove_index(self.rng.gen_range(0..self.max_cached_outpoints));
+            for output in tx.outputs.iter() {
+                if output.script_public_key == self.miner_data.script_public_key {
+                    if self.owned_script_keys.len() == self.max_cached_script_keys {
+                        self.owned_script_keys.swap_remove_index(self.rng.gen_range(0..self.max_cached_script_keys));
                     }
-                    self.possible_unspent_outpoints.insert(TransactionOutpoint::new(tx.id(), i as u32));
+                    self.owned_script_keys.insert(output.script_public_key.clone());
                 }
             }
         }
@@ -212,7 +184,7 @@ impl Miner {
         } else {
             let session = self.consensus.acquire_session();
             let status = futures::executor::block_on(self.consensus.validate_and_insert_block(block).virtual_state_task).unwrap();
-            assert!(status.is_utxo_valid_or_pending());
+            assert!(status.is_state_valid_or_pending());
             drop(session);
             Suspension::Idle
         }

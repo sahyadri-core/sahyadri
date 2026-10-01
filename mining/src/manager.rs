@@ -681,7 +681,7 @@ impl MiningManager {
                     match x.is_fully_populated() {
                         false => Some(x),
                         true => {
-                            // If all entries are populated with mempool UTXOs, we already know the transaction is valid
+                            // If all entries are populated with mempool REGISTRY_UNITs, we already know the transaction is valid
                             valid += 1;
                             None
                         }

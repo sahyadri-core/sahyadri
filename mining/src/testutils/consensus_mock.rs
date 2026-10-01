@@ -15,8 +15,8 @@ use sahyadri_consensus_core::{
     header::{CompressedParents, Header},
     mass::{ContextualMasses, NonContextualMasses, transaction_estimated_serialized_size},
     merkle::calc_hash_merkle_root,
-    tx::{MutableTransaction, Transaction, TransactionId, TransactionOutpoint, UtxoEntry},
-    utxo::utxo_collection::UtxoCollection,
+    tx::{MutableTransaction, Transaction, TransactionId, RegistryRef, RegistryUnit},
+    registry_unit::registry_unit_collection::RegistryUnitCollection,
 };
 use sahyadri_core::time::unix_now;
 use sahyadri_hashes::{Hash, ZERO_HASH};
@@ -27,7 +27,7 @@ use std::{collections::HashMap, sync::Arc};
 pub(crate) struct ConsensusMock {
     transactions: RwLock<HashMap<TransactionId, Arc<Transaction>>>,
     statuses: RwLock<HashMap<TransactionId, TxResult<()>>>,
-    utxos: RwLock<UtxoCollection>,
+    registry_units: RwLock<RegistryUnitCollection>,
 }
 
 impl ConsensusMock {
@@ -35,7 +35,7 @@ impl ConsensusMock {
         Self {
             transactions: RwLock::new(HashMap::default()),
             statuses: RwLock::new(HashMap::default()),
-            utxos: RwLock::new(HashMap::default()),
+            registry_units: RwLock::new(HashMap::default()),
         }
     }
 
@@ -46,17 +46,17 @@ impl ConsensusMock {
     pub(crate) fn add_transaction(&self, transaction: Transaction, block_daa_score: u64) {
         let transaction = MutableTransaction::from_tx(transaction);
         let mut transactions = self.transactions.write();
-        let mut utxos = self.utxos.write();
+        let mut registry_units = self.registry_units.write();
 
-        // Remove the spent UTXOs
+        // Remove the spent REGISTRY_UNITs
         transaction.tx.inputs.iter().for_each(|x| {
-            utxos.remove(&x.previous_outpoint);
+            registry_units.remove(&x.previous_outpoint);
         });
-        // Create the new UTXOs
+        // Create the new REGISTRY_UNITs
         transaction.tx.outputs.iter().enumerate().for_each(|(i, x)| {
-            utxos.insert(
-                TransactionOutpoint::new(transaction.id(), i as u32),
-                UtxoEntry::new(x.value, x.script_public_key.clone(), block_daa_score, transaction.tx.is_coinbase()),
+            registry_units.insert(
+                RegistryRef::new(transaction.id(), i as u32),
+                RegistryUnit::new(x.value, x.script_public_key.clone(), block_daa_score, transaction.tx.is_coinbase()),
             );
         });
         // Register the transaction
@@ -64,9 +64,9 @@ impl ConsensusMock {
     }
 
     pub(crate) fn can_finance_transaction(&self, transaction: &MutableTransaction) -> bool {
-        let utxos = self.utxos.read();
+        let registry_units = self.registry_units.read();
         for outpoint in transaction.missing_outpoints() {
-            if !utxos.contains_key(&outpoint) {
+            if !registry_units.contains_key(&outpoint) {
                 return false;
             }
         }
@@ -117,7 +117,7 @@ impl ConsensusApi for ConsensusMock {
         {
             return status.clone();
         }
-        let utxos = self.utxos.read();
+        let registry_units = self.registry_units.read();
         let mut has_missing_outpoints = false;
         for i in 0..mutable_tx.tx.inputs.len() {
             // Keep existing entries
@@ -125,7 +125,7 @@ impl ConsensusApi for ConsensusMock {
                 continue;
             }
             // Try add missing entries
-            if let Some(entry) = utxos.get(&mutable_tx.tx.inputs[i].previous_outpoint) {
+            if let Some(entry) = registry_units.get(&mutable_tx.tx.inputs[i].previous_outpoint) {
                 mutable_tx.entries[i] = Some(entry.clone());
             } else {
                 has_missing_outpoints = true;
@@ -134,7 +134,7 @@ impl ConsensusApi for ConsensusMock {
         if has_missing_outpoints {
             return Err(TxRuleError::MissingTxOutpoints);
         }
-        // At this point we know all UTXO entries are populated, so we can safely calculate the fee
+        // At this point we know all REGISTRY_UNIT entries are populated, so we can safely calculate the fee
         let total_in: u64 = mutable_tx.entries.iter().map(|x| x.as_ref().unwrap().amount).sum();
         let total_out: u64 = mutable_tx.tx.outputs.iter().map(|x| x.value).sum();
         mutable_tx.tx.set_mass(self.calculate_transaction_contextual_masses(mutable_tx).unwrap().storage_mass);

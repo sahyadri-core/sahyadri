@@ -19,7 +19,7 @@ use sahyadri_notify::{
     listener::ListenerLifespan,
     notifier::Notifier,
     subscriber::Subscriber,
-    subscription::{MutationPolicies, UtxosChangedMutationPolicy, context::SubscriptionContext},
+    subscription::{MutationPolicies, RegistryChangedMutationPolicy, context::SubscriptionContext},
 };
 use sahyadri_rpc_core::{
     Notification, RpcResult,
@@ -90,8 +90,8 @@ impl ConnectionHandler {
         broadcasters: usize,
         counters: Arc<TowerConnectionCounters>,
     ) -> Self {
-        // This notifier UTXOs subscription granularity to rpc-core notifier
-        let policies = MutationPolicies::new(UtxosChangedMutationPolicy::AddressSet);
+        // This notifier REGISTRY_UNITs subscription granularity to rpc-core notifier
+        let policies = MutationPolicies::new(RegistryChangedMutationPolicy::AddressSet);
 
         // Prepare core objects
         let core_channel = NotificationChannel::default();

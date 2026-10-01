@@ -35,7 +35,6 @@ pub mod sign;
 pub mod subnets;
 pub mod trusted;
 pub mod tx;
-pub mod utxo;
 
 #[cfg(feature = "zkp")]
 pub mod zkp_batch;

@@ -45,7 +45,7 @@ async fn bench_rpc_high_load() {
     sahyadri_core::log::try_init_logger("info,sahyadri_core::time=debug,sahyadri_mining::monitor=debug");
     sahyadri_core::panic::configure_panic();
 
-    // Setup for pre-allocated UTXOs and transaction generation
+    // Setup for pre-allocated REGISTRY_UNITs and transaction generation
     let mut seed = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut seed);
     let prealloc_kp = sahyadri_dilithium::generate_keypair_from_seed(&seed);
@@ -59,16 +59,16 @@ async fn bench_rpc_high_load() {
     let args = ArgsBuilder::simnet(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR, PREALLOC_AMOUNT_KANA) // Use simnet with prealloc args
         .prealloc_address(prealloc_address.clone()) // Set prealloc address
         .apply_args(Daemon::fill_args_with_random_ports)
-        .utxoindex(true) // Ensure utxoindex is enabled for transaction validation
+        .registry_unitindex(true) // Ensure registry_unitindex is enabled for transaction validation
         .build();
 
     let network = args.network();
     let params: Params = network.into();
 
-    // Generate UTXOs from args
-    let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
-    let txs = generate_tx_dag(utxoset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
-    verify_tx_dag(&utxoset, &txs);
+    // Generate REGISTRY_UNITs from args
+    let registry_unitset = args.generate_prealloc_registry_units(args.num_prealloc_registry_units.unwrap());
+    let txs = generate_tx_dag(registry_unitset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
+    verify_tx_dag(&registry_unitset, &txs);
     info!("Generated overall {} txs for mempool pressure.", txs.len());
 
     let client_manager = Arc::new(ClientManager::new(args));

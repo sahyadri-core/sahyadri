@@ -12,7 +12,7 @@ cfg_if! {
         pub mod signer;
         pub mod tx;
         pub mod utils;
-        pub mod utxo;
+        pub mod registry_unit;
         pub mod encryption;
         pub mod cryptobox;
 
@@ -22,7 +22,7 @@ cfg_if! {
         pub use self::signer::*;
         pub use self::tx::*;
         pub use self::utils::*;
-        pub use self::utxo::*;
+        pub use self::registry_unit::*;
         pub use self::encryption::*;
         pub use self::cryptobox::*;
     }

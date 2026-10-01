@@ -187,7 +187,7 @@ from!(item: RpcResult<&sahyadri_rpc_core::GetInfoResponse>, protowire::GetInfoRe
         p2p_id: item.p2p_id.clone(),
         mempool_size: item.mempool_size,
         server_version: item.server_version.clone(),
-        is_utxo_indexed: item.is_utxo_indexed,
+        is_registry_unit_indexed: item.is_registry_unit_indexed,
         is_synced: item.is_synced,
         has_notify_command: item.has_notify_command,
         has_message_id: item.has_message_id,
@@ -379,11 +379,11 @@ from!(item: RpcResult<&sahyadri_rpc_core::GetHeadersResponse>, protowire::GetHea
     Self { headers: item.headers.iter().map(|x| x.hash.to_string()).collect(), error: None }
 });
 
-from!(item: &sahyadri_rpc_core::GetUtxosByAddressesRequest, protowire::GetUtxosByAddressesRequestMessage, {
+from!(item: &sahyadri_rpc_core::GetRegistryByAddressesRequest, protowire::GetRegistryByAddressesRequestMessage, {
     Self { addresses: item.addresses.iter().map(|x| x.into()).collect() }
 });
-from!(item: RpcResult<&sahyadri_rpc_core::GetUtxosByAddressesResponse>, protowire::GetUtxosByAddressesResponseMessage, {
-    debug!("GRPC, Creating GetUtxosByAddresses message with {} entries", item.entries.len());
+from!(item: RpcResult<&sahyadri_rpc_core::GetRegistryByAddressesResponse>, protowire::GetRegistryByAddressesResponseMessage, {
+    debug!("GRPC, Creating GetRegistryByAddresses message with {} entries", item.entries.len());
     Self { entries: item.entries.iter().map(|x| x.into()).collect(), error: None }
 });
 
@@ -406,7 +406,7 @@ from!(item: &sahyadri_rpc_core::GetBalancesByAddressesRequest, protowire::GetBal
     Self { addresses: item.addresses.iter().map(|x| x.into()).collect() }
 });
 from!(item: RpcResult<&sahyadri_rpc_core::GetBalancesByAddressesResponse>, protowire::GetBalancesByAddressesResponseMessage, {
-    debug!("GRPC, Creating GetUtxosByAddresses message with {} entries", item.entries.len());
+    debug!("GRPC, Creating GetRegistryByAddresses message with {} entries", item.entries.len());
     Self { entries: item.entries.iter().map(|x| x.into()).collect(), error: None }
 });
 
@@ -485,13 +485,13 @@ from!(item: RpcResult<&sahyadri_rpc_core::GetCurrentBlockColorResponse>, protowi
     Self { blue: item.blue, error: None }
 });
 
-from!(item: &sahyadri_rpc_core::GetUtxoReturnAddressRequest, protowire::GetUtxoReturnAddressRequestMessage, {
+from!(item: &sahyadri_rpc_core::GetRegistryUnitReturnAddressRequest, protowire::GetRegistryUnitReturnAddressRequestMessage, {
     Self {
         txid: item.txid.to_string(),
         accepting_block_daa_score: item.accepting_block_daa_score
     }
 });
-from!(item: RpcResult<&sahyadri_rpc_core::GetUtxoReturnAddressResponse>, protowire::GetUtxoReturnAddressResponseMessage, {
+from!(item: RpcResult<&sahyadri_rpc_core::GetRegistryUnitReturnAddressResponse>, protowire::GetRegistryUnitReturnAddressResponseMessage, {
     Self { return_address: item.return_address.address_to_string(), error: None }
 });
 
@@ -557,7 +557,7 @@ from!(item: RpcResult<&sahyadri_rpc_core::GetServerInfoResponse>, protowire::Get
         rpc_api_revision: item.rpc_api_revision as u32,
         server_version: item.server_version.clone(),
         network_id: item.network_id.to_string(),
-        has_utxo_index: item.has_utxo_index,
+        has_registry_unit_index: item.has_registry_unit_index,
         is_synced: item.is_synced,
         virtual_daa_score: item.virtual_daa_score,
         error: None,
@@ -589,26 +589,26 @@ from!(item: RpcResult<&sahyadri_rpc_core::GetVirtualChainFromBlockV2Response>, p
     }
 });
 
-from!(item: &sahyadri_rpc_core::NotifyUtxosChangedRequest, protowire::NotifyUtxosChangedRequestMessage, {
+from!(item: &sahyadri_rpc_core::NotifyRegistryChangedRequest, protowire::NotifyRegistryChangedRequestMessage, {
     Self { addresses: item.addresses.iter().map(|x| x.into()).collect(), command: item.command.into() }
 });
-from!(item: &sahyadri_rpc_core::NotifyUtxosChangedRequest, protowire::StopNotifyingUtxosChangedRequestMessage, {
+from!(item: &sahyadri_rpc_core::NotifyRegistryChangedRequest, protowire::StopNotifyingRegistryChangedRequestMessage, {
     Self { addresses: item.addresses.iter().map(|x| x.into()).collect() }
 });
-from!(RpcResult<&sahyadri_rpc_core::NotifyUtxosChangedResponse>, protowire::NotifyUtxosChangedResponseMessage);
-from!(RpcResult<&sahyadri_rpc_core::NotifyUtxosChangedResponse>, protowire::StopNotifyingUtxosChangedResponseMessage);
+from!(RpcResult<&sahyadri_rpc_core::NotifyRegistryChangedResponse>, protowire::NotifyRegistryChangedResponseMessage);
+from!(RpcResult<&sahyadri_rpc_core::NotifyRegistryChangedResponse>, protowire::StopNotifyingRegistryChangedResponseMessage);
 
-from!(item: &sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideRequest, protowire::NotifyPruningPointUtxoSetOverrideRequestMessage, {
+from!(item: &sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideRequest, protowire::NotifyPruningPointRegistryUnitSetOverrideRequestMessage, {
     Self { command: item.command.into() }
 });
-from!(&sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideRequest, protowire::StopNotifyingPruningPointUtxoSetOverrideRequestMessage);
+from!(&sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideRequest, protowire::StopNotifyingPruningPointRegistryUnitSetOverrideRequestMessage);
 from!(
-    RpcResult<&sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideResponse>,
-    protowire::NotifyPruningPointUtxoSetOverrideResponseMessage
+    RpcResult<&sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideResponse>,
+    protowire::NotifyPruningPointRegistryUnitSetOverrideResponseMessage
 );
 from!(
-    RpcResult<&sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideResponse>,
-    protowire::StopNotifyingPruningPointUtxoSetOverrideResponseMessage
+    RpcResult<&sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideResponse>,
+    protowire::StopNotifyingPruningPointRegistryUnitSetOverrideResponseMessage
 );
 
 from!(item: &sahyadri_rpc_core::NotifyFinalityConflictRequest, protowire::NotifyFinalityConflictRequestMessage, {
@@ -717,7 +717,7 @@ try_from!(item: &protowire::GetInfoResponseMessage, RpcResult<sahyadri_rpc_core:
         p2p_id: item.p2p_id.clone(),
         mempool_size: item.mempool_size,
         server_version: item.server_version.clone(),
-        is_utxo_indexed: item.is_utxo_indexed,
+        is_registry_unit_indexed: item.is_registry_unit_indexed,
         is_synced: item.is_synced,
         has_notify_command: item.has_notify_command,
         has_message_id: item.has_message_id,
@@ -942,10 +942,10 @@ try_from!(item: &protowire::GetHeadersResponseMessage, RpcResult<sahyadri_rpc_co
     Self { headers: vec![] }
 });
 
-try_from!(item: &protowire::GetUtxosByAddressesRequestMessage, sahyadri_rpc_core::GetUtxosByAddressesRequest, {
+try_from!(item: &protowire::GetRegistryByAddressesRequestMessage, sahyadri_rpc_core::GetRegistryByAddressesRequest, {
     Self { addresses: item.addresses.iter().map(|x| x.as_str().try_into()).collect::<Result<Vec<_>, _>>()? }
 });
-try_from!(item: &protowire::GetUtxosByAddressesResponseMessage, RpcResult<sahyadri_rpc_core::GetUtxosByAddressesResponse>, {
+try_from!(item: &protowire::GetRegistryByAddressesResponseMessage, RpcResult<sahyadri_rpc_core::GetRegistryByAddressesResponse>, {
     Self { entries: item.entries.iter().map(|x| x.try_into()).collect::<Result<Vec<_>, _>>()? }
 });
 
@@ -1052,13 +1052,13 @@ try_from!(item: &protowire::GetCurrentBlockColorResponseMessage, RpcResult<sahya
         blue: item.blue
     }
 });
-try_from!(item: &protowire::GetUtxoReturnAddressRequestMessage, sahyadri_rpc_core::GetUtxoReturnAddressRequest , {
+try_from!(item: &protowire::GetRegistryUnitReturnAddressRequestMessage, sahyadri_rpc_core::GetRegistryUnitReturnAddressRequest , {
     Self {
         txid: Hash::from_str(&item.txid).unwrap_or_default(),
         accepting_block_daa_score: item.accepting_block_daa_score
     }
 });
-try_from!(item: &protowire::GetUtxoReturnAddressResponseMessage, RpcResult<sahyadri_rpc_core::GetUtxoReturnAddressResponse>, {
+try_from!(item: &protowire::GetRegistryUnitReturnAddressResponseMessage, RpcResult<sahyadri_rpc_core::GetRegistryUnitReturnAddressResponse>, {
     Self { return_address: Address::try_from(item.return_address.clone())? }
 });
 
@@ -1119,7 +1119,7 @@ try_from!(item: &protowire::GetServerInfoResponseMessage, RpcResult<sahyadri_rpc
         rpc_api_revision: item.rpc_api_revision as u16,
         server_version: item.server_version.clone(),
         network_id: NetworkId::from_str(&item.network_id)?,
-        has_utxo_index: item.has_utxo_index,
+        has_registry_unit_index: item.has_registry_unit_index,
         is_synced: item.is_synced,
         virtual_daa_score: item.virtual_daa_score,
     }
@@ -1132,38 +1132,38 @@ try_from!(item: &protowire::GetSyncStatusResponseMessage, RpcResult<sahyadri_rpc
     }
 });
 
-try_from!(item: &protowire::NotifyUtxosChangedRequestMessage, sahyadri_rpc_core::NotifyUtxosChangedRequest, {
+try_from!(item: &protowire::NotifyRegistryChangedRequestMessage, sahyadri_rpc_core::NotifyRegistryChangedRequest, {
     Self {
         addresses: item.addresses.iter().map(|x| x.as_str().try_into()).collect::<Result<Vec<_>, _>>()?,
         command: item.command.into(),
     }
 });
-try_from!(item: &protowire::StopNotifyingUtxosChangedRequestMessage, sahyadri_rpc_core::NotifyUtxosChangedRequest, {
+try_from!(item: &protowire::StopNotifyingRegistryChangedRequestMessage, sahyadri_rpc_core::NotifyRegistryChangedRequest, {
     Self {
         addresses: item.addresses.iter().map(|x| x.as_str().try_into()).collect::<Result<Vec<_>, _>>()?,
         command: Command::Stop,
     }
 });
-try_from!(&protowire::NotifyUtxosChangedResponseMessage, RpcResult<sahyadri_rpc_core::NotifyUtxosChangedResponse>);
-try_from!(&protowire::StopNotifyingUtxosChangedResponseMessage, RpcResult<sahyadri_rpc_core::NotifyUtxosChangedResponse>);
+try_from!(&protowire::NotifyRegistryChangedResponseMessage, RpcResult<sahyadri_rpc_core::NotifyRegistryChangedResponse>);
+try_from!(&protowire::StopNotifyingRegistryChangedResponseMessage, RpcResult<sahyadri_rpc_core::NotifyRegistryChangedResponse>);
 
 try_from!(
-    item: &protowire::NotifyPruningPointUtxoSetOverrideRequestMessage,
-    sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideRequest,
+    item: &protowire::NotifyPruningPointRegistryUnitSetOverrideRequestMessage,
+    sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideRequest,
     { Self { command: item.command.into() } }
 );
 try_from!(
-    _item: &protowire::StopNotifyingPruningPointUtxoSetOverrideRequestMessage,
-    sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideRequest,
+    _item: &protowire::StopNotifyingPruningPointRegistryUnitSetOverrideRequestMessage,
+    sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideRequest,
     { Self { command: Command::Stop } }
 );
 try_from!(
-    &protowire::NotifyPruningPointUtxoSetOverrideResponseMessage,
-    RpcResult<sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideResponse>
+    &protowire::NotifyPruningPointRegistryUnitSetOverrideResponseMessage,
+    RpcResult<sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideResponse>
 );
 try_from!(
-    &protowire::StopNotifyingPruningPointUtxoSetOverrideResponseMessage,
-    RpcResult<sahyadri_rpc_core::NotifyPruningPointUtxoSetOverrideResponse>
+    &protowire::StopNotifyingPruningPointRegistryUnitSetOverrideResponseMessage,
+    RpcResult<sahyadri_rpc_core::NotifyPruningPointRegistryUnitSetOverrideResponse>
 );
 
 try_from!(item: &protowire::NotifyFinalityConflictRequestMessage, sahyadri_rpc_core::NotifyFinalityConflictRequest, {

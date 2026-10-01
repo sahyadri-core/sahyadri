@@ -15,7 +15,7 @@ use sahyadri_consensus_core::config::Config;
 use sahyadri_consensus_core::errors::block::RuleError;
 use sahyadri_consensus_core::tx::{Transaction, TransactionId};
 use sahyadri_consensus_notify::{
-    notification::{Notification, PruningPointUtxoSetOverrideNotification},
+    notification::{Notification, PruningPointRegistryUnitSetOverrideNotification},
     root::ConsensusNotificationRoot,
 };
 use sahyadri_consensusmanager::{BlockProcessingBatch, ConsensusInstance, ConsensusManager, ConsensusProxy, ConsensusSessionOwned};
@@ -603,11 +603,11 @@ impl FlowContext {
         self.mining_rule_engine.should_mine(sink_daa_score_and_timestamp)
     }
 
-    /// Notifies that the UTXO set was reset due to pruning point change via IBD.
-    pub fn on_pruning_point_utxoset_override(&self) {
+    /// Notifies that the REGISTRY_UNIT set was reset due to pruning point change via IBD.
+    pub fn on_pruning_point_registry_unitset_override(&self) {
         // Notifications from the flow context might be ignored if the inner channel is already closing
         // due to global shutdown, hence we ignore the possible error
-        let _ = self.notification_root.notify(Notification::PruningPointUtxoSetOverride(PruningPointUtxoSetOverrideNotification {}));
+        let _ = self.notification_root.notify(Notification::PruningPointRegistryUnitSetOverride(PruningPointRegistryUnitSetOverrideNotification {}));
     }
 
     /// Notifies that a transaction has been added to the mempool.

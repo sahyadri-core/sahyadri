@@ -7,9 +7,6 @@ pub mod test_consensus;
 use crate::model::stores::did_store::DidStoreReader;
 use crate::model::stores::account_store::AccountStoreReader;
 
-#[cfg(feature = "devnet-prealloc")]
-mod utxo_set_override;
-
 use crate::{
     config::Config,
     errors::{BlockProcessResult, RuleError},
@@ -72,8 +69,8 @@ use sahyadri_consensus_core::{
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList, PruningProofMetadata},
     trusted::{ExternalSahyadriConsensusData, TrustedBlock},
     tx::{
-        MutableTransaction, Transaction, TransactionId, TransactionIndexType, TransactionOutpoint, TransactionQueryResult,
-        TransactionType, UtxoEntry,
+        MutableTransaction, Transaction, TransactionId, TransactionIndexType, RegistryRef, TransactionQueryResult,
+        TransactionType, RegistryUnit,
     },
 };
 use sahyadri_consensus_notify::root::ConsensusNotificationRoot;
@@ -352,8 +349,8 @@ impl Consensus {
         if pruning_meta_write.is_anticone_fully_synced() {
             pruning_meta_write.set_body_missing_anticone(&mut batch, vec![]).unwrap();
         }
-        if pruning_meta_write.pruning_utxoset_stable_flag() {
-            pruning_meta_write.set_pruning_utxoset_stable_flag(&mut batch, true).unwrap();
+        if pruning_meta_write.pruning_registry_unitset_stable_flag() {
+            pruning_meta_write.set_pruning_registry_stable_flag(&mut batch, true).unwrap();
         }
         self.db.write(batch).unwrap();
     }
@@ -486,7 +483,7 @@ impl Consensus {
         }
 
         // Update virtual state based to the new pruning point
-        // Updating of the utxoset is done separately as it requires downloading the new utxoset in its entirety.
+        // Updating of the registry_unitset is done separately as it requires downloading the new registry_unitset in its entirety.
         let virtual_parents = vec![new_pruning_point];
         let virtual_state = Arc::new(VirtualState {
             parents: virtual_parents.clone(),
@@ -499,8 +496,8 @@ impl Consensus {
         self.body_tips_store.write().init_batch(&mut batch, &virtual_parents).unwrap();
         // Update selected_chain
         self.selected_chain_store.write().init_with_pruning_point(&mut batch, new_pruning_point).unwrap();
-        // It is important to set this flag to false together with writing the batch, in case the node crashes suddenly before syncing of new utxo starts
-        self.pruning_meta_stores.write().set_pruning_utxoset_stable_flag(&mut batch, false).unwrap();
+        // It is important to set this flag to false together with writing the batch, in case the node crashes suddenly before syncing of new registry_unit starts
+        self.pruning_meta_stores.write().set_pruning_registry_stable_flag(&mut batch, false).unwrap();
         // Store the currently bodyless anticone from the POV of the syncer, for trusted body validation at a later stage.
         let mut anticone = self.services.dag_traversal_manager.anticone(new_pruning_point, [syncer_sink].into_iter(), None)?;
         // Add the pruning point itself which is also missing a body
@@ -667,7 +664,7 @@ impl ConsensusApi for Consensus {
 
     // Sahyadri Account Model: Bypass parallel mempool population
     fn populate_mempool_transactions_in_parallel(&self, transactions: &mut [MutableTransaction]) -> Vec<TxResult<()>> {
-        // Return Ok for all transactions without doing UTXO population
+        // Return Ok for all transactions without doing REGISTRY_UNIT population
         transactions.iter().map(|_| Ok(())).collect()
     }
 
@@ -927,7 +924,7 @@ impl ConsensusApi for Consensus {
 
     fn get_transactions_by_block_acceptance_data(
         &self,
-        accepting_block: Hash,
+        _accepting_block: Hash,
         block_acceptance_data: MergesetBlockAcceptanceData,
         tx_ids: Option<Vec<TransactionId>>,
         tx_type: TransactionType,
@@ -962,13 +959,9 @@ impl ConsensusApi for Consensus {
                     )?)))
                 }
             }
-            TransactionType::SignableTransaction => Ok(TransactionQueryResult::SignableTransaction(Arc::new(
-                self.virtual_processor.get_populated_transactions_by_block_acceptance_data(
-                    tx_ids,
-                    block_acceptance_data,
-                    accepting_block,
-                )?,
-            ))),
+            TransactionType::SignableTransaction => Err(ConsensusError::UnsupportedInAccountModel(
+                "SignableTransaction queries are not supported in account model".into(),
+            )),
         }
     }
 
@@ -1030,9 +1023,9 @@ impl ConsensusApi for Consensus {
                     )))
                 }
             }
-            TransactionType::SignableTransaction => Ok(TransactionQueryResult::SignableTransaction(Arc::new(
-                self.virtual_processor.get_populated_transactions_by_accepting_block(tx_ids, accepting_block)?,
-            ))),
+            TransactionType::SignableTransaction => Err(ConsensusError::UnsupportedInAccountModel(
+                "SignableTransaction queries are not supported in account model".into(),
+            )),
         }
     }
 
@@ -1044,13 +1037,13 @@ impl ConsensusApi for Consensus {
         self.lkg_virtual_state.load().parents.len()
     }
 
-    fn get_virtual_utxos(
+    fn get_virtual_registry(
         &self,
-        _from_outpoint: Option<TransactionOutpoint>, // '_' lagane se Rust warning nahi dega
+        _from_outpoint: Option<RegistryRef>, // '_' lagane se Rust warning nahi dega
         _chunk_size: usize,
         _skip_first: bool,
-    ) -> Vec<(TransactionOutpoint, UtxoEntry)> {
-        // Sahyadri Account Model: UTXO iterator is disabled.
+    ) -> Vec<(RegistryRef, RegistryUnit)> {
+        // Sahyadri Account Model: REGISTRY_UNIT iterator is disabled.
         // We return an empty vector to keep the compiler happy.
         Vec::new()
     }
@@ -1063,14 +1056,14 @@ impl ConsensusApi for Consensus {
         self.body_tips_store.read().get().unwrap().read().len()
     }
 
-    fn get_pruning_point_utxos(
+    fn get_pruning_point_registry(
         &self,
         _expected_pruning_point: Hash,
-        _from_outpoint: Option<TransactionOutpoint>,
+        _from_outpoint: Option<RegistryRef>,
         _chunk_size: usize,
         _skip_first: bool,
-    ) -> ConsensusResult<Vec<(TransactionOutpoint, UtxoEntry)>> {
-        // SAHYADRI: UTXO set removed. Pruning-point sync will rely on
+    ) -> ConsensusResult<Vec<(RegistryRef, RegistryUnit)>> {
+        // SAHYADRI: REGISTRY_UNIT set removed. Pruning-point sync will rely on
         // SMT state proofs; stub until that path is wired.
         Ok(Vec::new())
     }
@@ -1099,20 +1092,20 @@ impl ConsensusApi for Consensus {
         self.services.pruning_proof_manager.import_pruning_points(&pruning_points)
     }
 
-    fn append_imported_pruning_point_utxos(
+    fn append_imported_pruning_point_registry_units(
         &self,
-        _utxoset_chunk: &[(TransactionOutpoint, UtxoEntry)],
+        _registry_unitset_chunk: &[(RegistryRef, RegistryUnit)],
         _current_multiset: &mut MuHash,
     ) {
-        // SAHYADRI: UTXO import removed.
+        // SAHYADRI: REGISTRY_UNIT import removed.
     }
 
-    fn import_pruning_point_utxo_set(
+    fn import_pruning_point_registry_unit_set(
         &self,
         _new_pruning_point: Hash,
-        _imported_utxo_multiset: MuHash,
+        _imported_registry_unit_multiset: MuHash,
     ) -> PruningImportResult<()> {
-        // SAHYADRI: UTXO import removed.
+        // SAHYADRI: REGISTRY_UNIT import removed.
         Ok(())
     }
 
@@ -1398,18 +1391,18 @@ impl ConsensusApi for Consensus {
         self.virtual_processor.virtual_finality_point(&self.lkg_virtual_state.load().sahyadri_consensus_data, self.pruning_point())
     }
 
-    /// The utxoset is an additive structure,
-    /// to make room for the gradual aggregation of a new utxoset,
+    /// The registry_unitset is an additive structure,
+    /// to make room for the gradual aggregation of a new registry_unitset,
     /// first the old one must be cleared.
-    /// Likewise, clearing the old utxoset is also a gradual process.
-    /// The utxo stable flag guarantees that a full utxoset is never mistaken for
+    /// Likewise, clearing the old registry_unitset is also a gradual process.
+    /// The registry_unit stable flag guarantees that a full registry_unitset is never mistaken for
     /// an incomplete or partially deleted one.
-    fn clear_pruning_utxo_set(&self) {
+    fn clear_pruning_registry_set(&self) {
         let mut pruning_meta_write = self.pruning_meta_stores.write();
         let mut batch = rocksdb::WriteBatch::default();
         // Currently under the conditions in which this function is called, this flag should already be false.
         // We lower it down regardless as it is conceptually true to do so.
-        pruning_meta_write.set_pruning_utxoset_stable_flag(&mut batch, false).unwrap();
+        pruning_meta_write.set_pruning_registry_stable_flag(&mut batch, false).unwrap();
         self.db.write(batch).unwrap();
     }
 
@@ -1423,17 +1416,17 @@ impl ConsensusApi for Consensus {
         self.intrusive_pruning_point_store_writes(new_pruning_point, syncer_sink, pruning_points_to_add)
     }
 
-    fn set_pruning_utxoset_stable_flag(&self, val: bool) {
+    fn set_pruning_registry_stable_flag(&self, val: bool) {
         let mut pruning_meta_write = self.pruning_meta_stores.write();
         let mut batch = rocksdb::WriteBatch::default();
 
-        pruning_meta_write.set_pruning_utxoset_stable_flag(&mut batch, val).unwrap();
+        pruning_meta_write.set_pruning_registry_stable_flag(&mut batch, val).unwrap();
         self.db.write(batch).unwrap();
     }
 
-    fn is_pruning_utxoset_stable(&self) -> bool {
+    fn is_pruning_registry_stable(&self) -> bool {
         let pruning_meta_read = self.pruning_meta_stores.read();
-        pruning_meta_read.pruning_utxoset_stable_flag()
+        pruning_meta_read.pruning_registry_unitset_stable_flag()
     }
 
     fn is_pruning_point_anticone_fully_synced(&self) -> bool {

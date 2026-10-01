@@ -24,7 +24,7 @@ use sahyadri_notify::{
     scope::Scope,
     subscriber::{Subscriber, SubscriptionManager},
     subscription::{
-        Command, DynSubscription, MutateSingle, Mutation, MutationPolicies, UtxosChangedMutationPolicy, array::ArrayBuilder,
+        Command, DynSubscription, MutateSingle, Mutation, MutationPolicies, RegistryChangedMutationPolicy, array::ArrayBuilder,
         context::SubscriptionContext,
     },
 };
@@ -101,7 +101,7 @@ impl GrpcClient {
     /// `url`: the server to connect to
     ///
     /// `subscription_context`: it is advised to provide a clone of the same instance if multiple clients dealing with
-    /// `UtxosChangedNotifications` are connected concurrently in order to optimize the memory footprint.
+    /// `RegistryChangedNotifications` are connected concurrently in order to optimize the memory footprint.
     ///
     /// `reconnect`: features an automatic reconnection to the server, reactivating all subscriptions on success.
     ///
@@ -135,7 +135,7 @@ impl GrpcClient {
         )
         .await?;
         let converter = Arc::new(RpcCoreConverter::new());
-        let policies = MutationPolicies::new(UtxosChangedMutationPolicy::AddressSet);
+        let policies = MutationPolicies::new(RegistryChangedMutationPolicy::AddressSet);
         let subscription_context = subscription_context.unwrap_or_default();
         let (notifier, collector, subscriptions) = match notification_mode {
             NotificationMode::MultiListeners => {
@@ -265,7 +265,7 @@ impl RpcApi for GrpcClient {
     route!(resolve_finality_conflict_call, ResolveFinalityConflict);
     route!(shutdown_call, Shutdown);
     route!(get_headers_call, GetHeaders);
-    route!(get_utxos_by_addresses_call, GetUtxosByAddresses);
+    route!(get_registry_by_addresses_call, GetRegistryByAddresses);
     route!(get_balance_by_address_call, GetBalanceByAddress);
     route!(get_daa_score_call, GetDaaScore);
     route!(get_balances_by_addresses_call, GetBalancesByAddresses);
@@ -279,7 +279,7 @@ impl RpcApi for GrpcClient {
     route!(get_fee_estimate_call, GetFeeEstimate);
     route!(get_fee_estimate_experimental_call, GetFeeEstimateExperimental);
     route!(get_current_block_color_call, GetCurrentBlockColor);
-    route!(get_utxo_return_address_call, GetUtxoReturnAddress);
+    route!(get_registry_unit_return_address_call, GetRegistryUnitReturnAddress);
     route!(get_virtual_chain_from_block_v2_call, GetVirtualChainFromBlockV2);
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

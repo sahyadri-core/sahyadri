@@ -6,8 +6,8 @@
 use crate::imports::*;
 use crate::result::Result;
 use crate::{
-    Transaction, TransactionInput, TransactionInputInner, TransactionOutpoint, TransactionOutpointInner, TransactionOutput, UtxoEntry,
-    UtxoEntryId, UtxoEntryReference,
+    Transaction, TransactionInput, TransactionInputInner, RegistryRef, RegistryRefInner, TransactionOutput, RegistryUnit,
+    RegistryUnitId, RegistryUnitRef,
 };
 use ahash::AHashMap;
 use cctx::VerifiableTransaction;
@@ -18,12 +18,12 @@ use workflow_wasm::serde::{from_value, to_value};
 pub type SignedTransactionIndexType = u32;
 
 pub struct Options {
-    pub include_utxo: bool,
+    pub include_registry_unit: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SerializableUtxoEntry {
+pub struct SerializableRegistryUnit {
     pub address: Option<Address>,
     pub amount: String,
     pub script_public_key: ScriptPublicKey,
@@ -31,45 +31,45 @@ pub struct SerializableUtxoEntry {
     pub is_coinbase: bool,
 }
 
-impl AsRef<SerializableUtxoEntry> for SerializableUtxoEntry {
+impl AsRef<SerializableRegistryUnit> for SerializableRegistryUnit {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl From<&UtxoEntryReference> for SerializableUtxoEntry {
-    fn from(utxo: &UtxoEntryReference) -> Self {
-        let utxo = utxo.utxo.as_ref();
+impl From<&RegistryUnitRef> for SerializableRegistryUnit {
+    fn from(registry_unit: &RegistryUnitRef) -> Self {
+        let registry_unit = registry_unit.registry_unit.as_ref();
         Self {
-            address: utxo.address.clone(),
-            amount: utxo.amount.to_string(),
-            script_public_key: utxo.script_public_key.clone(),
-            block_daa_score: utxo.block_daa_score.to_string(),
-            is_coinbase: utxo.is_coinbase,
+            address: registry_unit.address.clone(),
+            amount: registry_unit.amount.to_string(),
+            script_public_key: registry_unit.script_public_key.clone(),
+            block_daa_score: registry_unit.block_daa_score.to_string(),
+            is_coinbase: registry_unit.is_coinbase,
         }
     }
 }
 
-impl From<&cctx::UtxoEntry> for SerializableUtxoEntry {
-    fn from(utxo: &cctx::UtxoEntry) -> Self {
+impl From<&cctx::RegistryUnit> for SerializableRegistryUnit {
+    fn from(registry_unit: &cctx::RegistryUnit) -> Self {
         Self {
             address: None,
-            amount: utxo.amount.to_string(),
-            script_public_key: utxo.script_public_key.clone(),
-            block_daa_score: utxo.block_daa_score.to_string(),
-            is_coinbase: utxo.is_coinbase,
+            amount: registry_unit.amount.to_string(),
+            script_public_key: registry_unit.script_public_key.clone(),
+            block_daa_score: registry_unit.block_daa_score.to_string(),
+            is_coinbase: registry_unit.is_coinbase,
         }
     }
 }
 
-impl TryFrom<&SerializableUtxoEntry> for cctx::UtxoEntry {
+impl TryFrom<&SerializableRegistryUnit> for cctx::RegistryUnit {
     type Error = crate::error::Error;
-    fn try_from(utxo: &SerializableUtxoEntry) -> Result<Self> {
+    fn try_from(registry_unit: &SerializableRegistryUnit) -> Result<Self> {
         Ok(Self {
-            amount: utxo.amount.parse()?,
-            script_public_key: utxo.script_public_key.clone(),
-            block_daa_score: utxo.block_daa_score.parse()?,
-            is_coinbase: utxo.is_coinbase,
+            amount: registry_unit.amount.parse()?,
+            script_public_key: registry_unit.script_public_key.clone(),
+            block_daa_score: registry_unit.block_daa_score.parse()?,
+            is_coinbase: registry_unit.is_coinbase,
         })
     }
 }
@@ -83,12 +83,12 @@ pub struct SerializableTransactionInput {
     pub sig_op_count: u8,
     #[serde(with = "hex::serde")]
     pub signature_script: Vec<u8>,
-    pub utxo: SerializableUtxoEntry,
+    pub registry_unit: SerializableRegistryUnit,
 }
 
 impl SerializableTransactionInput {
-    pub fn new(input: &cctx::TransactionInput, utxo: &cctx::UtxoEntry) -> Self {
-        let utxo = SerializableUtxoEntry::from(utxo);
+    pub fn new(input: &cctx::TransactionInput, registry_unit: &cctx::RegistryUnit) -> Self {
+        let registry_unit = SerializableRegistryUnit::from(registry_unit);
 
         Self {
             transaction_id: input.previous_outpoint.transaction_id,
@@ -96,26 +96,26 @@ impl SerializableTransactionInput {
             signature_script: input.signature_script.clone(),
             sequence: input.sequence.to_string(),
             sig_op_count: input.sig_op_count,
-            utxo: utxo.clone(),
+            registry_unit: registry_unit.clone(),
         }
     }
 }
 
-impl TryFrom<&SerializableTransactionInput> for UtxoEntryReference {
+impl TryFrom<&SerializableTransactionInput> for RegistryUnitRef {
     type Error = Error;
     fn try_from(input: &SerializableTransactionInput) -> Result<Self> {
-        let outpoint = TransactionOutpoint::new(input.transaction_id, input.index);
+        let outpoint = RegistryRef::new(input.transaction_id, input.index);
 
-        let utxo = UtxoEntry {
+        let registry_unit = RegistryUnit {
             outpoint,
-            address: input.utxo.address.clone(),
-            amount: input.utxo.amount.parse()?,
-            script_public_key: input.utxo.script_public_key.clone(),
-            block_daa_score: input.utxo.block_daa_score.parse()?,
-            is_coinbase: input.utxo.is_coinbase,
+            address: input.registry_unit.address.clone(),
+            amount: input.registry_unit.amount.parse()?,
+            script_public_key: input.registry_unit.script_public_key.clone(),
+            block_daa_score: input.registry_unit.block_daa_score.parse()?,
+            is_coinbase: input.registry_unit.is_coinbase,
         };
 
-        Ok(Self { utxo: Arc::new(utxo) })
+        Ok(Self { registry_unit: Arc::new(registry_unit) })
     }
 }
 
@@ -123,7 +123,7 @@ impl TryFrom<SerializableTransactionInput> for cctx::TransactionInput {
     type Error = Error;
     fn try_from(signable_input: SerializableTransactionInput) -> Result<Self> {
         Ok(Self {
-            previous_outpoint: cctx::TransactionOutpoint {
+            previous_outpoint: cctx::RegistryRef {
                 transaction_id: signable_input.transaction_id,
                 index: signable_input.index,
             },
@@ -137,16 +137,16 @@ impl TryFrom<SerializableTransactionInput> for cctx::TransactionInput {
 impl TryFrom<&SerializableTransactionInput> for TransactionInput {
     type Error = Error;
     fn try_from(serializable_input: &SerializableTransactionInput) -> Result<Self> {
-        let utxo = UtxoEntryReference::try_from(serializable_input)?;
+        let registry_unit = RegistryUnitRef::try_from(serializable_input)?;
 
-        let previous_outpoint = TransactionOutpoint::new(serializable_input.transaction_id, serializable_input.index);
+        let previous_outpoint = RegistryRef::new(serializable_input.transaction_id, serializable_input.index);
         let inner = TransactionInputInner {
             previous_outpoint,
             // TODO - convert to Option<Vec<u8>> and use hex serialization over Option
             signature_script: (!serializable_input.signature_script.is_empty()).then_some(serializable_input.signature_script.clone()),
             sequence: serializable_input.sequence.parse()?,
             sig_op_count: serializable_input.sig_op_count,
-            utxo: Some(utxo),
+            registry_unit: Some(registry_unit),
         };
 
         Ok(TransactionInput::new_with_inner(inner))
@@ -157,8 +157,8 @@ impl TryFrom<&TransactionInput> for SerializableTransactionInput {
     type Error = Error;
     fn try_from(input: &TransactionInput) -> Result<Self> {
         let inner = input.inner();
-        let utxo = inner.utxo.as_ref().ok_or(Error::MissingUtxoEntry)?;
-        let utxo = SerializableUtxoEntry::from(utxo);
+        let registry_unit = inner.registry_unit.as_ref().ok_or(Error::MissingRegistryUnit)?;
+        let registry_unit = SerializableRegistryUnit::from(registry_unit);
         Ok(Self {
             transaction_id: inner.previous_outpoint.transaction_id(),
             index: inner.previous_outpoint.index(),
@@ -166,7 +166,7 @@ impl TryFrom<&TransactionInput> for SerializableTransactionInput {
             signature_script: inner.signature_script.clone().unwrap_or_default(),
             sequence: inner.sequence.to_string(),
             sig_op_count: inner.sig_op_count,
-            utxo,
+            registry_unit,
         })
     }
 }
@@ -250,8 +250,8 @@ impl SerializableTransaction {
         let mut inputs = vec![];
         let transaction = tx.as_ref();
         for index in 0..transaction.inputs.len() {
-            let (input, utxo) = verifiable_tx.populated_input(index);
-            let input = SerializableTransactionInput::new(input, utxo);
+            let (input, registry_unit) = verifiable_tx.populated_input(index);
+            let input = SerializableTransactionInput::new(input, registry_unit);
             inputs.push(input);
         }
 
@@ -289,15 +289,15 @@ impl SerializableTransaction {
         })
     }
 
-    pub fn from_cctx_transaction(transaction: &cctx::Transaction, utxos: &AHashMap<UtxoEntryId, UtxoEntryReference>) -> Result<Self> {
+    pub fn from_cctx_transaction(transaction: &cctx::Transaction, registry_units: &AHashMap<RegistryUnitId, RegistryUnitRef>) -> Result<Self> {
         let inputs = transaction
             .inputs
             .iter()
             .map(|input| {
-                let id = TransactionOutpointInner::new(input.previous_outpoint.transaction_id, input.previous_outpoint.index);
-                let utxo = utxos.get(&id).ok_or(Error::MissingUtxoEntry)?;
-                let utxo = cctx::UtxoEntry::from(utxo);
-                let input = SerializableTransactionInput::new(input, &utxo);
+                let id = RegistryRefInner::new(input.previous_outpoint.transaction_id, input.previous_outpoint.index);
+                let registry_unit = registry_units.get(&id).ok_or(Error::MissingRegistryUnit)?;
+                let registry_unit = cctx::RegistryUnit::from(registry_unit);
+                let input = SerializableTransactionInput::new(input, &registry_unit);
                 Ok(input)
             })
             .collect::<Result<Vec<SerializableTransactionInput>>>()?;
@@ -324,7 +324,7 @@ impl TryFrom<SerializableTransaction> for cctx::SignableTransaction {
         let mut entries = vec![];
         let mut inputs = vec![];
         for input in signable.inputs {
-            entries.push(input.utxo.as_ref().try_into()?);
+            entries.push(input.registry_unit.as_ref().try_into()?);
             inputs.push(input.try_into()?);
         }
 

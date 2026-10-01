@@ -93,7 +93,7 @@ pub(crate) mod tests {
     use super::*;
     use sahyadri_consensus_core::{
         subnets::SUBNETWORK_ID_NATIVE,
-        tx::{Transaction, TransactionInput, TransactionOutpoint},
+        tx::{Transaction, TransactionInput, RegistryRef},
     };
     use sahyadri_hashes::{HasherBase, TransactionID};
     use std::sync::Arc;
@@ -101,7 +101,7 @@ pub(crate) mod tests {
     fn generate_unique_tx(i: u64) -> Arc<Transaction> {
         let mut hasher = TransactionID::new();
         let prev = hasher.update(i.to_le_bytes()).clone().finalize();
-        let input = TransactionInput::new(TransactionOutpoint::new(prev, 0), vec![], 0, 0);
+        let input = TransactionInput::new(RegistryRef::new(prev, 0), vec![], 0, 0);
         Arc::new(Transaction::new(0, vec![input], vec![], 0, SUBNETWORK_ID_NATIVE, 0, vec![]))
     }
 

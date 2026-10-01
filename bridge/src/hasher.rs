@@ -220,11 +220,11 @@ pub fn serialize_block_header(
     // The "Odd number of digits" error typically occurs when a hex string has odd length
     let _ = header.hash_merkle_root.as_bytes();
     let _ = header.accepted_id_merkle_root.as_bytes();
-    let _ = header.utxo_commitment.as_bytes();
+    let _ = header.registry_unit_commitment.as_bytes();
     let _ = header.pruning_point.as_bytes();
 
     // Write header fields
-    hasher.update(header.hash_merkle_root).update(header.accepted_id_merkle_root).update(header.utxo_commitment);
+    hasher.update(header.hash_merkle_root).update(header.accepted_id_merkle_root).update(header.registry_unit_commitment);
 
     // Write the struct fields EXACTLY like Go does (lines 74-93 in hasher.go)
     // Go writes: TS(0) + Bits + Nonce(0) + DAAScore + BlueScore as one struct

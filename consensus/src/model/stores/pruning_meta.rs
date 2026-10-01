@@ -8,42 +8,42 @@ use sahyadri_database::prelude::{BatchDbWriter, CachedDbItem};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 
-/// Used in order to group stores related to the pruning point utxoset under a single lock
+/// Used in order to group stores related to the pruning point registry_unitset under a single lock
 pub struct PruningMetaStores {
-    utxoset_position_access: CachedDbItem<Hash>,
-    utxoset_stable_flag_access: CachedDbItem<bool>,
+    registry_unitset_position_access: CachedDbItem<Hash>,
+    registry_unitset_stable_flag_access: CachedDbItem<bool>,
     body_missing_anticone_blocks: CachedDbItem<Vec<Hash>>,
 }
 
 impl PruningMetaStores {
     pub fn new(db: Arc<DB>) -> Self {
         Self {
-            utxoset_position_access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::PruningUtxosetPosition.into()),
-            utxoset_stable_flag_access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::PruningUtxosetSyncFlag.into()),
+            registry_unitset_position_access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::PruningRegistryUnitsetPosition.into()),
+            registry_unitset_stable_flag_access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::PruningRegistryUnitsetSyncFlag.into()),
             body_missing_anticone_blocks: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::BodyMissingAnticone.into()),
         }
     }
 
-    /// Represents the exact point of the current pruning point utxoset. Used in order to safely
-    /// progress the pruning point utxoset in batches and to allow recovery if the process crashes
-    /// during the pruning point utxoset movement
-    pub fn utxoset_position(&self) -> StoreResult<Hash> {
-        self.utxoset_position_access.read()
+    /// Represents the exact point of the current pruning point registry_unitset. Used in order to safely
+    /// progress the pruning point registry_unitset in batches and to allow recovery if the process crashes
+    /// during the pruning point registry_unitset movement
+    pub fn registry_unitset_position(&self) -> StoreResult<Hash> {
+        self.registry_unitset_position_access.read()
     }
 
-    pub fn set_utxoset_position(&mut self, batch: &mut WriteBatch, pruning_utxoset_position: Hash) -> StoreResult<()> {
-        self.utxoset_position_access.write(BatchDbWriter::new(batch), &pruning_utxoset_position)
+    pub fn set_registry_unitset_position(&mut self, batch: &mut WriteBatch, pruning_registry_unitset_position: Hash) -> StoreResult<()> {
+        self.registry_unitset_position_access.write(BatchDbWriter::new(batch), &pruning_registry_unitset_position)
     }
 
     /// Flip the sync flag in the same batch as your other writes
-    pub fn set_pruning_utxoset_stable_flag(&mut self, batch: &mut WriteBatch, stable: bool) -> StoreResult<()> {
-        self.utxoset_stable_flag_access.write(BatchDbWriter::new(batch), &stable)
+    pub fn set_pruning_registry_stable_flag(&mut self, batch: &mut WriteBatch, stable: bool) -> StoreResult<()> {
+        self.registry_unitset_stable_flag_access.write(BatchDbWriter::new(batch), &stable)
     }
 
     /// Read the flag; default to true if missing - this is important because a node upgrading should have this value true
-    /// as all non staging consensuses had a stable utxoset previously
-    pub fn pruning_utxoset_stable_flag(&self) -> bool {
-        self.utxoset_stable_flag_access.read().optional().unwrap().unwrap_or(true)
+    /// as all non staging consensuses had a stable registry_unitset previously
+    pub fn pruning_registry_unitset_stable_flag(&self) -> bool {
+        self.registry_unitset_stable_flag_access.read().optional().unwrap().unwrap_or(true)
     }
 
     /// Represents blocks in the anticone of the current pruning point which may lack a block body
@@ -65,6 +65,6 @@ impl PruningMetaStores {
     }
 
     pub fn is_in_transitional_ibd_state(&self) -> bool {
-        !self.is_anticone_fully_synced() || !self.pruning_utxoset_stable_flag()
+        !self.is_anticone_fully_synced() || !self.pruning_registry_unitset_stable_flag()
     }
 }

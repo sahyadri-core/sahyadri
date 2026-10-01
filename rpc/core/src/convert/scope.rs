@@ -1,8 +1,8 @@
 //! Conversion of Notification Scope related types
 
 use crate::{
-    NotifyBlockAddedRequest, NotifyFinalityConflictRequest, NotifyNewBlockTemplateRequest, NotifyPruningPointUtxoSetOverrideRequest,
-    NotifySinkBlueScoreChangedRequest, NotifyUtxosChangedRequest, NotifyVirtualChainChangedRequest,
+    NotifyBlockAddedRequest, NotifyFinalityConflictRequest, NotifyNewBlockTemplateRequest, NotifyPruningPointRegistryUnitSetOverrideRequest,
+    NotifySinkBlueScoreChangedRequest, NotifyRegistryChangedRequest, NotifyVirtualChainChangedRequest,
     NotifyVirtualDaaScoreChangedRequest,
 };
 use sahyadri_notify::scope::*;
@@ -55,10 +55,10 @@ impl From<&NotifyFinalityConflictRequest> for FinalityConflictResolvedScope {
         Self::default()
     }
 }
-from!(item: UtxosChanged, {
+from!(item: RegistryChanged, {
     Self::new(item.addresses.clone())
 });
 from!(SinkBlueScoreChanged);
 from!(VirtualDaaScoreChanged);
-from!(PruningPointUtxoSetOverride);
+from!(PruningPointRegistryUnitSetOverride);
 from!(NewBlockTemplate);

@@ -73,8 +73,8 @@ setDefaultStorageFolder(storageFolder);
             // console.log("ID:", id);
             // console.log("type:", tx.data.type, ", value:", value(tx));
             // console.log(chalk.dim("----------------------------"))
-            // let addresses = tx.data.data.utxoEntries.map(utxo=>{
-            //     return utxo.address.substring(0, 5)+"..."
+            // let addresses = tx.data.data.registry_unitEntries.map(registry_unit=>{
+            //     return registry_unit.address.substring(0, 5)+"..."
             // });
             list.push({
                 Id: tx.id,
@@ -137,9 +137,9 @@ setDefaultStorageFolder(storageFolder);
                             Mature: kanaToSahyadriString(b.mature),
                             Pending: kanaToSahyadriString(b.pending),
                             Outgoing: kanaToSahyadriString(b.outgoing),
-                            MatureUtxo: b.matureUtxoCount,
-                            PendingUtxo: b.pendingUtxoCount,
-                            StasisUtxo: b.stasisUtxoCount
+                            MatureRegistryUnit: b.matureRegistryUnitCount,
+                            PendingRegistryUnit: b.pendingRegistryUnitCount,
+                            StasisRegistryUnit: b.stasisRegistryUnitCount
                         })
                     })
                     log_title("Balance");
@@ -152,10 +152,10 @@ setDefaultStorageFolder(storageFolder);
                     }
                 break;
                 case "server-status":
-                case "utxo-proc-start":
+                case "registry_unit-proc-start":
                 case "sync-state":
                 case "account-activation":
-                case "utxo-proc-stop":
+                case "registry_unit-proc-stop":
                 case "connect":
                 case "stasis":
                     //

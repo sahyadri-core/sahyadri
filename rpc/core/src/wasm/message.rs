@@ -10,7 +10,7 @@ use js_sys::Array;
 use js_sys::Object;
 use sahyadri_addresses::Address;
 use sahyadri_addresses::AddressOrStringArrayT;
-use sahyadri_consensus_client::UtxoEntryReference;
+use sahyadri_consensus_client::RegistryUnitRef;
 use sahyadri_consensus_client::{OptionalHeader, Transaction};
 use sahyadri_consensus_core::tx as cctx;
 use sahyadri_rpc_macros::declare_typescript_wasm_interface as declare;
@@ -268,7 +268,7 @@ declare! {
         p2pId : string;
         mempoolSize : bigint;
         serverVersion : string;
-        isUtxoIndexed : boolean;
+        isRegistryUnitIndexed : boolean;
         isSynced : boolean;
         /** GRPC ONLY */
         hasNotifyCommand : boolean;
@@ -498,7 +498,7 @@ declare! {
         rpcApiVersion : number[];
         serverVersion : string;
         networkId : string;
-        hasUtxoIndex : boolean;
+        hasRegistryUnitIndex : boolean;
         isSynced : boolean;
         virtualDaaScore : bigint;
     }
@@ -1197,49 +1197,49 @@ try_from! ( args: GetSubnetworkResponse, IGetSubnetworkResponse, {
 // ---
 
 declare! {
-    IGetUtxosByAddressesRequest,
-    "IGetUtxosByAddressesRequest | Address[] | string[]",
+    IGetRegistryByAddressesRequest,
+    "IGetRegistryByAddressesRequest | Address[] | string[]",
     r#"
     /**
      *
      *
      * @category Node RPC
      */
-    export interface IGetUtxosByAddressesRequest {
+    export interface IGetRegistryByAddressesRequest {
         addresses : Address[] | string[]
     }
     "#,
 }
 
-try_from! ( args: IGetUtxosByAddressesRequest, GetUtxosByAddressesRequest, {
+try_from! ( args: IGetRegistryByAddressesRequest, GetRegistryByAddressesRequest, {
     let js_value = JsValue::from(args);
     let request = if let Ok(addresses) = Vec::<Address>::try_from(AddressOrStringArrayT::from(js_value.clone())) {
-        GetUtxosByAddressesRequest { addresses }
+        GetRegistryByAddressesRequest { addresses }
     } else {
-        from_value::<GetUtxosByAddressesRequest>(js_value)?
+        from_value::<GetRegistryByAddressesRequest>(js_value)?
     };
     Ok(request)
 });
 
 declare! {
-    IGetUtxosByAddressesResponse,
+    IGetRegistryByAddressesResponse,
     r#"
     /**
      *
      *
      * @category Node RPC
      */
-    export interface IGetUtxosByAddressesResponse {
-        entries : UtxoEntryReference[];
+    export interface IGetRegistryByAddressesResponse {
+        entries : RegistryUnitRef[];
     }
     "#,
 }
 
-try_from! ( args: GetUtxosByAddressesResponse, IGetUtxosByAddressesResponse, {
-    let GetUtxosByAddressesResponse { entries } = args;
-    let entries = entries.into_iter().map(UtxoEntryReference::from).collect::<Vec<UtxoEntryReference>>();
+try_from! ( args: GetRegistryByAddressesResponse, IGetRegistryByAddressesResponse, {
+    let GetRegistryByAddressesResponse { entries } = args;
+    let entries = entries.into_iter().map(RegistryUnitRef::from).collect::<Vec<RegistryUnitRef>>();
     let entries = js_sys::Array::from_iter(entries.into_iter().map(JsValue::from));
-    let response = IGetUtxosByAddressesResponse::default();
+    let response = IGetRegistryByAddressesResponse::default();
     response.set("entries", entries.as_ref())?;
     Ok(response)
 });
@@ -1819,39 +1819,39 @@ try_from!( args: GetFeeEstimateExperimentalResponse, IGetFeeEstimateExperimental
 });
 
 declare! {
-    IGetUtxoReturnAddressRequest,
+    IGetRegistryUnitReturnAddressRequest,
     r#"
     /**
      *
      *
      * @category Node RPC
      */
-    export interface IGetUtxoReturnAddressRequest {
+    export interface IGetRegistryUnitReturnAddressRequest {
         txid: HexString;
         acceptingBlockDaaScore: bigint;
     }
     "#,
 }
 
-try_from!(args: IGetUtxoReturnAddressRequest, GetUtxoReturnAddressRequest, {
+try_from!(args: IGetRegistryUnitReturnAddressRequest, GetRegistryUnitReturnAddressRequest, {
    Ok(from_value(args.into())?)
 });
 
 declare! {
-    IGetUtxoReturnAddressResponse,
+    IGetRegistryUnitReturnAddressResponse,
     r#"
     /**
      *
      *
      * @category Node RPC
      */
-    export interface IGetUtxoReturnAddressResponse {
+    export interface IGetRegistryUnitReturnAddressResponse {
         returnAddress: Address;
     }
     "#,
 }
 
-try_from!(args: GetUtxoReturnAddressResponse, IGetUtxoReturnAddressResponse, {
+try_from!(args: GetRegistryUnitReturnAddressResponse, IGetRegistryUnitReturnAddressResponse, {
     Ok(to_value(&args)?.into())
 });
 

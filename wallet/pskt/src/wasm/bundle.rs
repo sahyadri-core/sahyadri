@@ -171,7 +171,7 @@ mod tests {
             },
             "inputs": [
                 {
-                    "utxoEntry": {
+                    "registry_unitEntry": {
                         "amount": 468928887,
                         "scriptPublicKey": "0000202d8a1414e62e081fb6bcf644e648c18061c2855575cac722f86324cad91dd0faac",
                         "blockDaaScore": 84981186,
@@ -233,7 +233,7 @@ mod tests {
         let inner = deserialized_bundle.0.0.first().expect("pskt after deserialize");
         assert_eq!(inner.inputs.len(), 1);
         let input_01 = inner.inputs.first().expect("first input");
-        assert_eq!(input_01.clone().utxo_entry.expect("utxo entry").amount, 468928887);
+        assert_eq!(input_01.clone().registry_unit_entry.expect("registry_unit entry").amount, 468928887);
         assert_eq!(
             inner.outputs.first().expect("output").script_public_key,
             ScriptPublicKey::from_str("0000").expect("convert valid spk")

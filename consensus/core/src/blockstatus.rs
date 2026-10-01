@@ -1,23 +1,28 @@
 use sahyadri_utils::mem_size::MemSizeEstimator;
 use serde::{Deserialize, Serialize};
 
+/// Block validation status in the Sahyadri account model.
+///
+/// The `State*` variants refer to the account-state (SMT account root)
+/// commitment carried by every block header.
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub enum BlockStatus {
-    /// StatusInvalid indicates that the block is invalid.
+    /// The block is invalid.
     StatusInvalid,
 
-    /// StatusUTXOValid indicates the block is valid from any UTXO related aspects and has passed all the other validations as well.
-    StatusUTXOValid,
+    /// The block has been fully validated and its account-state root
+    /// matches the committed SMT root.
+    StatusStateValid,
 
-    /// StatusUTXOPendingVerification indicates that the block is pending verification against its past UTXO-Set, either
-    /// because it was not yet verified since the block was never in the selected parent chain, or if the
-    /// block violates finality.
-    StatusUTXOPendingVerification,
+    /// The block is pending verification against its past account state —
+    /// either it was never in the selected parent chain, or it violates
+    /// finality.
+    StatusStatePendingVerification,
 
-    /// StatusDisqualifiedFromChain indicates that the block is not eligible to be a selected parent.
+    /// The block is not eligible to be a selected parent.
     StatusDisqualifiedFromChain,
 
-    /// StatusHeaderOnly indicates that the block transactions are not held (pruned or wasn't added yet)
+    /// The block's transactions are not held (pruned or not yet received).
     StatusHeaderOnly,
 }
 
@@ -27,7 +32,10 @@ impl BlockStatus {
     pub fn has_block_header(self) -> bool {
         matches!(
             self,
-            Self::StatusHeaderOnly | Self::StatusUTXOValid | Self::StatusUTXOPendingVerification | Self::StatusDisqualifiedFromChain
+            Self::StatusHeaderOnly
+                | Self::StatusStateValid
+                | Self::StatusStatePendingVerification
+                | Self::StatusDisqualifiedFromChain
         )
     }
 
@@ -36,11 +44,16 @@ impl BlockStatus {
     }
 
     pub fn has_block_body(self) -> bool {
-        matches!(self, Self::StatusUTXOValid | Self::StatusUTXOPendingVerification | Self::StatusDisqualifiedFromChain)
+        matches!(
+            self,
+            Self::StatusStateValid | Self::StatusStatePendingVerification | Self::StatusDisqualifiedFromChain
+        )
     }
 
-    pub fn is_utxo_valid_or_pending(self) -> bool {
-        matches!(self, Self::StatusUTXOValid | Self::StatusUTXOPendingVerification)
+    /// Returns true if the block's account state is either fully valid or
+    /// pending verification (i.e. not invalid / not header-only).
+    pub fn is_state_valid_or_pending(self) -> bool {
+        matches!(self, Self::StatusStateValid | Self::StatusStatePendingVerification)
     }
 
     pub fn is_valid(self) -> bool {

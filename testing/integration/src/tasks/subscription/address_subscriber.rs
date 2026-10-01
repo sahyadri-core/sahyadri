@@ -76,13 +76,13 @@ impl Task for AddressSubscriberTask {
                 cycle += 1;
 
                 if cycle <= max_cycles {
-                    warn!("Cycle {cycle} - Starting UTXOs notifications...");
+                    warn!("Cycle {cycle} - Starting REGISTRY_UNITs notifications...");
                     let (tx, rx) = channel();
                     sender.send(SubscribeCommand::RegisterJob((clients.len(), tx))).await.unwrap();
                     let registration = rx.await.unwrap();
                     for (i, client) in clients.iter().cloned().enumerate() {
                         sender
-                            .send(SubscribeCommand::StartUtxosChanged((registration.id, client, addresses[i].clone())))
+                            .send(SubscribeCommand::StartRegistryChanged((registration.id, client, addresses[i].clone())))
                             .await
                             .unwrap();
                     }
@@ -93,7 +93,7 @@ impl Task for AddressSubscriberTask {
                         }
                         _ = registration.complete => {}
                     }
-                    warn!("Cycle {cycle} - UTXOs notifications started");
+                    warn!("Cycle {cycle} - REGISTRY_UNITs notifications started");
                 }
 
                 tokio::select! {
@@ -106,12 +106,12 @@ impl Task for AddressSubscriberTask {
                 stopwatch = Instant::now();
 
                 if cycle < max_cycles {
-                    warn!("Cycle {cycle} - Stopping UTXOs notifications...");
+                    warn!("Cycle {cycle} - Stopping REGISTRY_UNITs notifications...");
                     let (tx, rx) = channel();
                     sender.send(SubscribeCommand::RegisterJob((clients.len(), tx))).await.unwrap();
                     let registration = rx.await.unwrap();
                     for client in clients.iter().cloned() {
-                        sender.send(SubscribeCommand::StopUtxosChanged((registration.id, client))).await.unwrap();
+                        sender.send(SubscribeCommand::StopRegistryChanged((registration.id, client))).await.unwrap();
                     }
                     tokio::select! {
                         biased;
@@ -120,7 +120,7 @@ impl Task for AddressSubscriberTask {
                         }
                         _ = registration.complete => {}
                     }
-                    warn!("Cycle {cycle} - UTXOs notifications stopped");
+                    warn!("Cycle {cycle} - REGISTRY_UNITs notifications stopped");
                 }
 
                 tokio::select! {

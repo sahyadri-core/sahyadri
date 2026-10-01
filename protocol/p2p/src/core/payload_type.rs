@@ -19,13 +19,13 @@ pub enum SahyadridMessagePayloadType {
     Version,
     TransactionNotFound,
     Reject,
-    PruningPointUtxoSetChunk,
+    PruningPointRegistryUnitSetChunk,
     RequestIbdBlocks,
     UnexpectedPruningPoint,
     IbdBlockLocator,
     IbdBlockLocatorHighestHash,
-    RequestNextPruningPointUtxoSetChunk,
-    DonePruningPointUtxoSetChunks,
+    RequestNextPruningPointRegistryUnitSetChunk,
+    DonePruningPointRegistryUnitSetChunks,
     IbdBlockLocatorHighestHashNotFound,
     BlockWithTrustedData,
     DoneBlocksWithTrustedData,
@@ -33,7 +33,7 @@ pub enum SahyadridMessagePayloadType {
     BlockHeaders,
     RequestNextHeaders,
     DoneHeaders,
-    RequestPruningPointUtxoSet,
+    RequestPruningPointRegistryUnitSet,
     RequestHeaders,
     RequestBlockLocator,
     PruningPoints,
@@ -69,15 +69,15 @@ impl From<&SahyadridMessagePayload> for SahyadridMessagePayloadType {
             SahyadridMessagePayload::Version(_) => SahyadridMessagePayloadType::Version,
             SahyadridMessagePayload::TransactionNotFound(_) => SahyadridMessagePayloadType::TransactionNotFound,
             SahyadridMessagePayload::Reject(_) => SahyadridMessagePayloadType::Reject,
-            SahyadridMessagePayload::PruningPointUtxoSetChunk(_) => SahyadridMessagePayloadType::PruningPointUtxoSetChunk,
+            SahyadridMessagePayload::PruningPointRegistryUnitSetChunk(_) => SahyadridMessagePayloadType::PruningPointRegistryUnitSetChunk,
             SahyadridMessagePayload::RequestIbdBlocks(_) => SahyadridMessagePayloadType::RequestIbdBlocks,
             SahyadridMessagePayload::UnexpectedPruningPoint(_) => SahyadridMessagePayloadType::UnexpectedPruningPoint,
             SahyadridMessagePayload::IbdBlockLocator(_) => SahyadridMessagePayloadType::IbdBlockLocator,
             SahyadridMessagePayload::IbdBlockLocatorHighestHash(_) => SahyadridMessagePayloadType::IbdBlockLocatorHighestHash,
-            SahyadridMessagePayload::RequestNextPruningPointUtxoSetChunk(_) => {
-                SahyadridMessagePayloadType::RequestNextPruningPointUtxoSetChunk
+            SahyadridMessagePayload::RequestNextPruningPointRegistryUnitSetChunk(_) => {
+                SahyadridMessagePayloadType::RequestNextPruningPointRegistryUnitSetChunk
             }
-            SahyadridMessagePayload::DonePruningPointUtxoSetChunks(_) => SahyadridMessagePayloadType::DonePruningPointUtxoSetChunks,
+            SahyadridMessagePayload::DonePruningPointRegistryUnitSetChunks(_) => SahyadridMessagePayloadType::DonePruningPointRegistryUnitSetChunks,
             SahyadridMessagePayload::IbdBlockLocatorHighestHashNotFound(_) => {
                 SahyadridMessagePayloadType::IbdBlockLocatorHighestHashNotFound
             }
@@ -89,7 +89,7 @@ impl From<&SahyadridMessagePayload> for SahyadridMessagePayloadType {
             SahyadridMessagePayload::BlockHeaders(_) => SahyadridMessagePayloadType::BlockHeaders,
             SahyadridMessagePayload::RequestNextHeaders(_) => SahyadridMessagePayloadType::RequestNextHeaders,
             SahyadridMessagePayload::DoneHeaders(_) => SahyadridMessagePayloadType::DoneHeaders,
-            SahyadridMessagePayload::RequestPruningPointUtxoSet(_) => SahyadridMessagePayloadType::RequestPruningPointUtxoSet,
+            SahyadridMessagePayload::RequestPruningPointRegistryUnitSet(_) => SahyadridMessagePayloadType::RequestPruningPointRegistryUnitSet,
             SahyadridMessagePayload::RequestHeaders(_) => SahyadridMessagePayloadType::RequestHeaders,
             SahyadridMessagePayload::RequestBlockLocator(_) => SahyadridMessagePayloadType::RequestBlockLocator,
             SahyadridMessagePayload::PruningPoints(_) => SahyadridMessagePayloadType::PruningPoints,

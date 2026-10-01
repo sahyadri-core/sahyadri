@@ -64,7 +64,7 @@ impl ConsensusMonitor {
 
             if delta.chain_disqualified_counts > 0 {
                 warn!(
-                    "Consensus detected UTXO-invalid blocks which are disqualified from the virtual selected chain (possibly due to inheritance): {} disqualified vs. {} valid chain blocks",
+                    "Consensus detected REGISTRY_UNIT-invalid blocks which are disqualified from the virtual selected chain (possibly due to inheritance): {} disqualified vs. {} valid chain blocks",
                     delta.chain_disqualified_counts, delta.chain_block_counts
                 );
             }

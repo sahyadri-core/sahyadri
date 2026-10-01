@@ -1,8 +1,8 @@
 use crate::{
     RpcAcceptanceDataVerbosity, RpcDataVerbosityLevel, RpcError, RpcHeaderVerbosity, RpcMergesetBlockAcceptanceDataVerbosity,
     RpcTransactionInputVerboseDataVerbosity, RpcTransactionInputVerbosity, RpcTransactionOutputVerboseDataVerbosity,
-    RpcTransactionOutputVerbosity, RpcTransactionVerboseDataVerbosity, RpcTransactionVerbosity, RpcUtxoEntryVerboseDataVerbosity,
-    RpcUtxoEntryVerbosity,
+    RpcTransactionOutputVerbosity, RpcTransactionVerboseDataVerbosity, RpcTransactionVerbosity, RpcRegistryUnitVerboseDataVerbosity,
+    RpcRegistryUnitVerbosity,
 };
 
 macro_rules! impl_verbosity_from {
@@ -77,26 +77,26 @@ impl_verbosity_from! {
         include_parents_by_level:        (RpcDataVerbosityLevel::High),
         include_hash_merkle_root:        (RpcDataVerbosityLevel::High),
         include_accepted_id_merkle_root: (RpcDataVerbosityLevel::High),
-        include_utxo_commitment:         (RpcDataVerbosityLevel::Full),
+        include_registry_unit_commitment:         (RpcDataVerbosityLevel::Full),
         include_pruning_point:           (RpcDataVerbosityLevel::Full),
     }
 }
 
 impl_verbosity_from! {
-    for RpcUtxoEntryVerboseDataVerbosity, from RpcDataVerbosityLevel {
+    for RpcRegistryUnitVerboseDataVerbosity, from RpcDataVerbosityLevel {
         include_script_public_key_type:      (RpcDataVerbosityLevel::Low),
         include_script_public_key_address:   (RpcDataVerbosityLevel::Low),
     }
 }
 
 impl_verbosity_from! {
-    for RpcUtxoEntryVerbosity, from RpcDataVerbosityLevel {
+    for RpcRegistryUnitVerbosity, from RpcDataVerbosityLevel {
         include_amount:            (RpcDataVerbosityLevel::High),
         include_script_public_key: (RpcDataVerbosityLevel::High),
         include_block_daa_score:   (RpcDataVerbosityLevel::Full),
         include_is_coinbase:       (RpcDataVerbosityLevel::High),
         verbose_data_verbosity:    (|level| {
-            RpcUtxoEntryVerboseDataVerbosity::from(level)
+            RpcRegistryUnitVerboseDataVerbosity::from(level)
         }),
     }
 }
@@ -116,8 +116,8 @@ impl_verbosity_from! {
 
 impl_verbosity_from! {
     for RpcTransactionInputVerboseDataVerbosity, from RpcDataVerbosityLevel {
-        utxo_entry_verbosity: (|level| {
-            RpcUtxoEntryVerbosity::from(level)
+        registry_unit_entry_verbosity: (|level| {
+            RpcRegistryUnitVerbosity::from(level)
         }),
     }
 }

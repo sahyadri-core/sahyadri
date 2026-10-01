@@ -109,7 +109,7 @@ pub mod perf {
     const BASELINE_HEADER_DATA_CACHE_SIZE: usize = 10_000;
     const BASELINE_BLOCK_DATA_CACHE_SIZE: usize = 200;
     const BASELINE_BLOCK_WINDOW_CACHE_SIZE: usize = 2_000;
-    const BASELINE_UTXOSET_CACHE_SIZE: usize = 10_000;
+    const BASELINE_REGISTRY_UNITSET_CACHE_SIZE: usize = 10_000;
 
     #[derive(Clone, Debug)]
     pub struct PerfParams {
@@ -124,8 +124,8 @@ pub mod perf {
         /// (Note this cannot be set to high due to severe memory consumption)
         pub block_data_cache_size: usize,
 
-        /// Preferred cache size for UTXO-related data
-        pub utxo_set_cache_size: usize,
+        /// Preferred cache size for REGISTRY_UNIT-related data
+        pub registry_unit_set_cache_size: usize,
 
         /// Preferred cache size for block-window-related data
         pub block_window_cache_size: usize,
@@ -145,7 +145,7 @@ pub mod perf {
     pub const PERF_PARAMS: PerfParams = PerfParams {
         header_data_cache_size: BASELINE_HEADER_DATA_CACHE_SIZE,
         block_data_cache_size: BASELINE_BLOCK_DATA_CACHE_SIZE,
-        utxo_set_cache_size: BASELINE_UTXOSET_CACHE_SIZE,
+        registry_unit_set_cache_size: BASELINE_REGISTRY_UNITSET_CACHE_SIZE,
         block_window_cache_size: BASELINE_BLOCK_WINDOW_CACHE_SIZE,
         block_processors_num_threads: 0,
         virtual_processor_num_threads: 0,

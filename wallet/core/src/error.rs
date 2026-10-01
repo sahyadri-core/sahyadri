@@ -103,8 +103,8 @@ pub enum Error {
     #[error("{0}")]
     NetworkId(#[from] sahyadri_consensus_core::network::NetworkIdError),
 
-    #[error("The server UTXO index is not enabled")]
-    MissingUtxoIndex,
+    #[error("The server REGISTRY_UNIT index is not enabled")]
+    MissingRegistryUnitIndex,
 
     #[error("Invalid filename: {0}")]
     InvalidFilename(String),
@@ -211,8 +211,8 @@ pub enum Error {
     #[error("{0}")]
     ParseIntError(#[from] std::num::ParseIntError),
 
-    #[error("Receiving duplicate UTXO entry")]
-    DuplicateUtxoEntry,
+    #[error("Receiving duplicate REGISTRY_UNIT entry")]
+    DuplicateRegistryUnit,
 
     #[error("{0}")]
     ToValue(String),

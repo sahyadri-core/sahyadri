@@ -40,10 +40,10 @@ pub enum Scope {
     VirtualChainChanged,
     FinalityConflict,
     FinalityConflictResolved,
-    UtxosChanged,
+    RegistryChanged,
     SinkBlueScoreChanged,
     VirtualDaaScoreChanged,
-    PruningPointUtxoSetOverride,
+    PruningPointRegistryUnitSetOverride,
     NewBlockTemplate,
 }
 }
@@ -154,36 +154,36 @@ impl Deserializer for FinalityConflictResolvedScope {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub struct UtxosChangedScope {
+pub struct RegistryChangedScope {
     pub addresses: Vec<Address>,
 }
 
-impl std::fmt::Display for UtxosChangedScope {
+impl std::fmt::Display for RegistryChangedScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let addresses = match self.addresses.len() {
             0 => "all".to_string(),
             1 => format!("{}", self.addresses[0]),
             n => format!("{} addresses", n),
         };
-        write!(f, "UtxosChangedScope ({})", addresses)
+        write!(f, "RegistryChangedScope ({})", addresses)
     }
 }
 
-impl PartialEq for UtxosChangedScope {
+impl PartialEq for RegistryChangedScope {
     fn eq(&self, other: &Self) -> bool {
         self.addresses.len() == other.addresses.len() && self.addresses.iter().all(|x| other.addresses.contains(x))
     }
 }
 
-impl Eq for UtxosChangedScope {}
+impl Eq for RegistryChangedScope {}
 
-impl UtxosChangedScope {
+impl RegistryChangedScope {
     pub fn new(addresses: Vec<Address>) -> Self {
         Self { addresses }
     }
 }
 
-impl Serializer for UtxosChangedScope {
+impl Serializer for RegistryChangedScope {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u16, &1, writer)?;
         store!(Vec<Address>, &self.addresses, writer)?;
@@ -191,7 +191,7 @@ impl Serializer for UtxosChangedScope {
     }
 }
 
-impl Deserializer for UtxosChangedScope {
+impl Deserializer for RegistryChangedScope {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u16, reader)?;
         let addresses = load!(Vec<Address>, reader)?;
@@ -234,16 +234,16 @@ impl Deserializer for VirtualDaaScoreChangedScope {
 }
 
 #[derive(Clone, Display, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub struct PruningPointUtxoSetOverrideScope {}
+pub struct PruningPointRegistryUnitSetOverrideScope {}
 
-impl Serializer for PruningPointUtxoSetOverrideScope {
+impl Serializer for PruningPointRegistryUnitSetOverrideScope {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u16, &1, writer)?;
         Ok(())
     }
 }
 
-impl Deserializer for PruningPointUtxoSetOverrideScope {
+impl Deserializer for PruningPointRegistryUnitSetOverrideScope {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u16, reader)?;
         Ok(Self {})

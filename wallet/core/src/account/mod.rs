@@ -24,11 +24,11 @@ use crate::storage::account::AccountSettings;
 use crate::storage::{PrvKeyData, PrvKeyDataId};
 use crate::tx::PaymentOutput;
 use crate::tx::{Fees, Generator, GeneratorSettings, GeneratorSummary, PaymentDestination, PendingTransaction, Signer};
-use crate::utxo::UtxoContextBinding;
-use crate::utxo::balance::{AtomicBalance, BalanceStrings};
+use crate::registry_unit::RegistryUnitContextBinding;
+use crate::registry_unit::balance::{AtomicBalance, BalanceStrings};
 use sahyadri_bip32::{ChildNumber, DilithiumSeed, ExtendedPrivateKey, PrivateKey};
-use sahyadri_consensus_client::UtxoEntry;
-use sahyadri_consensus_client::UtxoEntryReference;
+use sahyadri_consensus_client::RegistryUnit;
+use sahyadri_consensus_client::RegistryUnitRef;
 use workflow_core::abortable::Abortable;
 
 /// Notification callback type used by [`Account::sweep`] and [`Account::send`].
@@ -59,14 +59,14 @@ pub struct Inner {
     id: AccountId,
     storage_key: AccountStorageKey,
     wallet: Arc<Wallet>,
-    utxo_context: UtxoContext,
+    registry_unit_context: RegistryUnitContext,
     // SAHYADRI ACCOUNT MODEL
     pub account_balance: std::sync::atomic::AtomicU64,
 }
 
 impl Inner {
     pub fn new(wallet: &Arc<Wallet>, id: AccountId, storage_key: AccountStorageKey, settings: AccountSettings) -> Self {
-        let utxo_context = UtxoContext::new(wallet.utxo_processor(), UtxoContextBinding::AccountId(id));
+        let registry_unit_context = RegistryUnitContext::new(wallet.registry_unit_processor(), RegistryUnitContextBinding::AccountId(id));
 
         let context = Context { settings };
         Inner {
@@ -74,7 +74,7 @@ impl Inner {
             id,
             storage_key,
             wallet: wallet.clone(),
-            utxo_context: utxo_context.clone(),
+            registry_unit_context: registry_unit_context.clone(),
             account_balance: std::sync::atomic::AtomicU64::new(0), // Initial balance 0
         }
     }
@@ -116,14 +116,14 @@ pub trait Account: AnySync + Send + Sync + 'static {
         &self.inner().wallet
     }
 
-    fn utxo_context(&self) -> &UtxoContext {
-        &self.inner().utxo_context
+    fn registry_unit_context(&self) -> &RegistryUnitContext {
+        &self.inner().registry_unit_context
     }
 
     fn balance(&self) -> Option<Balance> {
-        //UTXO Bypassed! Direct Account Balance Read
+        //REGISTRY_UNIT Bypassed! Direct Account Balance Read
         let amount = self.inner().account_balance.load(std::sync::atomic::Ordering::SeqCst);
-        let mut b = crate::utxo::balance::Balance::default();
+        let mut b = crate::registry_unit::balance::Balance::default();
         b.mature = amount;
         Some(b)
     }
@@ -172,18 +172,18 @@ pub trait Account: AnySync + Send + Sync + 'static {
     fn get_list_string(&self) -> Result<String> {
         let name = style(self.name_with_id()).blue();
         let balance = self.balance_as_strings(None)?;
-        let mature_utxo_size = self.utxo_context().mature_utxo_size();
-        let pending_utxo_size = self.utxo_context().pending_utxo_size();
-        let info = match (mature_utxo_size, pending_utxo_size) {
+        let mature_registry_unit_size = self.registry_unit_context().mature_registry_unit_size();
+        let pending_registry_unit_size = self.registry_unit_context().pending_registry_unit_size();
+        let info = match (mature_registry_unit_size, pending_registry_unit_size) {
             (0, 0) => "".to_string(),
             (_, 0) => {
-                format!("{} UTXOs", mature_utxo_size.separated_string())
+                format!("{} REGISTRY_UNITs", mature_registry_unit_size.separated_string())
             }
             (0, _) => {
-                format!("{} UTXOs pending", pending_utxo_size.separated_string())
+                format!("{} REGISTRY_UNITs pending", pending_registry_unit_size.separated_string())
             }
             _ => {
-                format!("{} UTXOs, {} UTXOs pending", mature_utxo_size.separated_string(), pending_utxo_size.separated_string())
+                format!("{} REGISTRY_UNITs, {} REGISTRY_UNITs pending", mature_registry_unit_size.separated_string(), pending_registry_unit_size.separated_string())
             }
         };
         Ok(format!("{name}: {balance}   {}", style(info).dim()))
@@ -211,12 +211,12 @@ pub trait Account: AnySync + Send + Sync + 'static {
     fn metadata(&self) -> Result<Option<AccountMetadata>>;
     fn descriptor(&self) -> Result<descriptor::AccountDescriptor>;
 
-    /// NATIVE AUTO-PILOT: Automatically consolidates UTXOs into Master Notes.
+    /// NATIVE AUTO-PILOT: Automatically consolidates REGISTRY_UNITs into Master Notes.
     /// Global Fix for all Sahyadri Miners.
     async fn perform_auto_compounding(self: Arc<Self>, wallet_secret: Secret, payment_secret: Option<Secret>) -> Result<()> {
-        let mature_utxos = self.utxo_context().mature_utxo_size();
+        let mature_registry_units = self.registry_unit_context().mature_registry_unit_size();
 
-        if mature_utxos < 500 {
+        if mature_registry_units < 500 {
             return Ok(());
         }
 
@@ -244,7 +244,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
     } // <--- Closes function
 
     async fn scan(self: Arc<Self>, window_size: Option<usize>, extent: Option<u32>) -> Result<()> {
-        self.utxo_context().clear().await?;
+        self.registry_unit_context().clear().await?;
 
         let current_daa_score = self.wallet().current_daa_score().ok_or(Error::NotConnected)?;
         let balance = Arc::new(AtomicBalance::default());
@@ -275,7 +275,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
                     ),
                 ];
 
-                let futures = scans.iter().map(|scan| scan.scan(self.utxo_context())).collect::<Vec<_>>();
+                let futures = scans.iter().map(|scan| scan.scan(self.registry_unit_context())).collect::<Vec<_>>();
 
                 join_all(futures).await.into_iter().collect::<Result<Vec<_>>>()?;
             }
@@ -285,11 +285,11 @@ pub trait Account: AnySync + Send + Sync + 'static {
                 address_set.insert(self.change_address()?);
 
                 let scan = Scan::new_with_address_set(address_set, &balance, current_daa_score);
-                scan.scan(self.utxo_context()).await?;
+                scan.scan(self.registry_unit_context()).await?;
             }
         }
 
-        self.utxo_context().update_balance().await?;
+        self.registry_unit_context().update_balance().await?;
 
         Ok(())
     }
@@ -320,7 +320,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
     /// Stop Account service task
     async fn stop(self: Arc<Self>) -> Result<()> {
-        self.utxo_context().clear().await?;
+        self.registry_unit_context().clear().await?;
         self.disconnect().await?;
         Ok(())
     }
@@ -373,7 +373,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
     fn as_dyn_arc(self: Arc<Self>) -> Arc<dyn Account>;
 
-    /// Aggregate all account UTXOs into the change address.
+    /// Aggregate all account REGISTRY_UNITs into the change address.
     /// Also known as "compounding".
     async fn sweep(
         self: Arc<Self>,
@@ -556,7 +556,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
                 Ok(pskt) => {
                     let change = self.change_address()?;
                     let transaction =
-                        pskt_to_pending_transaction(pskt, self.wallet().network_id()?, change, self.utxo_context().clone().into())?;
+                        pskt_to_pending_transaction(pskt, self.wallet().network_id()?, change, self.registry_unit_context().clone().into())?;
                     log_info!("Submitting to rpc");
                     ids.push(transaction.try_submit(&self.wallet().rpc_api()).await?);
                     log_info!("Submitted to rpc");
@@ -569,9 +569,9 @@ pub trait Account: AnySync + Send + Sync + 'static {
         Ok(ids)
     }
 
-    async fn get_utxos(self: Arc<Self>, addresses: Option<Vec<Address>>, min_amount_kana: Option<u64>) -> Result<Vec<UtxoEntry>> {
-        let utxos = self.utxo_context().get_utxos(addresses, min_amount_kana).await?;
-        Ok(utxos)
+    async fn get_registry_units(self: Arc<Self>, addresses: Option<Vec<Address>>, min_amount_kana: Option<u64>) -> Result<Vec<RegistryUnit>> {
+        let registry_units = self.registry_unit_context().get_registry_units(addresses, min_amount_kana).await?;
+        Ok(registry_units)
     }
 
     /// Execute a transfer to another wallet account.
@@ -607,7 +607,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
             priority_fee_kana,
             final_transaction_payload,
         )?
-        .utxo_context_transfer(destination_account.utxo_context());
+        .registry_unit_context_transfer(destination_account.registry_unit_context());
 
         let generator = Generator::try_new(settings, Some(signer), Some(abortable))?;
 
@@ -726,7 +726,7 @@ pub trait DerivationCapableAccount: Account {
         let mut index: usize = start;
         let mut last_notification = 0;
         let mut aggregate_balance = 0;
-        let mut aggregate_utxo_count = 0;
+        let mut aggregate_registry_unit_count = 0;
         let mut last_change_address_index = change_address_index;
         let mut last_receive_address_index = receive_address_manager.index();
 
@@ -758,13 +758,13 @@ pub trait DerivationCapableAccount: Account {
                 (vec![], addresses)
             };
 
-            let utxos = rpc.get_utxos_by_addresses(addresses.clone()).await?;
+            let registry_units = rpc.get_registry_by_addresses(addresses.clone()).await?;
             let mut balance = 0;
-            let utxos = utxos
+            let registry_units = registry_units
                 .iter()
-                .map(|utxo| {
-                    let utxo_ref = UtxoEntryReference::from(utxo);
-                    if let Some(address) = utxo_ref.utxo.address.as_ref() {
+                .map(|registry_unit| {
+                    let registry_unit_ref = RegistryUnitRef::from(registry_unit);
+                    if let Some(address) = registry_unit_ref.registry_unit.address.as_ref() {
                         if let Some(address_index) = receive_address_manager.inner().address_to_index_map.get(address) {
                             if last_receive_address_index < *address_index {
                                 last_receive_address_index = *address_index;
@@ -777,18 +777,18 @@ pub trait DerivationCapableAccount: Account {
                             panic!("Account::derivation_scan() has received an unknown address: `{address}`");
                         }
                     }
-                    balance += utxo_ref.utxo.amount;
-                    utxo_ref
+                    balance += registry_unit_ref.registry_unit.amount;
+                    registry_unit_ref
                 })
                 .collect::<Vec<_>>();
-            aggregate_utxo_count += utxos.len();
+            aggregate_registry_unit_count += registry_units.len();
 
             if balance > 0 {
                 aggregate_balance += balance;
                 if sweep {
                     let settings = GeneratorSettings::try_new_with_iterator(
                         self.wallet().network_id()?,
-                        Box::new(utxos.into_iter()),
+                        Box::new(registry_units.into_iter()),
                         None,
                         change_address.clone(),
                         1,
@@ -807,13 +807,13 @@ pub trait DerivationCapableAccount: Account {
                         transaction.try_sign_with_keys(&keys, None)?;
                         let id = transaction.try_submit(&rpc).await?;
                         if let Some(notifier) = notifier {
-                            notifier(index, aggregate_utxo_count, balance, Some(id));
+                            notifier(index, aggregate_registry_unit_count, balance, Some(id));
                         }
                         yield_executor().await;
                     }
                 } else {
                     if let Some(notifier) = notifier {
-                        notifier(index, aggregate_utxo_count, aggregate_balance, None);
+                        notifier(index, aggregate_registry_unit_count, aggregate_balance, None);
                     }
                     yield_executor().await;
                 }
@@ -822,7 +822,7 @@ pub trait DerivationCapableAccount: Account {
             if index > last_notification + 1_000 {
                 last_notification = index;
                 if let Some(notifier) = notifier {
-                    notifier(index, aggregate_utxo_count, aggregate_balance, None);
+                    notifier(index, aggregate_registry_unit_count, aggregate_balance, None);
                 }
                 yield_executor().await;
             }
@@ -833,7 +833,7 @@ pub trait DerivationCapableAccount: Account {
         if index > last_notification
             && let Some(notifier) = notifier
         {
-            notifier(index, aggregate_utxo_count, aggregate_balance, None);
+            notifier(index, aggregate_registry_unit_count, aggregate_balance, None);
         }
 
         // update address manager with the last used index
@@ -857,7 +857,7 @@ pub trait DerivationCapableAccount: Account {
 
     async fn new_receive_address(self: Arc<Self>) -> Result<Address> {
         let address = self.derivation().receive_address_manager().new_address()?;
-        self.utxo_context().register_addresses(std::slice::from_ref(&address)).await?;
+        self.registry_unit_context().register_addresses(std::slice::from_ref(&address)).await?;
 
         let metadata = self.metadata()?.expect("derivation accounts must provide metadata");
         let store = self.wallet().store().as_account_store()?;
@@ -870,7 +870,7 @@ pub trait DerivationCapableAccount: Account {
 
     async fn new_change_address(self: Arc<Self>) -> Result<Address> {
         let address = self.derivation().change_address_manager().new_address()?;
-        self.utxo_context().register_addresses(std::slice::from_ref(&address)).await?;
+        self.registry_unit_context().register_addresses(std::slice::from_ref(&address)).await?;
 
         let metadata = self.metadata()?.expect("derivation accounts must provide metadata");
         let store = self.wallet().store().as_account_store()?;

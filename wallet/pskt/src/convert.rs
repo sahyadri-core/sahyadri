@@ -21,10 +21,10 @@ impl TryFrom<Transaction> for Inner {
 impl TryFrom<TransactionInput> for Input {
     type Error = Error;
     fn try_from(input: TransactionInput) -> std::result::Result<Input, Self::Error> {
-        let TransactionInputInner { previous_outpoint, signature_script: _, sequence: _, sig_op_count, utxo } = &*input.inner();
+        let TransactionInputInner { previous_outpoint, signature_script: _, sequence: _, sig_op_count, registry_unit } = &*input.inner();
 
         let input = InputBuilder::default()
-        .utxo_entry(utxo.as_ref().ok_or(Error::MissingUtxoEntry)?.into())
+        .registry_unit_entry(registry_unit.as_ref().ok_or(Error::MissingRegistryUnit)?.into())
         .previous_outpoint(previous_outpoint.into())
         // .sequence(*sequence)
         // min_time
@@ -60,17 +60,17 @@ impl TryFrom<TransactionOutput> for Output {
     }
 }
 
-impl TryFrom<(cctx::Transaction, Vec<(&cctx::TransactionInput, &cctx::UtxoEntry)>)> for Inner {
+impl TryFrom<(cctx::Transaction, Vec<(&cctx::TransactionInput, &cctx::RegistryUnit)>)> for Inner {
     type Error = Error; // Define your error type
 
     fn try_from(
-        (transaction, populated_inputs): (cctx::Transaction, Vec<(&cctx::TransactionInput, &cctx::UtxoEntry)>),
+        (transaction, populated_inputs): (cctx::Transaction, Vec<(&cctx::TransactionInput, &cctx::RegistryUnit)>),
     ) -> Result<Self, Self::Error> {
         let inputs: Result<Vec<Input>, Self::Error> = populated_inputs
             .into_iter()
-            .map(|(input, utxo)| {
+            .map(|(input, registry_unit)| {
                 InputBuilder::default()
-                    .utxo_entry(utxo.to_owned().clone())
+                    .registry_unit_entry(registry_unit.to_owned().clone())
                     .previous_outpoint(input.previous_outpoint)
                     .sig_op_count(input.sig_op_count)
                     .build()

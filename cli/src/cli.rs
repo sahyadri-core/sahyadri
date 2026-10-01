@@ -295,9 +295,9 @@ impl SahyadriCli {
                                 }
                                 Events::FeeRate { .. } => {},
                                 Events::Error { message } => { terrorln!(this,"{message}"); },
-                                Events::UtxoProcStart => {},
-                                Events::UtxoProcStop => {},
-                                Events::UtxoProcError { message } => {
+                                Events::RegistryUnitProcStart => {},
+                                Events::RegistryUnitProcStop => {},
+                                Events::RegistryUnitProcError { message } => {
                                     terrorln!(this,"{message}");
                                 },
                                 #[allow(unused_variables)]
@@ -309,8 +309,8 @@ impl SahyadriCli {
                                     tprintln!(this, "Disconnected from {}",url.unwrap_or("N/A".to_string()));
                                     this.term().refresh_prompt();
                                 },
-                                Events::UtxoIndexNotEnabled { .. } => {
-                                    tprintln!(this, "Error: Sahyadri node UTXO index is not enabled...")
+                                Events::RegistryUnitIndexNotEnabled { .. } => {
+                                    tprintln!(this, "Error: Sahyadri node REGISTRY_UNIT index is not enabled...")
                                 },
                                 Events::SyncState { sync_state } => {
 
@@ -392,8 +392,8 @@ impl SahyadriCli {
                                         let guard = this.wallet.guard();
                                         let guard = guard.lock().await;
 
-                                        let include_utxos = this.flags.get(Track::Utxo);
-                                        let tx = record.format_transaction_with_state(&this.wallet,Some("reorg"),include_utxos, &guard).await;
+                                        let include_registry_units = this.flags.get(Track::RegistryUnit);
+                                        let tx = record.format_transaction_with_state(&this.wallet,Some("reorg"),include_registry_units, &guard).await;
                                         tx.iter().for_each(|line|tprintln!(this,"{NOTIFY} {line}"));
                                     }
                                 },
@@ -405,8 +405,8 @@ impl SahyadriCli {
                                         let guard = this.wallet.guard();
                                         let guard = guard.lock().await;
 
-                                        let include_utxos = this.flags.get(Track::Utxo);
-                                        let tx = record.format_transaction_with_state(&this.wallet,Some("stasis"),include_utxos, &guard).await;
+                                        let include_registry_units = this.flags.get(Track::RegistryUnit);
+                                        let tx = record.format_transaction_with_state(&this.wallet,Some("stasis"),include_registry_units, &guard).await;
                                         tx.iter().for_each(|line|tprintln!(this,"{NOTIFY} {line}"));
                                     }
                                 },
@@ -414,8 +414,8 @@ impl SahyadriCli {
                                 //     record
                                 // } => {
                                 //     if !this.is_mutted() || (this.is_mutted() && this.flags.get(Track::Tx)) {
-                                //         let include_utxos = this.flags.get(Track::Utxo);
-                                //         let tx = record.format_with_state(&this.wallet,Some("external"),include_utxos).await;
+                                //         let include_registry_units = this.flags.get(Track::RegistryUnit);
+                                //         let tx = record.format_with_state(&this.wallet,Some("external"),include_registry_units).await;
                                 //         tx.iter().for_each(|line|tprintln!(this,"{NOTIFY} {line}"));
                                 //     }
                                 // },
@@ -426,8 +426,8 @@ impl SahyadriCli {
                                         let guard = this.wallet.guard();
                                         let guard = guard.lock().await;
 
-                                        let include_utxos = this.flags.get(Track::Utxo);
-                                        let tx = record.format_transaction_with_state(&this.wallet,Some("pending"),include_utxos, &guard).await;
+                                        let include_registry_units = this.flags.get(Track::RegistryUnit);
+                                        let tx = record.format_transaction_with_state(&this.wallet,Some("pending"),include_registry_units, &guard).await;
                                         tx.iter().for_each(|line|tprintln!(this,"{NOTIFY} {line}"));
                                     }
                                 },
@@ -438,8 +438,8 @@ impl SahyadriCli {
                                         let guard = this.wallet.guard();
                                         let guard = guard.lock().await;
 
-                                        let include_utxos = this.flags.get(Track::Utxo);
-                                        let tx = record.format_transaction_with_state(&this.wallet,Some("confirmed"),include_utxos, &guard).await;
+                                        let include_registry_units = this.flags.get(Track::RegistryUnit);
+                                        let tx = record.format_transaction_with_state(&this.wallet,Some("confirmed"),include_registry_units, &guard).await;
                                         tx.iter().for_each(|line|tprintln!(this,"{NOTIFY} {line}"));
                                     }
                                 },
@@ -447,8 +447,8 @@ impl SahyadriCli {
                                 //     record
                                 // } => {
                                 //     if !this.is_mutted() || (this.is_mutted() && this.flags.get(Track::Tx)) {
-                                //         let include_utxos = this.flags.get(Track::Utxo);
-                                //         let tx = record.format_with_state(&this.wallet,Some("confirmed"),include_utxos).await;
+                                //         let include_registry_units = this.flags.get(Track::RegistryUnit);
+                                //         let tx = record.format_with_state(&this.wallet,Some("confirmed"),include_registry_units).await;
                                 //         tx.iter().for_each(|line|tprintln!(this,"{NOTIFY} {line}"));
                                 //     }
                                 // },
@@ -456,8 +456,8 @@ impl SahyadriCli {
                                 //     record
                                 // } => {
                                 //     if !this.is_mutted() || (this.is_mutted() && this.flags.get(Track::Tx)) {
-                                //         let include_utxos = this.flags.get(Track::Utxo);
-                                //         let tx = record.format_with_state(&this.wallet,Some("change"),include_utxos).await;
+                                //         let include_registry_units = this.flags.get(Track::RegistryUnit);
+                                //         let tx = record.format_with_state(&this.wallet,Some("change"),include_registry_units).await;
                                 //         tx.iter().for_each(|line|tprintln!(this,"{NOTIFY} {line}"));
                                 //     }
                                 // },
@@ -472,15 +472,15 @@ impl SahyadriCli {
                                         let balance_strings = BalanceStrings::from((balance.as_ref(),&network_type, None));
                                         let id = id.short();
 
-                                        let mature_utxo_count = balance.as_ref().map(|balance|balance.mature_utxo_count.separated_string()).unwrap_or("N/A".to_string());
-                                        let pending_utxo_count = balance.as_ref().map(|balance|balance.pending_utxo_count).unwrap_or(0);
+                                        let mature_registry_unit_count = balance.as_ref().map(|balance|balance.mature_registry_unit_count.separated_string()).unwrap_or("N/A".to_string());
+                                        let pending_registry_unit_count = balance.as_ref().map(|balance|balance.pending_registry_unit_count).unwrap_or(0);
 
-                                        let pending_utxo_info = if pending_utxo_count > 0 {
-                                            format!("({} pending)", pending_utxo_count)
+                                        let pending_registry_unit_info = if pending_registry_unit_count > 0 {
+                                            format!("({} pending)", pending_registry_unit_count)
                                         } else { "".to_string() };
-                                        let utxo_info = style(format!("{mature_utxo_count} UTXOs {pending_utxo_info}")).dim();
+                                        let registry_unit_info = style(format!("{mature_registry_unit_count} REGISTRY_UNITs {pending_registry_unit_info}")).dim();
 
-                                        tprintln!(this, "{NOTIFY} {} {id}: {balance_strings}   {utxo_info}",style("balance".pad_to_width(8)).blue());
+                                        tprintln!(this, "{NOTIFY} {} {id}: {balance_strings}   {registry_unit_info}",style("balance".pad_to_width(8)).blue());
                                     }
 
                                     this.term().refresh_prompt();
@@ -785,10 +785,10 @@ impl SahyadriCli {
                         .join(" "),
                     )
                 }
-                SyncState::UtxoSync { total, .. } => {
-                    Some([style("SYNC UTXO").red().to_string(), style(total.separated_string()).dim().to_string()].join(" "))
+                SyncState::RegistryUnitSync { total, .. } => {
+                    Some([style("SYNC REGISTRY_UNIT").red().to_string(), style(total.separated_string()).dim().to_string()].join(" "))
                 }
-                SyncState::UtxoResync => Some([style("SYNC").red().to_string(), style("UTXO").black().to_string()].join(" ")),
+                SyncState::RegistryUnitResync => Some([style("SYNC").red().to_string(), style("REGISTRY_UNIT").black().to_string()].join(" ")),
                 SyncState::NotSynced => Some([style("SYNC").red().to_string(), style("...").black().to_string()].join(" ")),
                 SyncState::Synced => None,
             }

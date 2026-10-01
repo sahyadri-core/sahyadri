@@ -8,7 +8,7 @@ use crate::imports::*;
 use crate::result::Result;
 use crate::rpc::DynRpcApi;
 use crate::tx::{DataKind, Generator, MAXIMUM_STANDARD_TRANSACTION_MASS};
-use crate::utxo::{UtxoContext, UtxoEntryId, UtxoEntryReference, UtxoIterator};
+use crate::registry_unit::{RegistryUnitContext, RegistryUnitId, RegistryUnitRef, RegistryUnitIterator};
 use sahyadri_consensus_core::hashing::sighash_type::SigHashType;
 use sahyadri_consensus_core::sign::{Signed, sign_input, sign_with_multiple_v2};
 use sahyadri_consensus_core::tx::{SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput};
@@ -18,13 +18,13 @@ use sahyadri_rpc_core::{RpcTransaction, RpcTransactionId};
 pub(crate) struct PendingTransactionInner {
     /// Generator that produced the transaction
     pub(crate) generator: Generator,
-    /// UtxoEntryReferences of the pending transaction
-    pub(crate) utxo_entries: AHashMap<UtxoEntryId, UtxoEntryReference>,
+    /// RegistryUnitRefs of the pending transaction
+    pub(crate) registry_unit_entries: AHashMap<RegistryUnitId, RegistryUnitRef>,
     /// Transaction Id (cached in pending to avoid mutex lock)
     pub(crate) id: TransactionId,
     /// Signable transaction (actual transaction that will be signed and sent)
     pub(crate) signable_tx: Mutex<SignableTransaction>,
-    /// UTXO addresses used by this transaction
+    /// REGISTRY_UNIT addresses used by this transaction
     pub(crate) addresses: Vec<Address>,
     /// Whether the transaction has been committed to the mempool via RPC
     pub(crate) is_submitted: AtomicBool,
@@ -54,7 +54,7 @@ impl std::fmt::Debug for PendingTransaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let transaction = self.transaction();
         f.debug_struct("PendingTransaction")
-            .field("utxo_entries", &self.inner.utxo_entries)
+            .field("registry_unit_entries", &self.inner.registry_unit_entries)
             .field("addresses", &self.inner.addresses)
             .field("payment_value", &self.inner.payment_value)
             .field("change_output_index", &self.inner.change_output_index)
@@ -82,7 +82,7 @@ impl PendingTransaction {
     pub fn try_new(
         generator: &Generator,
         transaction: Transaction,
-        utxo_entries: Vec<UtxoEntryReference>,
+        registry_unit_entries: Vec<RegistryUnitRef>,
         addresses: Vec<Address>,
         payment_value: Option<u64>,
         change_output_index: Option<usize>,
@@ -95,15 +95,15 @@ impl PendingTransaction {
         kind: DataKind,
     ) -> Result<Self> {
         let id = transaction.id();
-        let entries = utxo_entries.iter().map(|e| e.utxo.as_ref().into()).collect::<Vec<_>>();
+        let entries = registry_unit_entries.iter().map(|e| e.registry_unit.as_ref().into()).collect::<Vec<_>>();
         let signable_tx = Mutex::new(SignableTransaction::with_entries(transaction, entries));
-        let utxo_entries = utxo_entries.into_iter().map(|entry| (entry.id(), entry)).collect::<AHashMap<_, _>>();
+        let registry_unit_entries = registry_unit_entries.into_iter().map(|entry| (entry.id(), entry)).collect::<AHashMap<_, _>>();
         Ok(Self {
             inner: Arc::new(PendingTransactionInner {
                 generator: generator.clone(),
                 id,
                 signable_tx,
-                utxo_entries,
+                registry_unit_entries,
                 addresses,
                 is_submitted: AtomicBool::new(false),
                 payment_value,
@@ -127,12 +127,12 @@ impl PendingTransaction {
         &self.inner.generator
     }
 
-    pub fn source_utxo_context(&self) -> &Option<UtxoContext> {
-        self.inner.generator.source_utxo_context()
+    pub fn source_registry_unit_context(&self) -> &Option<RegistryUnitContext> {
+        self.inner.generator.source_registry_unit_context()
     }
 
-    pub fn destination_utxo_context(&self) -> &Option<UtxoContext> {
-        self.inner.generator.destination_utxo_context()
+    pub fn destination_registry_unit_context(&self) -> &Option<RegistryUnitContext> {
+        self.inner.generator.destination_registry_unit_context()
     }
 
     /// Addresses used by the pending transaction
@@ -140,9 +140,9 @@ impl PendingTransaction {
         &self.inner.addresses
     }
 
-    /// Get UTXO entries [`AHashSet<UtxoEntryReference>`] of the pending transaction
-    pub fn utxo_entries(&self) -> &AHashMap<UtxoEntryId, UtxoEntryReference> {
-        &self.inner.utxo_entries
+    /// Get REGISTRY_UNIT entries [`AHashSet<RegistryUnitRef>`] of the pending transaction
+    pub fn registry_unit_entries(&self) -> &AHashMap<RegistryUnitId, RegistryUnitRef> {
+        &self.inner.registry_unit_entries
     }
 
     pub fn fees(&self) -> u64 {
@@ -211,29 +211,29 @@ impl PendingTransaction {
 
         let rpc_transaction: RpcTransaction = self.rpc_transaction();
 
-        // if we are running under UtxoProcessor
-        if let Some(utxo_context) = self.inner.generator.source_utxo_context() {
-            // lock UtxoProcessor notification ingest
-            let _lock = utxo_context.processor().notification_lock().await;
+        // if we are running under RegistryUnitProcessor
+        if let Some(registry_unit_context) = self.inner.generator.source_registry_unit_context() {
+            // lock RegistryUnitProcessor notification ingest
+            let _lock = registry_unit_context.processor().notification_lock().await;
 
-            // register pending UTXOs with UtxoProcessor
-            utxo_context.register_outgoing_transaction(self).await?;
+            // register pending REGISTRY_UNITs with RegistryUnitProcessor
+            registry_unit_context.register_outgoing_transaction(self).await?;
 
             // try to submit transaction
             match rpc.submit_transaction(rpc_transaction, false).await {
                 Ok(id) => {
                     // on successful submit, create a notification
-                    utxo_context.notify_outgoing_transaction(self).await?;
+                    registry_unit_context.notify_outgoing_transaction(self).await?;
                     Ok(id)
                 }
                 Err(error) => {
-                    // in case of failure, remove transaction UTXOs from the consumed list
-                    utxo_context.cancel_outgoing_transaction(self).await?;
+                    // in case of failure, remove transaction REGISTRY_UNITs from the consumed list
+                    registry_unit_context.cancel_outgoing_transaction(self).await?;
                     Err(error.into())
                 }
             }
         } else {
-            // No UtxoProcessor present (API etc)
+            // No RegistryUnitProcessor present (API etc)
             Ok(rpc.submit_transaction(rpc_transaction, false).await?)
         }
     }
@@ -310,7 +310,7 @@ impl PendingTransaction {
 
         let PendingTransactionInner {
             generator,
-            utxo_entries,
+            registry_unit_entries,
             id,
             signable_tx,
             addresses,
@@ -327,7 +327,7 @@ impl PendingTransaction {
         } = &*self.inner;
 
         let generator = generator.clone();
-        let utxo_entries = utxo_entries.clone();
+        let registry_unit_entries = registry_unit_entries.clone();
         let id = *id;
         // let signable_tx = Mutex::new(signable_tx.lock()?.clone());
         let mut signable_tx = signable_tx.lock()?.clone();
@@ -359,26 +359,26 @@ impl PendingTransaction {
                         signable_tx.tx.outputs[index].value = change_output_value;
                     }
                 } else {
-                    // we need more utxos...
-                    let mut utxo_entries_rbf = vec![];
+                    // we need more registry_units...
+                    let mut registry_unit_entries_rbf = vec![];
                     let mut available = change_output_value;
 
-                    let utxo_context = generator.source_utxo_context().as_ref().ok_or(Error::custom("No utxo context"))?;
-                    let mut context_utxo_entries = UtxoIterator::new(utxo_context);
+                    let registry_unit_context = generator.source_registry_unit_context().as_ref().ok_or(Error::custom("No registry_unit context"))?;
+                    let mut context_registry_unit_entries = RegistryUnitIterator::new(registry_unit_context);
                     while available < additional_fees {
-                        // let utxo_entry = utxo_entries.next().ok_or(Error::InsufficientFunds { additional_needed: additional_fees - available, origin: "increase_fees_for_rbf" })?;
-                        // let utxo_entry = generator.get_utxo_entry_for_rbf()?;
-                        if let Some(utxo_entry) = context_utxo_entries.next() {
-                            // let utxo = utxo_entry.utxo.as_ref();
-                            let value = utxo_entry.amount();
+                        // let registry_unit_entry = registry_unit_entries.next().ok_or(Error::InsufficientFunds { additional_needed: additional_fees - available, origin: "increase_fees_for_rbf" })?;
+                        // let registry_unit_entry = generator.get_registry_unit_entry_for_rbf()?;
+                        if let Some(registry_unit_entry) = context_registry_unit_entries.next() {
+                            // let registry_unit = registry_unit_entry.registry_unit.as_ref();
+                            let value = registry_unit_entry.amount();
                             available += value;
                             // aggregate_input_value += value;
 
-                            utxo_entries_rbf.push(utxo_entry);
-                            // signable_tx.lock().unwrap().tx.inputs.push(utxo.as_input());
+                            registry_unit_entries_rbf.push(registry_unit_entry);
+                            // signable_tx.lock().unwrap().tx.inputs.push(registry_unit.as_input());
                         } else {
-                            // generator.stash(utxo_entries_rbf);
-                            // utxo_entries_rbf.into_iter().for_each(|utxo_entry|generator.stash(utxo_entry));
+                            // generator.stash(registry_unit_entries_rbf);
+                            // registry_unit_entries_rbf.into_iter().for_each(|registry_unit_entry|generator.stash(registry_unit_entry));
                             return Err(Error::InsufficientFunds {
                                 additional_needed: additional_fees - available,
                                 origin: "increase_fees_for_rbf",
@@ -386,21 +386,21 @@ impl PendingTransaction {
                         }
                     }
 
-                    let utxo_entries_vec = utxo_entries
+                    let registry_unit_entries_vec = registry_unit_entries
                         .iter()
-                        .map(|(_, utxo_entry)| utxo_entry.as_ref().clone())
-                        .chain(utxo_entries_rbf.iter().map(|utxo_entry| utxo_entry.as_ref().clone()))
+                        .map(|(_, registry_unit_entry)| registry_unit_entry.as_ref().clone())
+                        .chain(registry_unit_entries_rbf.iter().map(|registry_unit_entry| registry_unit_entry.as_ref().clone()))
                         .collect::<Vec<_>>();
 
-                    let inputs = utxo_entries_rbf
+                    let inputs = registry_unit_entries_rbf
                         .into_iter()
-                        .map(|utxo| TransactionInput::new(utxo.outpoint().clone().into(), vec![], 0, generator.sig_op_count()));
+                        .map(|registry_unit| TransactionInput::new(registry_unit.outpoint().clone().into(), vec![], 0, generator.sig_op_count()));
 
                     signable_tx.tx.inputs.extend(inputs);
 
                     // let transaction_mass = generator.mass_calculator().calc_overall_mass_for_unsigned_consensus_transaction(
                     //     &signable_tx.tx,
-                    //     &utxo_entries_vec,
+                    //     &registry_unit_entries_vec,
                     //     self.inner.minimum_signatures,
                     // )?;
                     // if transaction_mass > MAXIMUM_STANDARD_TRANSACTION_MASS {
@@ -409,7 +409,7 @@ impl PendingTransaction {
                     // }
                     // signable_tx.tx.set_mass(transaction_mass);
 
-                    // utxo
+                    // registry_unit
 
                     // let input = ;
                 }
@@ -419,7 +419,7 @@ impl PendingTransaction {
 
         let inner = PendingTransactionInner {
             generator,
-            utxo_entries,
+            registry_unit_entries,
             id,
             signable_tx: Mutex::new(signable_tx),
             addresses,

@@ -436,7 +436,7 @@ async fn validate(src_consensus: &Consensus, dst_consensus: &Consensus, params: 
         if header_only {
             assert!(statuses.iter().all(|s| s.is_header_only()));
         } else {
-            assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
+            assert!(statuses.iter().all(|s| s.is_state_valid_or_pending()));
         }
         prev_joins = current_joins;
     }
@@ -445,11 +445,11 @@ async fn validate(src_consensus: &Consensus, dst_consensus: &Consensus, params: 
     if header_only {
         assert!(statuses.iter().all(|s| s.is_header_only()));
     } else {
-        assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
+        assert!(statuses.iter().all(|s| s.is_state_valid_or_pending()));
     }
 
-    // Assert that at least one body tip was resolved with valid UTXO
-    assert!(dst_consensus.body_tips().iter().copied().any(|h| dst_consensus.block_status(h) == BlockStatus::StatusUTXOValid));
+    // Assert that at least one body tip was resolved with valid REGISTRY_UNIT
+    assert!(dst_consensus.body_tips().iter().copied().any(|h| dst_consensus.block_status(h) == BlockStatus::StatusStateValid));
     let elapsed = start.elapsed();
     info!(
         "Total validation time: {:?}, {} processing rate: {:.2} (b/s), transaction processing rate: {:.2} (t/s)",

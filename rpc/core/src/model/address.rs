@@ -1,34 +1,34 @@
-use crate::{RpcTransactionOutpoint, RpcUtxoEntry};
+use crate::{RpcRegistryRef, RpcRegistryUnit};
 use serde::{Deserialize, Serialize};
 use workflow_serializer::prelude::*;
 
 pub type RpcAddress = sahyadri_addresses::Address;
 
-/// Represents a UTXO entry of an address returned by the `GetUtxosByAddresses` RPC.
+/// Represents a REGISTRY_UNIT entry of an address returned by the `GetRegistryByAddresses` RPC.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcUtxosByAddressesEntry {
+pub struct RpcRegistryByAddressesEntry {
     pub address: Option<RpcAddress>,
-    pub outpoint: RpcTransactionOutpoint,
-    pub utxo_entry: RpcUtxoEntry,
+    pub outpoint: RpcRegistryRef,
+    pub registry_unit_entry: RpcRegistryUnit,
 }
 
-impl Serializer for RpcUtxosByAddressesEntry {
+impl Serializer for RpcRegistryByAddressesEntry {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?; // version
         store!(Option<RpcAddress>, &self.address, writer)?;
-        serialize!(RpcTransactionOutpoint, &self.outpoint, writer)?;
-        serialize!(RpcUtxoEntry, &self.utxo_entry, writer)
+        serialize!(RpcRegistryRef, &self.outpoint, writer)?;
+        serialize!(RpcRegistryUnit, &self.registry_unit_entry, writer)
     }
 }
 
-impl Deserializer for RpcUtxosByAddressesEntry {
+impl Deserializer for RpcRegistryByAddressesEntry {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version: u8 = load!(u8, reader)?;
         let address = load!(Option<RpcAddress>, reader)?;
-        let outpoint = deserialize!(RpcTransactionOutpoint, reader)?;
-        let utxo_entry = deserialize!(RpcUtxoEntry, reader)?;
-        Ok(Self { address, outpoint, utxo_entry })
+        let outpoint = deserialize!(RpcRegistryRef, reader)?;
+        let registry_unit_entry = deserialize!(RpcRegistryUnit, reader)?;
+        Ok(Self { address, outpoint, registry_unit_entry })
     }
 }
 

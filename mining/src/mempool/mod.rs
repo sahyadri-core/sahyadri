@@ -37,7 +37,7 @@ pub(crate) mod validate_and_insert_transaction;
 ///   dependencies in the mempool.
 /// - A transaction can have some of its outpoints refer to missing outputs when
 ///   added to the mempool. In this case it is considered orphan.
-/// - An orphan transaction is unorphaned when all its UTXO entries have been
+/// - An orphan transaction is unorphaned when all its REGISTRY_UNIT entries have been
 ///   built or found.
 /// - There are transaction priorities: high and low.
 /// - Transactions submitted to the mempool by a RPC call have **high priority**.

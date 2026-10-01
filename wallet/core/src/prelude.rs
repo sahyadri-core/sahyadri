@@ -17,7 +17,7 @@ pub use crate::utils::{
     kana_to_sahyadri, kana_to_sahyadri_string, kana_to_sahyadri_string_with_suffix, sahyadri_suffix, sahyadri_to_kana,
     try_sahyadri_str_to_kana, try_sahyadri_str_to_kana_i64,
 };
-pub use crate::utxo::balance::{Balance, BalanceStrings};
+pub use crate::registry_unit::balance::{Balance, BalanceStrings};
 pub use crate::wallet::Wallet;
 pub use crate::wallet::args::*;
 pub use async_std::sync::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard};

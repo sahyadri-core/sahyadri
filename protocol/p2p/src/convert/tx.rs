@@ -2,7 +2,7 @@ use super::{error::ConversionError, option::TryIntoOptionEx};
 use crate::pb as protowire;
 use sahyadri_consensus_core::{
     subnets::SubnetworkId,
-    tx::{ScriptPublicKey, Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
+    tx::{ScriptPublicKey, Transaction, TransactionId, TransactionInput, RegistryRef, TransactionOutput, RegistryUnit},
 };
 use sahyadri_hashes::Hash;
 
@@ -28,8 +28,8 @@ impl From<&SubnetworkId> for protowire::SubnetworkId {
     }
 }
 
-impl From<&TransactionOutpoint> for protowire::Outpoint {
-    fn from(outpoint: &TransactionOutpoint) -> Self {
+impl From<&RegistryRef> for protowire::Outpoint {
+    fn from(outpoint: &RegistryRef) -> Self {
         Self { transaction_id: Some(outpoint.transaction_id.into()), index: outpoint.index }
     }
 }
@@ -84,7 +84,7 @@ impl TryFrom<protowire::TransactionId> for TransactionId {
     }
 }
 
-impl TryFrom<protowire::Outpoint> for TransactionOutpoint {
+impl TryFrom<protowire::Outpoint> for RegistryRef {
     type Error = ConversionError;
 
     fn try_from(item: protowire::Outpoint) -> Result<Self, Self::Error> {
@@ -100,19 +100,19 @@ impl TryFrom<protowire::ScriptPublicKey> for ScriptPublicKey {
     }
 }
 
-impl TryFrom<protowire::UtxoEntry> for UtxoEntry {
+impl TryFrom<protowire::RegistryUnit> for RegistryUnit {
     type Error = ConversionError;
 
-    fn try_from(value: protowire::UtxoEntry) -> Result<Self, Self::Error> {
+    fn try_from(value: protowire::RegistryUnit) -> Result<Self, Self::Error> {
         Ok(Self::new(value.amount, value.script_public_key.try_into_ex()?, value.block_daa_score, value.is_coinbase))
     }
 }
 
-impl TryFrom<protowire::OutpointAndUtxoEntryPair> for (TransactionOutpoint, UtxoEntry) {
+impl TryFrom<protowire::OutpointAndRegistryUnitPair> for (RegistryRef, RegistryUnit) {
     type Error = ConversionError;
 
-    fn try_from(value: protowire::OutpointAndUtxoEntryPair) -> Result<Self, Self::Error> {
-        Ok((value.outpoint.try_into_ex()?, value.utxo_entry.try_into_ex()?))
+    fn try_from(value: protowire::OutpointAndRegistryUnitPair) -> Result<Self, Self::Error> {
+        Ok((value.outpoint.try_into_ex()?, value.registry_unit_entry.try_into_ex()?))
     }
 }
 

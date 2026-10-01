@@ -77,7 +77,7 @@ impl MiningMonitor {
             }
             if tx_script_cache_snapshot != last_tx_script_cache_snapshot {
                 debug!(
-                    "UTXO set stats: {} spent, {} created ({} signatures validated, {} cache hits, {:.2} hit ratio)",
+                    "REGISTRY_UNIT set stats: {} spent, {} created ({} signatures validated, {} cache hits, {:.2} hit ratio)",
                     delta.input_counts,
                     delta.output_counts,
                     tx_script_cache_delta.insert_counts,

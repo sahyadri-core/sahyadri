@@ -3,7 +3,7 @@
 //!
 //! This crate offers client-side primitives mirroring the consensus layer of the Sahyadri p2p node.
 //! It declares structs such as [`Transaction`], [`TransactionInput`], [`TransactionOutput`],
-//! [`TransactionOutpoint`], [`UtxoEntry`], and [`UtxoEntryReference`]
+//! [`RegistryRef`], [`RegistryUnit`], and [`RegistryUnitRef`]
 //! that are used by the Wallet subsystem as well as WASM bindings.
 //!
 //! Unlike raw consensus primitives (used for high-performance DAG processing) the primitives
@@ -20,13 +20,13 @@ mod output;
 pub mod result;
 mod serializable;
 mod transaction;
-mod utxo;
+mod registry_unit;
 pub use input::*;
 pub use outpoint::*;
 pub use output::*;
 pub use serializable::*;
 pub use transaction::*;
-pub use utxo::*;
+pub use registry_unit::*;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "wasm32-sdk")] {

@@ -251,7 +251,7 @@ mod tests {
         mass::NonContextualMasses,
         network::NetworkType,
         subnets::SUBNETWORK_ID_NATIVE,
-        tx::{ScriptPublicKey, ScriptVec, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput},
+        tx::{ScriptPublicKey, ScriptVec, Transaction, TransactionInput, RegistryRef, TransactionOutput},
     };
     use sahyadri_txscript::{
         opcodes::codes::{OpReturn, OpTrue},
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn test_check_transaction_standard_in_isolation() {
         // Create some dummy, but otherwise standard, data for transactions.
-        let dummy_prev_out = TransactionOutpoint::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
+        let dummy_prev_out = RegistryRef::new(sahyadri_hashes::Hash::from_u64_word(1), 1);
         let dummy_sig_script = vec![0u8; 65];
         let dummy_tx_input = TransactionInput::new(dummy_prev_out, dummy_sig_script, MAX_TX_IN_SEQUENCE_NUM, 1);
         let addr_hash = vec![1u8; 32];

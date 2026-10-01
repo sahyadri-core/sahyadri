@@ -1,5 +1,5 @@
 use super::HasherExtensions;
-use crate::tx::{Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput};
+use crate::tx::{Transaction, TransactionId, TransactionInput, RegistryRef, TransactionOutput};
 use sahyadri_hashes::{Hash, Hasher};
 
 bitflags::bitflags! {
@@ -94,7 +94,7 @@ fn write_input<T: Hasher>(hasher: &mut T, input: &TransactionInput, encoding_fla
 }
 
 #[inline(always)]
-fn write_outpoint<T: Hasher>(hasher: &mut T, outpoint: &TransactionOutpoint) {
+fn write_outpoint<T: Hasher>(hasher: &mut T, outpoint: &RegistryRef) {
     hasher.update(outpoint.transaction_id).update(outpoint.index.to_le_bytes());
 }
 
@@ -132,7 +132,7 @@ mod tests {
             },
         ];
 
-        let inputs = vec![TransactionInput::new(TransactionOutpoint::new(Hash::from_u64_word(0), 2), vec![1, 2], 7, 5)];
+        let inputs = vec![TransactionInput::new(RegistryRef::new(Hash::from_u64_word(0), 2), vec![1, 2], 7, 5)];
 
         // Test #2
         tests.push(Test {
@@ -158,7 +158,7 @@ mod tests {
         });
 
         let inputs = vec![TransactionInput::new(
-            TransactionOutpoint::new(Hash::from_str("59b3d6dc6cdc660c389c3fdb5704c48c598d279cdf1bab54182db586a4c95dd5").unwrap(), 2),
+            RegistryRef::new(Hash::from_str("59b3d6dc6cdc660c389c3fdb5704c48c598d279cdf1bab54182db586a4c95dd5").unwrap(), 2),
             vec![1, 2],
             7,
             5,

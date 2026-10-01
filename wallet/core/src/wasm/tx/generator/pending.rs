@@ -79,10 +79,10 @@ impl PendingTransaction {
         self.inner.addresses().iter().map(|address| JsValue::from(address.to_string())).collect()
     }
 
-    /// Provides a list of UTXO entries used by the transaction.
-    #[wasm_bindgen(js_name = getUtxoEntries)]
-    pub fn get_utxo_entries(&self) -> Array {
-        self.inner.utxo_entries().values().map(|utxo_entry| JsValue::from(utxo_entry.clone())).collect()
+    /// Provides a list of REGISTRY_UNIT entries used by the transaction.
+    #[wasm_bindgen(js_name = getRegistryUnitEntries)]
+    pub fn get_registry_unit_entries(&self) -> Array {
+        self.inner.registry_unit_entries().values().map(|registry_unit_entry| JsValue::from(registry_unit_entry.clone())).collect()
     }
 
     /// Creates and returns a signature for the input at the specified index.
@@ -135,9 +135,9 @@ impl PendingTransaction {
     }
 
     /// Submit transaction to the supplied [`RpcClient`]
-    /// **IMPORTANT:** This method will remove UTXOs from the associated
-    /// {@link UtxoContext} if one was used to create the transaction
-    /// and will return UTXOs back to {@link UtxoContext} in case of
+    /// **IMPORTANT:** This method will remove REGISTRY_UNITs from the associated
+    /// {@link RegistryUnitContext} if one was used to create the transaction
+    /// and will return REGISTRY_UNITs back to {@link RegistryUnitContext} in case of
     /// a failed submission.
     ///
     /// # Important
@@ -157,7 +157,7 @@ impl PendingTransaction {
     /// Returns encapsulated network [`Transaction`]
     #[wasm_bindgen(getter)]
     pub fn transaction(&self) -> Result<Transaction> {
-        Ok(Transaction::from_cctx_transaction(&self.inner.transaction(), self.inner.utxo_entries()))
+        Ok(Transaction::from_cctx_transaction(&self.inner.transaction(), self.inner.registry_unit_entries()))
     }
 
     /// Serializes the transaction to a pure JavaScript Object.
@@ -166,7 +166,7 @@ impl PendingTransaction {
     /// @see {@link Transaction}, {@link ISerializableTransaction}
     #[wasm_bindgen(js_name = "serializeToObject")]
     pub fn serialize_to_object(&self) -> Result<TransactionT> {
-        Ok(numeric::SerializableTransaction::from_cctx_transaction(&self.inner.transaction(), self.inner.utxo_entries())?
+        Ok(numeric::SerializableTransaction::from_cctx_transaction(&self.inner.transaction(), self.inner.registry_unit_entries())?
             .serialize_to_object()?
             .into())
     }
@@ -177,7 +177,7 @@ impl PendingTransaction {
     /// @see {@link Transaction}, {@link ISerializableTransaction}
     #[wasm_bindgen(js_name = "serializeToJSON")]
     pub fn serialize_to_json(&self) -> Result<String> {
-        Ok(numeric::SerializableTransaction::from_cctx_transaction(&self.inner.transaction(), self.inner.utxo_entries())?
+        Ok(numeric::SerializableTransaction::from_cctx_transaction(&self.inner.transaction(), self.inner.registry_unit_entries())?
             .serialize_to_json()?)
     }
 
@@ -186,7 +186,7 @@ impl PendingTransaction {
     /// @see {@link Transaction}, {@link ISerializableTransaction}
     #[wasm_bindgen(js_name = "serializeToSafeJSON")]
     pub fn serialize_to_json_safe(&self) -> Result<String> {
-        Ok(string::SerializableTransaction::from_cctx_transaction(&self.inner.transaction(), self.inner.utxo_entries())?
+        Ok(string::SerializableTransaction::from_cctx_transaction(&self.inner.transaction(), self.inner.registry_unit_entries())?
             .serialize_to_json()?)
     }
 }

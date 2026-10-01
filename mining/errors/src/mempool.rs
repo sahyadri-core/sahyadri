@@ -1,6 +1,6 @@
 use sahyadri_consensus_core::{
     errors::tx::TxRuleError,
-    tx::{TransactionId, TransactionOutpoint},
+    tx::{TransactionId, RegistryRef},
 };
 use thiserror::Error;
 
@@ -15,7 +15,7 @@ pub enum RuleError {
     #[error(transparent)]
     RejectTxRule(TxRuleError),
 
-    #[error("at least one outpoint of transaction is lacking a matching UTXO entry")]
+    #[error("at least one outpoint of transaction is lacking a matching REGISTRY_UNIT entry")]
     RejectMissingOutpoint,
 
     #[error("transaction {0} was already accepted by the consensus")]
@@ -25,7 +25,7 @@ pub enum RuleError {
     RejectDuplicate(TransactionId),
 
     #[error("output {0} already spent by transaction {1} in the mempool")]
-    RejectDoubleSpendInMempool(TransactionOutpoint, TransactionId),
+    RejectDoubleSpendInMempool(RegistryRef, TransactionId),
 
     #[error("replace by fee found no double spending transaction in the mempool")]
     RejectRbfNoDoubleSpend,
@@ -41,7 +41,7 @@ pub enum RuleError {
     #[error("transaction {0} is not standard: {1}")]
     RejectNonStandard(TransactionId, String),
 
-    #[error("one of the transaction inputs spends an immature UTXO: {0}")]
+    #[error("one of the transaction inputs spends an immature REGISTRY_UNIT: {0}")]
     RejectImmatureSpend(TxRuleError),
 
     #[error("transaction {0} doesn't exist in transaction pool")]
@@ -60,7 +60,7 @@ pub enum RuleError {
     RejectDisallowedOrphan(TransactionId),
 
     #[error("input No. {0} of {1} ({2}) doesn't exist in orphan_ids_by_previous_outpoint")]
-    RejectMissingOrphanOutpoint(usize, TransactionId, TransactionOutpoint),
+    RejectMissingOrphanOutpoint(usize, TransactionId, RegistryRef),
 
     #[error("transaction {0} doesn't exist in orphan pool")]
     RejectMissingOrphanTransaction(TransactionId),

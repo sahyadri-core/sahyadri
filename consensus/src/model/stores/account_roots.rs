@@ -1,4 +1,4 @@
-//! Per-block account commitment root. Analogous to `utxo_multisets.rs`,
+//! Per-block account commitment root. Analogous to `registry_unit_multisets.rs`,
 //! but keyed by block hash and storing the SMT root that block commits to.
 
 use rocksdb::WriteBatch;

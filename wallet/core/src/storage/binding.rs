@@ -1,9 +1,9 @@
 //!
-//! Id references used to associate transactions with Account or UtxoContext ids.
+//! Id references used to associate transactions with Account or RegistryUnitContext ids.
 //!
 
 use crate::imports::*;
-use crate::utxo::{UtxoContextBinding as UtxoProcessorBinding, UtxoContextId};
+use crate::registry_unit::{RegistryUnitContextBinding as RegistryUnitProcessorBinding, RegistryUnitContextId};
 
 #[wasm_bindgen(typescript_custom_section)]
 const ITransactionRecord: &'static str = r#"
@@ -48,16 +48,16 @@ extern "C" {
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "type", content = "id")]
 pub enum Binding {
-    Custom(UtxoContextId),
+    Custom(RegistryUnitContextId),
     Account(AccountId),
 }
 
-impl From<UtxoProcessorBinding> for Binding {
-    fn from(b: UtxoProcessorBinding) -> Self {
+impl From<RegistryUnitProcessorBinding> for Binding {
+    fn from(b: RegistryUnitProcessorBinding) -> Self {
         match b {
-            UtxoProcessorBinding::Internal(id) => Binding::Custom(id),
-            UtxoProcessorBinding::Id(id) => Binding::Custom(id),
-            UtxoProcessorBinding::AccountId(id) => Binding::Account(id),
+            RegistryUnitProcessorBinding::Internal(id) => Binding::Custom(id),
+            RegistryUnitProcessorBinding::Id(id) => Binding::Custom(id),
+            RegistryUnitProcessorBinding::AccountId(id) => Binding::Account(id),
         }
     }
 }

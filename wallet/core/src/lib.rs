@@ -12,8 +12,8 @@
 //! [`sahyadri_wallet_keys`] crate.
 //!
 //! This crate included are low-level primitives
-//! such as [`UtxoProcessor`](crate::utxo::UtxoProcessor)
-//! and [`UtxoContext`](crate::utxo::UtxoContext) that provide
+//! such as [`RegistryUnitProcessor`](crate::registry_unit::RegistryUnitProcessor)
+//! and [`RegistryUnitContext`](crate::registry_unit::RegistryUnitContext) that provide
 //! various levels of automation as well as higher-level
 //! APIs such as [`Wallet`](crate::wallet::Wallet),
 //! [`Account`](crate::account::Account) (managed via the
@@ -26,7 +26,7 @@
 //! The wallet framework also includes transaction
 //! [`Generator`](crate::tx::generator::Generator)
 //! that can be used to generate transactions from a set of
-//! UTXO entries. The generator can be used to create
+//! REGISTRY_UNIT entries. The generator can be used to create
 //! simple transactions as well as batch transactions
 //! comprised of multiple chained transactions.  Batch
 //! transactions (also known as compound transactions)
@@ -93,7 +93,7 @@ pub mod settings;
 pub mod storage;
 pub mod tx;
 pub mod utils;
-pub mod utxo;
+pub mod registry_unit;
 pub mod wallet;
 
 #[cfg(any(feature = "wasm32-sdk", feature = "wasm32-core"))]

@@ -7,7 +7,7 @@ use crate::{
     scope::Scope,
     subscriber::SubscriptionManager,
     subscription::{
-        Command, DynSubscription, MutateSingle, Mutation, MutationPolicies, UtxosChangedMutationPolicy, array::ArrayBuilder,
+        Command, DynSubscription, MutateSingle, Mutation, MutationPolicies, RegistryChangedMutationPolicy, array::ArrayBuilder,
         context::SubscriptionContext,
     },
 };
@@ -110,7 +110,7 @@ where
 
     fn new(sender: Sender<N>, subscription_context: SubscriptionContext) -> Self {
         let subscriptions = RwLock::new(ArrayBuilder::single(Self::ROOT_LISTENER_ID, None));
-        let policies = MutationPolicies::new(UtxosChangedMutationPolicy::Wildcard);
+        let policies = MutationPolicies::new(RegistryChangedMutationPolicy::Wildcard);
         Self { sender, subscriptions, subscription_context, policies }
     }
 

@@ -8,7 +8,7 @@ use rand_distr::{Distribution, Exp};
 use sahyadri_addresses::Address;
 use sahyadri_core::warn;
 use sahyadri_grpc_client::GrpcClient;
-use sahyadri_notify::scope::{Scope, UtxosChangedScope};
+use sahyadri_notify::scope::{Scope, RegistryChangedScope};
 use sahyadri_rpc_core::api::rpc::RpcApi;
 use sahyadri_utils::{channel::Channel, triggers::SingleTrigger};
 use std::{cmp::max, collections::HashMap, sync::Arc, time::Duration};
@@ -36,8 +36,8 @@ pub enum SubscribeCommand {
     RegisterJob((Count, OneshotSender<Registration>)),
     Start((JobId, Arc<GrpcClient>, Scope)),
     Stop((JobId, Arc<GrpcClient>, Scope)),
-    StartUtxosChanged((JobId, Arc<GrpcClient>, Arc<Vec<Address>>)),
-    StopUtxosChanged((JobId, Arc<GrpcClient>)),
+    StartRegistryChanged((JobId, Arc<GrpcClient>, Arc<Vec<Address>>)),
+    StopRegistryChanged((JobId, Arc<GrpcClient>)),
 }
 
 struct Job {
@@ -131,8 +131,8 @@ impl Task for SubscriptionSubmitterTask {
                                 client.stop_notify(0, scope).await.unwrap();
                                 register.lock().dec_count(id);
                             }
-                            SubscribeCommand::StartUtxosChanged((id, client, addresses)) => loop {
-                                match client.start_notify(0, UtxosChangedScope::new((*addresses).clone()).into()).await {
+                            SubscribeCommand::StartRegistryChanged((id, client, addresses)) => loop {
+                                match client.start_notify(0, RegistryChangedScope::new((*addresses).clone()).into()).await {
                                     Ok(_) => {
                                         register.lock().dec_count(id);
                                         break;
@@ -144,8 +144,8 @@ impl Task for SubscriptionSubmitterTask {
                                     }
                                 }
                             },
-                            SubscribeCommand::StopUtxosChanged((id, client)) => loop {
-                                match client.stop_notify(0, UtxosChangedScope::new(vec![]).into()).await {
+                            SubscribeCommand::StopRegistryChanged((id, client)) => loop {
+                                match client.stop_notify(0, RegistryChangedScope::new(vec![]).into()).await {
                                     Ok(_) => {
                                         register.lock().dec_count(id);
                                         break;

@@ -56,7 +56,7 @@ pub(crate) mod raigad {
 
         pub fn _report_activation(&self) -> bool {
             if self.steps.compare_exchange(Self::_ACTIVATE, Self::_ACTIVATE + 1, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                info!(target: RAIGAD_KEYWORD, "[Raigad] [--------- Raigad activated for UTXO state processing rules ---------]");
+                info!(target: RAIGAD_KEYWORD, "[Raigad] [--------- Raigad activated for REGISTRY_UNIT state processing rules ---------]");
                 true
             } else {
                 false
@@ -65,7 +65,7 @@ pub(crate) mod raigad {
     }
 }
 
-/// A context for processing the UTXO state of a block with respect to its selected parent.
+/// A context for processing the REGISTRY_UNIT state of a block with respect to its selected parent.
 /// Note this can also be the virtual block.
 pub(super) struct BlockProcessingContext<'a> {
     pub sahyadri_consensus_data: Refs<'a, SahyadriConsensusData>,
@@ -93,7 +93,7 @@ impl<'a> BlockProcessingContext<'a> {
 }
 
 impl VirtualStateProcessor {
-    /// Calculates UTXO state and transaction acceptance data relative to the selected parent state
+    /// Calculates REGISTRY_UNIT state and transaction acceptance data relative to the selected parent state
     pub(super) fn calculate_block_state(
         &self,
         ctx: &mut BlockProcessingContext,
@@ -126,14 +126,14 @@ impl VirtualStateProcessor {
             let is_selected_parent = i == 0;
 
             // No need to fully validate selected parent transactions since selected parent txs were already validated
-            // as part of selected parent UTXO state verification with the exact same UTXO context.
+            // as part of selected parent REGISTRY_UNIT state verification with the exact same REGISTRY_UNIT context.
             let validation_flags = if is_selected_parent { TxValidationFlags::SkipScriptChecks } else { TxValidationFlags::Full };
             let (validated_transactions, inner_multiset) =
                 self.validate_transactions_with_muhash_in_parallel(&txs, pov_daa_score, validation_flags);
 
             // NOTE: We intentionally do NOT combine `inner_multiset` here.
             // Duplicate txs across parallel DAG blocks would be double-counted
-            // in the UTXO multiset hash, corrupting the commitment. Instead we
+            // in the REGISTRY_UNIT multiset hash, corrupting the commitment. Instead we
             // accumulate per-tx below, only for the first occurrence of each txid.
             let _ = inner_multiset;
 
@@ -172,13 +172,13 @@ impl VirtualStateProcessor {
         }
     }
 
-    /// Verify that the current block fully respects its own UTXO view. We define a block as
-    /// UTXO valid if all the following conditions hold:
-    ///     1. The block header includes the expected `utxo_commitment`.
+    /// Verify that the current block fully respects its own REGISTRY_UNIT view. We define a block as
+    /// REGISTRY_UNIT valid if all the following conditions hold:
+    ///     1. The block header includes the expected `registry_unit_commitment`.
     ///     2. The block header includes the expected `accepted_id_merkle_root`.
     ///     3. The block header includes the expected `pruning_point`.
     ///     4. The block coinbase transaction rewards the mergeset blocks correctly.
-    ///     5. All non-coinbase block transactions are valid against its own UTXO view.
+    ///     5. All non-coinbase block transactions are valid against its own REGISTRY_UNIT view.
     pub(super) fn verify_block_state(
         &self,
         ctx: &mut BlockProcessingContext,
@@ -187,7 +187,7 @@ impl VirtualStateProcessor {
         // SAHYADRI: read parent root from the parent's HEADER, not from
         // account_roots_store. The store is written asynchronously during
         // commit, so for recent parents (which is the normal case) it may
-        // not yet contain the entry. The header's utxo_commitment field is
+        // not yet contain the entry. The header's registry_unit_commitment field is
         // always populated by the producer and available before verify.
         let parent_hash = ctx.selected_parent();
         let parent_header = self
@@ -247,12 +247,12 @@ impl VirtualStateProcessor {
 
         let expected_commitment = sahyadri_hashes::Hash::from_bytes(my_root);
 
-        if expected_commitment != header.utxo_commitment {
+        if expected_commitment != header.registry_unit_commitment {
             log::warn!(
                 "SAHYADRI: ACCOUNT COMMITMENT MISMATCH — block {} header={} calc={}",
-                header.hash, header.utxo_commitment, expected_commitment
+                header.hash, header.registry_unit_commitment, expected_commitment
             );
-            return Err(BadAccountCommitment(header.hash, header.utxo_commitment, expected_commitment));
+            return Err(BadAccountCommitment(header.hash, header.registry_unit_commitment, expected_commitment));
         }
 
         trace!("correct commitment: {}, {}", header.hash, expected_commitment);
@@ -312,7 +312,7 @@ impl VirtualStateProcessor {
         _mergeset_non_daa: &BlockHashSet,
     ) -> BlockProcessResult<()> {
         // SAHYADRI ACCOUNT MODEL BYPASS:
-        // We bypass the traditional UTXO-based coinbase validation
+        // We bypass the traditional REGISTRY_UNIT-based coinbase validation
         // because rewards are handled directly as account balance updates.
         Ok(())
     }
@@ -323,19 +323,28 @@ impl VirtualStateProcessor {
         _pov_daa_score: u64,
         _flags: TxValidationFlags,
     ) -> Vec<(ValidatedTransaction<'a>, usize)> {
-        // SAHYADRI: account-model transactions pass through directly.
-        txs.iter()
-            .enumerate()
-            .skip(1)
-            .map(|(i, tx)| {
-                (ValidatedTransaction::new_account_bypass(tx), i)
-            })
-            .collect()
+        use crate::processes::transaction_validator::tx_validation_in_isolation::verify_account_tx_signatures_batch;
+
+        // ── Phase 1: batch-parallel Dilithium3 signature verify ──
+        // Skip coinbase (index 0). Uses VERIFY_POOL (rayon) + AVX2 NTT.
+        let candidates: Vec<(usize, &Transaction)> = txs.iter().enumerate().skip(1).collect();
+        let candidates_ref: Vec<&Transaction> = candidates.iter().map(|(_, tx)| *tx).collect();
+        let results = verify_account_tx_signatures_batch(&candidates_ref);
+
+        // ── Phase 2: accept only verified txs ──
+        let mut out = Vec::with_capacity(results.len());
+        for ((i, tx), res) in candidates.into_iter().zip(results) {
+            if res.is_ok() {
+                out.push((ValidatedTransaction::new_account_bypass(tx), i));
+            }
+            // Silent drop of invalid ones. Counters handle this at a higher layer.
+        }
+        out
     }
 
-    /// SAHYADRI ACCOUNT MODEL: UTXO-based muhash tracking removed.
+    /// SAHYADRI ACCOUNT MODEL: REGISTRY_UNIT-based muhash tracking removed.
     /// Returns account-bypass validated transactions and a fresh
-    /// (unused) MuHash. The muhash is a legacy artifact of the UTXO
+    /// (unused) MuHash. The muhash is a legacy artifact of the REGISTRY_UNIT
     /// commitment scheme and is no longer read by any caller.
     pub(crate) fn validate_transactions_with_muhash_in_parallel<'a>(
         &self,

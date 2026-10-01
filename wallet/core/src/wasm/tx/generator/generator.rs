@@ -1,22 +1,22 @@
 use crate::imports::*;
 use crate::result::Result;
 use crate::tx::{Fees, PaymentDestination, PaymentOutputs, generator as native};
-use crate::utxo::{TryIntoUtxoEntryReferences, UtxoEntryReference};
+use crate::registry_unit::{TryIntoRegistryUnitRefs, RegistryUnitRef};
 use crate::wasm::tx::IFees;
 use crate::wasm::tx::generator::*;
 // use crate::wasm::wallet::Account;
-use crate::wasm::UtxoContext;
+use crate::wasm::RegistryUnitContext;
 
 // TODO-WASM fix outputs
 #[wasm_bindgen(typescript_custom_section)]
 const TS_GENERATOR_SETTINGS_OBJECT: &'static str = r#"
 /**
  * Configuration for the transaction {@link Generator}. This interface
- * allows you to specify UTXO sources, transaction outputs, change address,
+ * allows you to specify REGISTRY_UNIT sources, transaction outputs, change address,
  * priority fee, and other transaction parameters.
  * 
- * If the total number of UTXOs needed to satisfy the transaction outputs
- * exceeds maximum allowed number of UTXOs per transaction (limited by
+ * If the total number of REGISTRY_UNITs needed to satisfy the transaction outputs
+ * exceeds maximum allowed number of REGISTRY_UNITs per transaction (limited by
  * the maximum transaction mass), the {@link Generator} will produce 
  * multiple chained transactions to the change address and then used these
  * transactions as a source for the "final" transaction.
@@ -25,8 +25,8 @@ const TS_GENERATOR_SETTINGS_OBJECT: &'static str = r#"
  *      {@link sahyadriToKana},
  *      {@link Generator}, 
  *      {@link PendingTransaction}, 
- *      {@link UtxoContext}, 
- *      {@link UtxoEntry},
+ *      {@link RegistryUnitContext}, 
+ *      {@link RegistryUnit},
  *      {@link createTransactions},
  *      {@link estimateTransactions}
  * @category Wallet SDK
@@ -67,20 +67,20 @@ interface IGeneratorSettingsObject {
      */
     priorityFee?: IFees | bigint;
     /**
-     * UTXO entries to be used for the transaction. This can be an
-     * array of UtxoEntry instances, objects matching {@link IUtxoEntry}
-     * interface, or a {@link UtxoContext} instance.
+     * REGISTRY_UNIT entries to be used for the transaction. This can be an
+     * array of RegistryUnit instances, objects matching {@link IRegistryUnit}
+     * interface, or a {@link RegistryUnitContext} instance.
      */
-    entries: IUtxoEntry[] | UtxoEntryReference[] | UtxoContext;
+    entries: IRegistryUnit[] | RegistryUnitRef[] | RegistryUnitContext;
     /**
-     * Optional UTXO entries that will be consumed before those available in `entries`.
+     * Optional REGISTRY_UNIT entries that will be consumed before those available in `entries`.
      * You can use this property to apply custom input selection logic.
      * Please note that these inputs are consumed first, then `entries` are consumed
      * to generate a desirable transaction output amount.  If transaction mass
      * overflows, these inputs will be consumed into a batch/sweep transaction
      * where the destination if the `changeAddress`.
      */
-    priorityEntries?: IUtxoEntry[] | UtxoEntryReference[],
+    priorityEntries?: IRegistryUnit[] | RegistryUnitRef[],
     /**
      * Optional number of signature operations in the transaction.
      */
@@ -109,13 +109,13 @@ extern "C" {
 }
 
 /// Generator is a type capable of generating transactions based on a supplied
-/// set of UTXO entries or a UTXO entry producer (such as {@link UtxoContext}). The Generator
-/// accumulates UTXO entries until it can generate a transaction that meets the
+/// set of REGISTRY_UNIT entries or a REGISTRY_UNIT entry producer (such as {@link RegistryUnitContext}). The Generator
+/// accumulates REGISTRY_UNIT entries until it can generate a transaction that meets the
 /// requested amount or until the total mass of created inputs exceeds the allowed
 /// transaction mass, at which point it will produce a compound transaction by forwarding
-/// all selected UTXO entries to the supplied change address and prepare to start generating
+/// all selected REGISTRY_UNIT entries to the supplied change address and prepare to start generating
 /// a new transaction.  Such sequence of daisy-chained transactions is known as a "batch".
-/// Each compound transaction results in a new UTXO, which is immediately reused in the
+/// Each compound transaction results in a new REGISTRY_UNIT, which is immediately reused in the
 /// subsequent transaction.
 ///
 /// The Generator constructor accepts a single {@link IGeneratorSettingsObject} object.
@@ -123,7 +123,7 @@ extern "C" {
 /// ```javascript
 ///
 /// let generator = new Generator({
-///     utxoEntries : [...],
+///     registry_unitEntries : [...],
 ///     changeAddress : "sahyadri:...",
 ///     outputs : [
 ///         { amount : sahyadriToKana(10.0), address: "sahyadri:..."},
@@ -146,7 +146,7 @@ extern "C" {
 /// @see
 ///     {@link IGeneratorSettingsObject},
 ///     {@link PendingTransaction},
-///     {@link UtxoContext},
+///     {@link RegistryUnitContext},
 ///     {@link createTransactions},
 ///     {@link estimateTransactions},
 /// @category Wallet SDK
@@ -164,7 +164,7 @@ impl Generator {
         let GeneratorSettings {
             network_id,
             source,
-            priority_utxo_entries,
+            priority_registry_unit_entries,
             multiplexer,
             final_transaction_destination,
             change_address,
@@ -176,17 +176,17 @@ impl Generator {
         } = settings;
 
         let settings = match source {
-            GeneratorSource::UtxoEntries(utxo_entries) => {
+            GeneratorSource::RegistryUnitEntries(registry_unit_entries) => {
                 let change_address = change_address
-                    .ok_or_else(|| Error::custom("changeAddress is required for Generator constructor with UTXO entries"))?;
+                    .ok_or_else(|| Error::custom("changeAddress is required for Generator constructor with REGISTRY_UNIT entries"))?;
 
                 let network_id =
-                    network_id.ok_or_else(|| Error::custom("networkId is required for Generator constructor with UTXO entries"))?;
+                    network_id.ok_or_else(|| Error::custom("networkId is required for Generator constructor with REGISTRY_UNIT entries"))?;
 
                 native::GeneratorSettings::try_new_with_iterator(
                     network_id,
-                    Box::new(utxo_entries.into_iter()),
-                    priority_utxo_entries,
+                    Box::new(registry_unit_entries.into_iter()),
+                    priority_registry_unit_entries,
                     change_address,
                     sig_op_count,
                     minimum_signatures,
@@ -197,13 +197,13 @@ impl Generator {
                     multiplexer,
                 )?
             }
-            GeneratorSource::UtxoContext(utxo_context) => {
+            GeneratorSource::RegistryUnitContext(registry_unit_context) => {
                 let change_address = change_address
-                    .ok_or_else(|| Error::custom("changeAddress is required for Generator constructor with UTXO entries"))?;
+                    .ok_or_else(|| Error::custom("changeAddress is required for Generator constructor with REGISTRY_UNIT entries"))?;
 
                 native::GeneratorSettings::try_new_with_context(
-                    utxo_context.into(),
-                    priority_utxo_entries,
+                    registry_unit_context.into(),
+                    priority_registry_unit_entries,
                     change_address,
                     sig_op_count,
                     minimum_signatures,
@@ -257,8 +257,8 @@ impl Generator {
 }
 
 enum GeneratorSource {
-    UtxoEntries(Vec<UtxoEntryReference>),
-    UtxoContext(UtxoContext),
+    RegistryUnitEntries(Vec<RegistryUnitRef>),
+    RegistryUnitContext(RegistryUnitContext),
     // #[cfg(any(feature = "wasm32-sdk"), not(target_arch = "wasm32"))]
     // Account(Account),
 }
@@ -267,7 +267,7 @@ enum GeneratorSource {
 struct GeneratorSettings {
     pub network_id: Option<NetworkId>,
     pub source: GeneratorSource,
-    pub priority_utxo_entries: Option<Vec<UtxoEntryReference>>,
+    pub priority_registry_unit_entries: Option<Vec<RegistryUnitRef>>,
     pub multiplexer: Option<Multiplexer<Box<Events>>>,
     pub final_transaction_destination: PaymentDestination,
     pub change_address: Option<Address>,
@@ -283,7 +283,7 @@ impl TryFrom<IGeneratorSettingsObject> for GeneratorSettings {
     fn try_from(args: IGeneratorSettingsObject) -> std::result::Result<Self, Self::Error> {
         let network_id = args.try_get::<NetworkId>("networkId")?;
 
-        // lack of outputs results in a sweep transaction compounding utxos into the change address
+        // lack of outputs results in a sweep transaction compounding registry_units into the change address
         let outputs = args.get_value("outputs")?;
         let final_transaction_destination: PaymentDestination =
             if outputs.is_undefined() { PaymentDestination::Change } else { PaymentOutputs::try_owned_from(outputs)?.into() };
@@ -294,15 +294,15 @@ impl TryFrom<IGeneratorSettingsObject> for GeneratorSettings {
 
         let final_priority_fee = args.get::<IFees>("priorityFee")?.try_into()?;
 
-        let generator_source = if let Ok(Some(context)) = args.try_cast_into::<UtxoContext>("entries") {
-            GeneratorSource::UtxoContext(context)
-        } else if let Some(utxo_entries) = args.try_get_value("entries")? {
-            GeneratorSource::UtxoEntries(utxo_entries.try_into_utxo_entry_references()?)
+        let generator_source = if let Ok(Some(context)) = args.try_cast_into::<RegistryUnitContext>("entries") {
+            GeneratorSource::RegistryUnitContext(context)
+        } else if let Some(registry_unit_entries) = args.try_get_value("entries")? {
+            GeneratorSource::RegistryUnitEntries(registry_unit_entries.try_into_registry_unit_entry_references()?)
         } else {
             return Err(Error::custom("'entries' property is required for Generator"));
         };
 
-        let priority_utxo_entries = args.try_get_value("priorityEntries")?.map(|v| v.try_into_utxo_entry_references()).transpose()?;
+        let priority_registry_unit_entries = args.try_get_value("priorityEntries")?.map(|v| v.try_into_registry_unit_entry_references()).transpose()?;
 
         let sig_op_count = args.get_value("sigOpCount")?;
         let sig_op_count =
@@ -320,7 +320,7 @@ impl TryFrom<IGeneratorSettingsObject> for GeneratorSettings {
         let settings = GeneratorSettings {
             network_id,
             source: generator_source,
-            priority_utxo_entries,
+            priority_registry_unit_entries,
             multiplexer: None,
             final_transaction_destination,
             change_address,

@@ -115,15 +115,15 @@ impl Monitor {
                 let balance_strings = BalanceStrings::from((balance.as_ref(), &network_type, None));
                 let id = id.short();
 
-                let mature_utxo_count =
-                    balance.as_ref().map(|balance| balance.mature_utxo_count.separated_string()).unwrap_or("N/A".to_string());
-                let pending_utxo_count = balance.as_ref().map(|balance| balance.pending_utxo_count).unwrap_or(0);
+                let mature_registry_unit_count =
+                    balance.as_ref().map(|balance| balance.mature_registry_unit_count.separated_string()).unwrap_or("N/A".to_string());
+                let pending_registry_unit_count = balance.as_ref().map(|balance| balance.pending_registry_unit_count).unwrap_or(0);
 
-                let pending_utxo_info =
-                    if pending_utxo_count > 0 { format!("({pending_utxo_count} pending)") } else { "".to_string() };
-                let utxo_info = style(format!("{mature_utxo_count} UTXOs {pending_utxo_info}")).dim();
+                let pending_registry_unit_info =
+                    if pending_registry_unit_count > 0 { format!("({pending_registry_unit_count} pending)") } else { "".to_string() };
+                let registry_unit_info = style(format!("{mature_registry_unit_count} REGISTRY_UNITs {pending_registry_unit_info}")).dim();
 
-                tprintln!(ctx, "{} {id}: {balance_strings}   {utxo_info}", style("balance".pad_to_width(8)).blue());
+                tprintln!(ctx, "{} {id}: {balance_strings}   {registry_unit_info}", style("balance".pad_to_width(8)).blue());
             }
             _ => {}
         });

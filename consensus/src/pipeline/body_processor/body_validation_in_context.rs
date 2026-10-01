@@ -96,7 +96,7 @@ mod tests {
         config::params::MAINNET_PARAMS,
         merkle::calc_hash_merkle_root,
         subnets::SUBNETWORK_ID_NATIVE,
-        tx::{Transaction, TransactionInput, TransactionOutpoint},
+        tx::{Transaction, TransactionInput, RegistryRef},
     };
     use sahyadri_core::assert_match;
     use sahyadri_hashes::Hash;
@@ -220,7 +220,7 @@ mod tests {
             vec![parent],
             vec![Transaction::new(
                 TX_VERSION,
-                vec![TransactionInput::new(TransactionOutpoint::new(1.into(), 0), vec![], sequence, 0)],
+                vec![TransactionInput::new(RegistryRef::new(1.into(), 0), vec![], sequence, 0)],
                 vec![],
                 lock_time,
                 SUBNETWORK_ID_NATIVE,

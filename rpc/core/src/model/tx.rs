@@ -1,8 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use sahyadri_addresses::Address;
 use sahyadri_consensus_core::tx::{
-    ScriptPublicKey, ScriptVec, TransactionId, TransactionIndexType, TransactionInput, TransactionOutpoint, TransactionOutput,
-    UtxoEntry,
+    ScriptPublicKey, ScriptVec, TransactionId, TransactionIndexType, TransactionInput, RegistryRef, TransactionOutput,
+    RegistryUnit,
 };
 use sahyadri_utils::{hex::ToHex, serde_bytes_fixed_ref};
 use serde::{Deserialize, Serialize};
@@ -21,21 +21,21 @@ pub type RpcScriptPublicKey = ScriptPublicKey;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcUtxoEntry {
+pub struct RpcRegistryUnit {
     pub amount: u64,
     pub script_public_key: ScriptPublicKey,
     pub block_daa_score: u64,
     pub is_coinbase: bool,
 }
 
-impl RpcUtxoEntry {
+impl RpcRegistryUnit {
     pub fn new(amount: u64, script_public_key: ScriptPublicKey, block_daa_score: u64, is_coinbase: bool) -> Self {
         Self { amount, script_public_key, block_daa_score, is_coinbase }
     }
 }
 
-impl From<UtxoEntry> for RpcUtxoEntry {
-    fn from(entry: UtxoEntry) -> Self {
+impl From<RegistryUnit> for RpcRegistryUnit {
+    fn from(entry: RegistryUnit) -> Self {
         Self {
             amount: entry.amount,
             script_public_key: entry.script_public_key,
@@ -45,8 +45,8 @@ impl From<UtxoEntry> for RpcUtxoEntry {
     }
 }
 
-impl From<RpcUtxoEntry> for UtxoEntry {
-    fn from(entry: RpcUtxoEntry) -> Self {
+impl From<RpcRegistryUnit> for RegistryUnit {
+    fn from(entry: RpcRegistryUnit) -> Self {
         Self {
             amount: entry.amount,
             script_public_key: entry.script_public_key,
@@ -56,7 +56,7 @@ impl From<RpcUtxoEntry> for UtxoEntry {
     }
 }
 
-impl Serializer for RpcUtxoEntry {
+impl Serializer for RpcRegistryUnit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
         store!(u64, &self.amount, writer)?;
@@ -68,7 +68,7 @@ impl Serializer for RpcUtxoEntry {
     }
 }
 
-impl Deserializer for RpcUtxoEntry {
+impl Deserializer for RpcRegistryUnit {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
         let amount = load!(u64, reader)?;
@@ -83,37 +83,37 @@ impl Deserializer for RpcUtxoEntry {
 /// Represents a Sahyadri transaction outpoint
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcTransactionOutpoint {
+pub struct RpcRegistryRef {
     #[serde(with = "serde_bytes_fixed_ref")]
     pub transaction_id: TransactionId,
     pub index: TransactionIndexType,
 }
 
-impl From<TransactionOutpoint> for RpcTransactionOutpoint {
-    fn from(outpoint: TransactionOutpoint) -> Self {
+impl From<RegistryRef> for RpcRegistryRef {
+    fn from(outpoint: RegistryRef) -> Self {
         Self { transaction_id: outpoint.transaction_id, index: outpoint.index }
     }
 }
 
-impl From<RpcTransactionOutpoint> for TransactionOutpoint {
-    fn from(outpoint: RpcTransactionOutpoint) -> Self {
+impl From<RpcRegistryRef> for RegistryRef {
+    fn from(outpoint: RpcRegistryRef) -> Self {
         Self { transaction_id: outpoint.transaction_id, index: outpoint.index }
     }
 }
 
-impl From<sahyadri_consensus_client::TransactionOutpoint> for RpcTransactionOutpoint {
-    fn from(outpoint: sahyadri_consensus_client::TransactionOutpoint) -> Self {
-        TransactionOutpoint::from(outpoint).into()
+impl From<sahyadri_consensus_client::RegistryRef> for RpcRegistryRef {
+    fn from(outpoint: sahyadri_consensus_client::RegistryRef) -> Self {
+        RegistryRef::from(outpoint).into()
     }
 }
 
-impl From<RpcTransactionOutpoint> for sahyadri_consensus_client::TransactionOutpoint {
-    fn from(outpoint: RpcTransactionOutpoint) -> Self {
-        TransactionOutpoint::from(outpoint).into()
+impl From<RpcRegistryRef> for sahyadri_consensus_client::RegistryRef {
+    fn from(outpoint: RpcRegistryRef) -> Self {
+        RegistryRef::from(outpoint).into()
     }
 }
 
-impl Serializer for RpcTransactionOutpoint {
+impl Serializer for RpcRegistryRef {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
         store!(TransactionId, &self.transaction_id, writer)?;
@@ -123,7 +123,7 @@ impl Serializer for RpcTransactionOutpoint {
     }
 }
 
-impl Deserializer for RpcTransactionOutpoint {
+impl Deserializer for RpcRegistryRef {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
         let transaction_id = load!(TransactionId, reader)?;
@@ -137,7 +137,7 @@ impl Deserializer for RpcTransactionOutpoint {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcTransactionInput {
-    pub previous_outpoint: RpcTransactionOutpoint,
+    pub previous_outpoint: RpcRegistryRef,
     #[serde(with = "hex::serde")]
     pub signature_script: Vec<u8>,
     pub sequence: u64,
@@ -178,7 +178,7 @@ impl RpcTransactionInput {
 impl Serializer for RpcTransactionInput {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
-        serialize!(RpcTransactionOutpoint, &self.previous_outpoint, writer)?;
+        serialize!(RpcRegistryRef, &self.previous_outpoint, writer)?;
         store!(Vec<u8>, &self.signature_script, writer)?;
         store!(u64, &self.sequence, writer)?;
         store!(u8, &self.sig_op_count, writer)?;
@@ -191,7 +191,7 @@ impl Serializer for RpcTransactionInput {
 impl Deserializer for RpcTransactionInput {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
-        let previous_outpoint = deserialize!(RpcTransactionOutpoint, reader)?;
+        let previous_outpoint = deserialize!(RpcRegistryRef, reader)?;
         let signature_script = load!(Vec<u8>, reader)?;
         let sequence = load!(u64, reader)?;
         let sig_op_count = load!(u8, reader)?;

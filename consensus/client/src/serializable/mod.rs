@@ -27,12 +27,12 @@ use wasm_bindgen::prelude::*;
 const TS_TYPES: &'static str = r#"
 
 /**
- * Interface defines the structure of a serializable UTXO entry.
+ * Interface defines the structure of a serializable REGISTRY_UNIT entry.
  * 
  * @see {@link ISerializableTransactionInput}, {@link ISerializableTransaction}
  * @category Wallet SDK
  */
-export interface ISerializableUtxoEntry {
+export interface ISerializableRegistryUnit {
     address?: Address;
     amount: bigint;
     scriptPublicKey: ScriptPublicKey;
@@ -52,7 +52,7 @@ export interface ISerializableTransactionInput {
     sequence: bigint;
     sigOpCount: number;
     signatureScript?: HexString;
-    utxo: ISerializableUtxoEntry;
+    registry_unit: ISerializableRegistryUnit;
 }
 
 /**
@@ -82,7 +82,7 @@ export interface ISerializableTransactionOutput {
  * @see {@link Transaction},
  * {@link ISerializableTransactionInput},
  * {@link ISerializableTransactionOutput},
- * {@link ISerializableUtxoEntry}
+ * {@link ISerializableRegistryUnit}
  * 
  * @category Wallet SDK
  */

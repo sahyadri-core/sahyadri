@@ -12,8 +12,8 @@ pub enum Error {
     ConstructorError(#[from] ConstructorError),
     #[error("OutputNotModifiable")]
     OutOfBounds,
-    #[error("Missing UTXO entry")]
-    MissingUtxoEntry,
+    #[error("Missing REGISTRY_UNIT entry")]
+    MissingRegistryUnit,
     #[error("Missing redeem script")]
     MissingRedeemScript,
     #[error(transparent)]
@@ -26,8 +26,8 @@ pub enum Error {
     JsonDeserializeError(#[from] serde_json::Error),
     #[error("Serialize error")]
     PskbSerializeError(String),
-    #[error("Unlock utxo error")]
-    MultipleUnlockUtxoError(Vec<Error>),
+    #[error("Unlock registry_unit error")]
+    MultipleUnlockRegistryUnitError(Vec<Error>),
     #[error("Unlock fees exceed available amount")]
     ExcessUnlockFeeError,
     #[error("Transaction output to output conversion error")]

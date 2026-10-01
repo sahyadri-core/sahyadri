@@ -1413,7 +1413,7 @@ declare! {
          */
         payload? : Uint8Array | HexString;
         /**
-         * If not supplied, the destination will be the change address resulting in a UTXO compound transaction.
+         * If not supplied, the destination will be the change address resulting in a REGISTRY_UNIT compound transaction.
          */
         destination? : IPaymentOutput[];
     }
@@ -1648,14 +1648,14 @@ try_from! ( args: AccountsPskbSendResponse, IAccountsPskbSendResponse, {
 // ---
 
 declare! {
-    IAccountsGetUtxosRequest,
+    IAccountsGetRegistryUnitsRequest,
     r#"
     /**
      * 
      *  
      * @category Wallet API
      */
-    export interface IAccountsGetUtxosRequest {
+    export interface IAccountsGetRegistryUnitsRequest {
         accountId : HexString;
         addresses : Address[] | string[];
         minAmountKana? : bigint;
@@ -1663,34 +1663,34 @@ declare! {
     "#,
 }
 
-try_from! ( args: IAccountsGetUtxosRequest, AccountsGetUtxosRequest, {
+try_from! ( args: IAccountsGetRegistryUnitsRequest, AccountsGetRegistryUnitsRequest, {
     let account_id = args.get_account_id("accountId")?;
     let addresses = args.try_get_addresses("addresses")?;
     let min_amount_kana = args.get_u64("minAmountKana").ok();
-    Ok(AccountsGetUtxosRequest { account_id, addresses, min_amount_kana })
+    Ok(AccountsGetRegistryUnitsRequest { account_id, addresses, min_amount_kana })
 });
 
 declare! {
-    IAccountsGetUtxosResponse,
+    IAccountsGetRegistryUnitsResponse,
     r#"
     /**
      * 
      *  
      * @category Wallet API
      */
-    export interface IAccountsGetUtxosResponse {
-        utxos : UtxoEntry[];
+    export interface IAccountsGetRegistryUnitsResponse {
+        registry_units : RegistryUnit[];
     }
     "#,
 }
 
-try_from! ( args: AccountsGetUtxosResponse, IAccountsGetUtxosResponse, {
-    let response = IAccountsGetUtxosResponse::default();
+try_from! ( args: AccountsGetRegistryUnitsResponse, IAccountsGetRegistryUnitsResponse, {
+    let response = IAccountsGetRegistryUnitsResponse::default();
 
 
-    let utxos = args.utxos.into_iter().map(|entry| entry.to_js_object()).collect::<Result<Vec<js_sys::Object>>>()?;
-    let utxos = js_sys::Array::from_iter(utxos.into_iter());
-    response.set("utxos", &utxos)?;
+    let registry_units = args.registry_units.into_iter().map(|entry| entry.to_js_object()).collect::<Result<Vec<js_sys::Object>>>()?;
+    let registry_units = js_sys::Array::from_iter(registry_units.into_iter());
+    response.set("registry_units", &registry_units)?;
     Ok(response)
 });
 
@@ -2258,7 +2258,7 @@ declare! {
      * The startDestination stands for the commit transaction and the endDestination
      * for the reveal transaction.
      * 
-     * The scriptSig will be used to spend the UTXO of the first transaction and
+     * The scriptSig will be used to spend the REGISTRY_UNIT of the first transaction and
      * must therefore match the startDestination output P2SH.
      * 
      * Set revealFeeKana or reflect the reveal fee transaction on endDestination

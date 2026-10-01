@@ -11,4 +11,4 @@ pub mod sahyadri_consensus;
 pub mod subnets;
 pub mod trusted;
 pub mod tx;
-pub mod utxo;
+pub mod registry_unit;

@@ -264,7 +264,7 @@ mod tests {
         constants::{KANA_PER_SAHYADRI, MAX_TX_IN_SEQUENCE_NUM, TX_VERSION},
         mass::transaction_estimated_serialized_size,
         subnets::SUBNETWORK_ID_NATIVE,
-        tx::{Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput},
+        tx::{Transaction, TransactionId, TransactionInput, RegistryRef, TransactionOutput},
     };
     use sahyadri_txscript::{pay_to_script_hash_signature_script, test_helpers::op_true_script};
     use std::{collections::HashSet, sync::Arc};
@@ -324,7 +324,7 @@ mod tests {
     }
 
     fn create_transaction(value: u64) -> CandidateTransaction {
-        let previous_outpoint = TransactionOutpoint::new(TransactionId::default(), 0);
+        let previous_outpoint = RegistryRef::new(TransactionId::default(), 0);
         let (script_public_key, redeem_script) = op_true_script();
         let signature_script = pay_to_script_hash_signature_script(redeem_script, vec![]).expect("the redeem script is canonical");
 

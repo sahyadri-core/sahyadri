@@ -19,7 +19,7 @@ const ITransactionRecord: &'static str = r#"
  * 
  * @category Wallet SDK
  */
-export interface IUtxoRecord {
+export interface IRegistryUnitRecord {
     address?: Address;
     index: number;
     amount: bigint;
@@ -35,18 +35,18 @@ export interface IUtxoRecord {
 export enum TransactionDataType {
     /**
      * Transaction has been invalidated due to a SahyadriDAG reorganization.
-     * Such transaction is no longer valid and its UTXO entries are removed.
+     * Such transaction is no longer valid and its REGISTRY_UNIT entries are removed.
      * @see {@link ITransactionDataReorg}
      */
     Reorg = "reorg",
     /**
-     * Transaction has been received and its UTXO entries are added to the 
-     * pending or mature UTXO set.
+     * Transaction has been received and its REGISTRY_UNIT entries are added to the 
+     * pending or mature REGISTRY_UNIT set.
      * @see {@link ITransactionDataIncoming}
      */
     Incoming = "incoming",
     /**
-     * Transaction is in stasis and its UTXO entries are not yet added to the UTXO set.
+     * Transaction is in stasis and its REGISTRY_UNIT entries are not yet added to the REGISTRY_UNIT set.
      * This event is generated for **Coinbase** transactions only.
      * @see {@link ITransactionDataStasis}
      */
@@ -58,76 +58,76 @@ export enum TransactionDataType {
      */
     External = "external",
     /**
-     * Transaction is outgoing and its UTXO entries are removed from the UTXO set.
+     * Transaction is outgoing and its REGISTRY_UNIT entries are removed from the REGISTRY_UNIT set.
      * @see {@link ITransactionDataOutgoing}
      */
     Outgoing = "outgoing",
     /**
-     * Transaction is a batch transaction (compounding UTXOs to an internal change address).
+     * Transaction is a batch transaction (compounding REGISTRY_UNITs to an internal change address).
      * @see {@link ITransactionDataBatch}
      */
     Batch = "batch",
     /**
-     * Transaction is an incoming transfer from another {@link UtxoContext} managed by the {@link UtxoProcessor}.
+     * Transaction is an incoming transfer from another {@link RegistryUnitContext} managed by the {@link RegistryUnitProcessor}.
      * When operating under the integrated wallet, these are transfers between different wallet accounts.
      * @see {@link ITransactionDataTransferIncoming}
      */
     TransferIncoming = "transfer-incoming",
     /**
-     * Transaction is an outgoing transfer to another {@link UtxoContext} managed by the {@link UtxoProcessor}.
+     * Transaction is an outgoing transfer to another {@link RegistryUnitContext} managed by the {@link RegistryUnitProcessor}.
      * When operating under the integrated wallet, these are transfers between different wallet accounts.
      * @see {@link ITransactionDataTransferOutgoing}
      */
     TransferOutgoing = "transfer-outgoing",
     /**
-     * Transaction is a change transaction and its UTXO entries are added to the UTXO set.
+     * Transaction is a change transaction and its REGISTRY_UNIT entries are added to the REGISTRY_UNIT set.
      * @see {@link ITransactionDataChange}
      */
     Change = "change",
 }
 
 /**
- * Contains UTXO entries and value for a transaction
+ * Contains REGISTRY_UNIT entries and value for a transaction
  * that has been invalidated due to a SahyadriDAG reorganization.
  * @category Wallet SDK
  */
 export interface ITransactionDataReorg {
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
     value: bigint;
 }
 
 /**
- * Contains UTXO entries and value for an incoming transaction.
+ * Contains REGISTRY_UNIT entries and value for an incoming transaction.
  * @category Wallet SDK
  */
 export interface ITransactionDataIncoming {
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
     value: bigint;
 }
 
 /**
- * Contains UTXO entries and value for a stasis transaction.
+ * Contains REGISTRY_UNIT entries and value for a stasis transaction.
  * @category Wallet SDK
  */
 export interface ITransactionDataStasis {
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
     value: bigint;
 }
 
 /**
- * Contains UTXO entries and value for an external transaction.
+ * Contains REGISTRY_UNIT entries and value for an external transaction.
  * An external transaction is a transaction that was not issued 
  * by this instance of the wallet but belongs to this address set.
  * @category Wallet SDK
  */
 export interface ITransactionDataExternal {
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
     value: bigint;
 }
 
 /**
  * Batch transaction data (created by the {@link Generator} as a 
- * result of UTXO compounding process).
+ * result of REGISTRY_UNIT compounding process).
  * @category Wallet SDK
  */
 export interface ITransactionDataBatch {
@@ -138,7 +138,7 @@ export interface ITransactionDataBatch {
     paymentValue: bigint;
     changeValue: bigint;
     acceptedDaaScore?: bigint;
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
 }
 
 /**
@@ -153,13 +153,13 @@ export interface ITransactionDataOutgoing {
     paymentValue: bigint;
     changeValue: bigint;
     acceptedDaaScore?: bigint;
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
 }
 
 /**
  * Incoming transfer transaction data.
  * Transfer occurs when a transaction is issued between 
- * two {@link UtxoContext} (wallet account) instances.
+ * two {@link RegistryUnitContext} (wallet account) instances.
  * @category Wallet SDK
  */
 export interface ITransactionDataTransferIncoming {
@@ -170,13 +170,13 @@ export interface ITransactionDataTransferIncoming {
     paymentValue: bigint;
     changeValue: bigint;
     acceptedDaaScore?: bigint;
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
 }
 
 /**
  * Outgoing transfer transaction data.
  * Transfer occurs when a transaction is issued between 
- * two {@link UtxoContext} (wallet account) instances.
+ * two {@link RegistryUnitContext} (wallet account) instances.
  * @category Wallet SDK
  */
 export interface ITransactionDataTransferOutgoing {
@@ -187,7 +187,7 @@ export interface ITransactionDataTransferOutgoing {
     paymentValue: bigint;
     changeValue: bigint;
     acceptedDaaScore?: bigint;
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
 }
 
 /**
@@ -201,7 +201,7 @@ export interface ITransactionDataChange {
     paymentValue: bigint;
     changeValue: bigint;
     acceptedDaaScore?: bigint;
-    utxoEntries: IUtxoRecord[];
+    registry_unitEntries: IRegistryUnitRecord[];
 }
 
 /**
@@ -231,7 +231,7 @@ export interface ITransactionData {
 
 /**
  * Transaction record generated by the Sahyadri Wallet SDK.
- * This data structure is delivered within {@link UtxoProcessor} and `Wallet` notification events.
+ * This data structure is delivered within {@link RegistryUnitProcessor} and `Wallet` notification events.
  * @see {@link ITransactionData}, {@link TransactionDataType}, {@link ITransactionDataVariant}
  * @category Wallet SDK
  */
@@ -249,7 +249,7 @@ export interface ITransactionRecord {
      */
     value: bigint;
     /**
-     * Transaction binding (id of UtxoContext or Wallet Account).
+     * Transaction binding (id of RegistryUnitContext or Wallet Account).
      */
     binding: HexString;
     /**
@@ -410,7 +410,7 @@ impl TransactionRecord {
 
     pub fn is_coinbase(&self) -> bool {
         match &self.transaction_data {
-            TransactionData::Incoming { utxo_entries, .. } => utxo_entries.iter().any(|entry| entry.is_coinbase),
+            TransactionData::Incoming { registry_unit_entries, .. } => registry_unit_entries.iter().any(|entry| entry.is_coinbase),
             _ => false,
         }
     }
@@ -473,35 +473,35 @@ impl TransactionRecord {
 }
 
 impl TransactionRecord {
-    pub fn new_incoming(utxo_context: &UtxoContext, id: TransactionId, utxos: &[UtxoEntryReference]) -> Self {
-        Self::new_incoming_impl(utxo_context, TransactionKind::Incoming, id, utxos)
+    pub fn new_incoming(registry_unit_context: &RegistryUnitContext, id: TransactionId, registry_units: &[RegistryUnitRef]) -> Self {
+        Self::new_incoming_impl(registry_unit_context, TransactionKind::Incoming, id, registry_units)
     }
 
-    pub fn new_reorg(utxo_context: &UtxoContext, id: TransactionId, utxos: &[UtxoEntryReference]) -> Self {
-        Self::new_incoming_impl(utxo_context, TransactionKind::Reorg, id, utxos)
+    pub fn new_reorg(registry_unit_context: &RegistryUnitContext, id: TransactionId, registry_units: &[RegistryUnitRef]) -> Self {
+        Self::new_incoming_impl(registry_unit_context, TransactionKind::Reorg, id, registry_units)
     }
 
-    pub fn new_stasis(utxo_context: &UtxoContext, id: TransactionId, utxos: &[UtxoEntryReference]) -> Self {
-        Self::new_incoming_impl(utxo_context, TransactionKind::Stasis, id, utxos)
+    pub fn new_stasis(registry_unit_context: &RegistryUnitContext, id: TransactionId, registry_units: &[RegistryUnitRef]) -> Self {
+        Self::new_incoming_impl(registry_unit_context, TransactionKind::Stasis, id, registry_units)
     }
 
     fn new_incoming_impl(
-        utxo_context: &UtxoContext,
+        registry_unit_context: &RegistryUnitContext,
         transaction_type: TransactionKind,
         id: TransactionId,
-        utxos: &[UtxoEntryReference],
+        registry_units: &[RegistryUnitRef],
     ) -> Self {
-        let binding = Binding::from(utxo_context.binding());
-        let block_daa_score = utxos[0].utxo.block_daa_score;
-        let utxo_entries = utxos.iter().map(UtxoRecord::from).collect::<Vec<_>>();
-        let aggregate_input_value = utxo_entries.iter().map(|utxo| utxo.amount).sum::<u64>();
+        let binding = Binding::from(registry_unit_context.binding());
+        let block_daa_score = registry_units[0].registry_unit.block_daa_score;
+        let registry_unit_entries = registry_units.iter().map(RegistryUnitRecord::from).collect::<Vec<_>>();
+        let aggregate_input_value = registry_unit_entries.iter().map(|registry_unit| registry_unit.amount).sum::<u64>();
 
         let unixtime = unixtime_as_millis_u64();
 
         let transaction_data = match transaction_type {
-            TransactionKind::Incoming => TransactionData::Incoming { utxo_entries, aggregate_input_value },
-            TransactionKind::Reorg => TransactionData::Reorg { utxo_entries, aggregate_input_value },
-            TransactionKind::Stasis => TransactionData::Stasis { utxo_entries, aggregate_input_value },
+            TransactionKind::Incoming => TransactionData::Incoming { registry_unit_entries, aggregate_input_value },
+            TransactionKind::Reorg => TransactionData::Reorg { registry_unit_entries, aggregate_input_value },
+            TransactionKind::Stasis => TransactionData::Stasis { registry_unit_entries, aggregate_input_value },
             kind => panic!("TransactionRecord::new_incoming() - invalid transaction type: {kind:?}"),
         };
 
@@ -512,7 +512,7 @@ impl TransactionRecord {
             binding,
             transaction_data,
             block_daa_score,
-            network_id: utxo_context.processor().network_id().expect("network expected for transaction record generation"),
+            network_id: registry_unit_context.processor().network_id().expect("network expected for transaction record generation"),
             metadata: None,
             note: None,
         }
@@ -521,13 +521,13 @@ impl TransactionRecord {
     /// Transaction that was not issued by this instance of the wallet
     /// but belongs to this address set. This is an "external" transaction
     /// that occurs during the lifetime of this wallet.
-    pub fn new_external(utxo_context: &UtxoContext, id: TransactionId, utxos: &[UtxoEntryReference]) -> Self {
-        let binding = Binding::from(utxo_context.binding());
-        let block_daa_score = utxos[0].utxo.block_daa_score;
-        let utxo_entries = utxos.iter().map(UtxoRecord::from).collect::<Vec<_>>();
-        let aggregate_input_value = utxo_entries.iter().map(|utxo| utxo.amount).sum::<u64>();
+    pub fn new_external(registry_unit_context: &RegistryUnitContext, id: TransactionId, registry_units: &[RegistryUnitRef]) -> Self {
+        let binding = Binding::from(registry_unit_context.binding());
+        let block_daa_score = registry_units[0].registry_unit.block_daa_score;
+        let registry_unit_entries = registry_units.iter().map(RegistryUnitRecord::from).collect::<Vec<_>>();
+        let aggregate_input_value = registry_unit_entries.iter().map(|registry_unit| registry_unit.amount).sum::<u64>();
 
-        let transaction_data = TransactionData::External { utxo_entries, aggregate_input_value };
+        let transaction_data = TransactionData::External { registry_unit_entries, aggregate_input_value };
         let unixtime = unixtime_as_millis_u64();
 
         TransactionRecord {
@@ -537,22 +537,22 @@ impl TransactionRecord {
             binding,
             transaction_data,
             block_daa_score,
-            network_id: utxo_context.processor().network_id().expect("network expected for transaction record generation"),
+            network_id: registry_unit_context.processor().network_id().expect("network expected for transaction record generation"),
             metadata: None,
             note: None,
         }
     }
 
     pub fn new_outgoing(
-        utxo_context: &UtxoContext,
+        registry_unit_context: &RegistryUnitContext,
         outgoing_tx: &OutgoingTransaction,
         accepted_daa_score: Option<u64>,
     ) -> Result<Self> {
-        let binding = Binding::from(utxo_context.binding());
+        let binding = Binding::from(registry_unit_context.binding());
         let block_daa_score =
-            utxo_context.processor().current_daa_score().ok_or(Error::MissingDaaScore("TransactionRecord::new_outgoing()"))?;
+            registry_unit_context.processor().current_daa_score().ok_or(Error::MissingDaaScore("TransactionRecord::new_outgoing()"))?;
 
-        let utxo_entries = outgoing_tx.utxo_entries().values().map(UtxoRecord::from).collect::<Vec<_>>();
+        let registry_unit_entries = outgoing_tx.registry_unit_entries().values().map(RegistryUnitRecord::from).collect::<Vec<_>>();
 
         let unixtime = unixtime_as_millis_u64();
 
@@ -577,7 +577,7 @@ impl TransactionRecord {
             payment_value: *payment_value,
             change_value: *change_output_value,
             accepted_daa_score,
-            utxo_entries,
+            registry_unit_entries,
         };
 
         Ok(TransactionRecord {
@@ -587,18 +587,18 @@ impl TransactionRecord {
             binding,
             transaction_data,
             block_daa_score,
-            network_id: utxo_context.processor().network_id().expect("network expected for transaction record generation"),
+            network_id: registry_unit_context.processor().network_id().expect("network expected for transaction record generation"),
             metadata: None,
             note: None,
         })
     }
 
-    pub fn new_batch(utxo_context: &UtxoContext, outgoing_tx: &OutgoingTransaction, accepted_daa_score: Option<u64>) -> Result<Self> {
-        let binding = Binding::from(utxo_context.binding());
+    pub fn new_batch(registry_unit_context: &RegistryUnitContext, outgoing_tx: &OutgoingTransaction, accepted_daa_score: Option<u64>) -> Result<Self> {
+        let binding = Binding::from(registry_unit_context.binding());
         let block_daa_score =
-            utxo_context.processor().current_daa_score().ok_or(Error::MissingDaaScore("TransactionRecord::new_batch()"))?;
+            registry_unit_context.processor().current_daa_score().ok_or(Error::MissingDaaScore("TransactionRecord::new_batch()"))?;
 
-        let utxo_entries = outgoing_tx.utxo_entries().values().map(UtxoRecord::from).collect::<Vec<_>>();
+        let registry_unit_entries = outgoing_tx.registry_unit_entries().values().map(RegistryUnitRecord::from).collect::<Vec<_>>();
 
         let unixtime = unixtime_as_millis_u64();
 
@@ -623,7 +623,7 @@ impl TransactionRecord {
             payment_value: *payment_value,
             change_value: *change_output_value,
             accepted_daa_score,
-            utxo_entries,
+            registry_unit_entries,
         };
 
         Ok(TransactionRecord {
@@ -633,24 +633,24 @@ impl TransactionRecord {
             binding,
             transaction_data,
             block_daa_score,
-            network_id: utxo_context.processor().network_id().expect("network expected for transaction record generation"),
+            network_id: registry_unit_context.processor().network_id().expect("network expected for transaction record generation"),
             metadata: None,
             note: None,
         })
     }
 
     pub fn new_transfer_incoming(
-        utxo_context: &UtxoContext,
+        registry_unit_context: &RegistryUnitContext,
         outgoing_tx: &OutgoingTransaction,
         accepted_daa_score: Option<u64>,
-        utxos: &[UtxoEntryReference],
+        registry_units: &[RegistryUnitRef],
     ) -> Result<Self> {
-        let binding = Binding::from(utxo_context.binding());
-        let block_daa_score = utxo_context
+        let binding = Binding::from(registry_unit_context.binding());
+        let block_daa_score = registry_unit_context
             .processor()
             .current_daa_score()
             .ok_or(Error::MissingDaaScore("TransactionRecord::new_transfer_incoming()"))?;
-        let utxo_entries = utxos.iter().map(UtxoRecord::from).collect::<Vec<_>>();
+        let registry_unit_entries = registry_units.iter().map(RegistryUnitRecord::from).collect::<Vec<_>>();
 
         let unixtime = unixtime_as_millis_u64();
 
@@ -675,7 +675,7 @@ impl TransactionRecord {
             payment_value: *payment_value,
             change_value: *change_output_value,
             accepted_daa_score,
-            utxo_entries,
+            registry_unit_entries,
         };
 
         Ok(TransactionRecord {
@@ -685,24 +685,24 @@ impl TransactionRecord {
             binding,
             transaction_data,
             block_daa_score,
-            network_id: utxo_context.processor().network_id().expect("network expected for transaction record generation"),
+            network_id: registry_unit_context.processor().network_id().expect("network expected for transaction record generation"),
             metadata: None,
             note: None,
         })
     }
 
     pub fn new_transfer_outgoing(
-        utxo_context: &UtxoContext,
+        registry_unit_context: &RegistryUnitContext,
         outgoing_tx: &OutgoingTransaction,
         accepted_daa_score: Option<u64>,
-        utxos: &[UtxoEntryReference],
+        registry_units: &[RegistryUnitRef],
     ) -> Result<Self> {
-        let binding = Binding::from(utxo_context.binding());
-        let block_daa_score = utxo_context
+        let binding = Binding::from(registry_unit_context.binding());
+        let block_daa_score = registry_unit_context
             .processor()
             .current_daa_score()
             .ok_or(Error::MissingDaaScore("TransactionRecord::new_transfer_outgoing()"))?;
-        let utxo_entries = utxos.iter().map(UtxoRecord::from).collect::<Vec<_>>();
+        let registry_unit_entries = registry_units.iter().map(RegistryUnitRecord::from).collect::<Vec<_>>();
 
         let unixtime = unixtime_as_millis_u64();
 
@@ -727,7 +727,7 @@ impl TransactionRecord {
             payment_value: *payment_value,
             change_value: *change_output_value,
             accepted_daa_score,
-            utxo_entries,
+            registry_unit_entries,
         };
 
         Ok(TransactionRecord {
@@ -737,22 +737,22 @@ impl TransactionRecord {
             binding,
             transaction_data,
             block_daa_score,
-            network_id: utxo_context.processor().network_id().expect("network expected for transaction record generation"),
+            network_id: registry_unit_context.processor().network_id().expect("network expected for transaction record generation"),
             metadata: None,
             note: None,
         })
     }
 
     pub fn new_change(
-        utxo_context: &UtxoContext,
+        registry_unit_context: &RegistryUnitContext,
         outgoing_tx: &OutgoingTransaction,
         accepted_daa_score: Option<u64>,
-        utxos: &[UtxoEntryReference],
+        registry_units: &[RegistryUnitRef],
     ) -> Result<Self> {
-        let binding = Binding::from(utxo_context.binding());
+        let binding = Binding::from(registry_unit_context.binding());
         let block_daa_score =
-            utxo_context.processor().current_daa_score().ok_or(Error::MissingDaaScore("TransactionRecord::new_change()"))?;
-        let utxo_entries = utxos.iter().map(UtxoRecord::from).collect::<Vec<_>>();
+            registry_unit_context.processor().current_daa_score().ok_or(Error::MissingDaaScore("TransactionRecord::new_change()"))?;
+        let registry_unit_entries = registry_units.iter().map(RegistryUnitRecord::from).collect::<Vec<_>>();
 
         let unixtime = unixtime_as_millis_u64();
 
@@ -775,7 +775,7 @@ impl TransactionRecord {
             payment_value: *payment_value,
             change_value: *change_output_value,
             accepted_daa_score,
-            utxo_entries,
+            registry_unit_entries,
         };
 
         Ok(TransactionRecord {
@@ -785,7 +785,7 @@ impl TransactionRecord {
             binding,
             transaction_data,
             block_daa_score,
-            network_id: utxo_context.processor().network_id().expect("network expected for transaction record generation"),
+            network_id: registry_unit_context.processor().network_id().expect("network expected for transaction record generation"),
             metadata: None,
             note: None,
         })
@@ -819,7 +819,7 @@ impl TransactionRecord {
         self.transaction_data.kind().to_string()
     }
 
-    /// Check if the transaction record has the given address within the associated UTXO set.
+    /// Check if the transaction record has the given address within the associated REGISTRY_UNIT set.
     #[wasm_bindgen(js_name = hasAddress)]
     pub fn has_address(&self, address: &Address) -> bool {
         self.transaction_data.has_address(address)

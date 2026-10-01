@@ -8,7 +8,7 @@
 use crate::imports::*;
 use crate::tx::{Fees, GeneratorSummary, PaymentDestination};
 use sahyadri_addresses::Address;
-use sahyadri_consensus_client::{TransactionOutpoint, UtxoEntry};
+use sahyadri_consensus_client::{RegistryRef, RegistryUnit};
 use sahyadri_rpc_core::RpcFeerateBucket;
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
@@ -559,7 +559,7 @@ pub struct AccountsPskbSendResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AccountsGetUtxosRequest {
+pub struct AccountsGetRegistryUnitsRequest {
     pub account_id: AccountId,
     pub addresses: Option<Vec<Address>>,
     pub min_amount_kana: Option<u64>,
@@ -567,21 +567,21 @@ pub struct AccountsGetUtxosRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AccountsGetUtxosResponse {
-    pub utxos: Vec<UtxoEntryWrapper>,
+pub struct AccountsGetRegistryUnitsResponse {
+    pub registry_units: Vec<RegistryUnitWrapper>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UtxoEntryWrapper {
+pub struct RegistryUnitWrapper {
     pub address: Option<Address>,
-    pub outpoint: TransactionOutpointWrapper,
+    pub outpoint: RegistryRefWrapper,
     pub amount: u64,
     pub script_public_key: ScriptPublicKey,
     pub block_daa_score: u64,
     pub is_coinbase: bool,
 }
-impl UtxoEntryWrapper {
+impl RegistryUnitWrapper {
     pub fn to_js_object(&self) -> Result<js_sys::Object> {
         let obj = js_sys::Object::new();
         if let Some(address) = &self.address {
@@ -604,25 +604,25 @@ impl UtxoEntryWrapper {
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TransactionOutpointWrapper {
+pub struct RegistryRefWrapper {
     pub transaction_id: TransactionId,
     pub index: TransactionIndexType,
 }
 
-impl From<TransactionOutpoint> for TransactionOutpointWrapper {
-    fn from(outpoint: TransactionOutpoint) -> Self {
+impl From<RegistryRef> for RegistryRefWrapper {
+    fn from(outpoint: RegistryRef) -> Self {
         Self { transaction_id: outpoint.transaction_id(), index: outpoint.index() }
     }
 }
 
-impl From<TransactionOutpointWrapper> for TransactionOutpoint {
-    fn from(outpoint: TransactionOutpointWrapper) -> Self {
+impl From<RegistryRefWrapper> for RegistryRef {
+    fn from(outpoint: RegistryRefWrapper) -> Self {
         Self::new(outpoint.transaction_id, outpoint.index)
     }
 }
 
-impl From<UtxoEntryWrapper> for UtxoEntry {
-    fn from(entry: UtxoEntryWrapper) -> Self {
+impl From<RegistryUnitWrapper> for RegistryUnit {
+    fn from(entry: RegistryUnitWrapper) -> Self {
         Self {
             address: entry.address,
             outpoint: entry.outpoint.into(),
@@ -634,8 +634,8 @@ impl From<UtxoEntryWrapper> for UtxoEntry {
     }
 }
 
-impl From<UtxoEntry> for UtxoEntryWrapper {
-    fn from(entry: UtxoEntry) -> Self {
+impl From<RegistryUnit> for RegistryUnitWrapper {
+    fn from(entry: RegistryUnit) -> Self {
         Self {
             address: entry.address,
             outpoint: entry.outpoint.into(),

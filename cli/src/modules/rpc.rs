@@ -166,12 +166,12 @@ impl Rpc {
             //     let result = rpc.get_headers_call(GetHeadersRequest {  }).await?;
             //     self.println(&ctx, result);
             // }
-            RpcApiOps::GetUtxosByAddresses => {
+            RpcApiOps::GetRegistryByAddresses => {
                 if argv.is_empty() {
                     return Err(Error::custom("Please specify at least one address"));
                 }
                 let addresses = argv.iter().map(|s| Address::try_from(s.as_str())).collect::<std::result::Result<Vec<_>, _>>()?;
-                let result = rpc.get_utxos_by_addresses_call(None, GetUtxosByAddressesRequest { addresses }).await?;
+                let result = rpc.get_registry_by_addresses_call(None, GetRegistryByAddressesRequest { addresses }).await?;
                 self.println(&ctx, result);
             }
             RpcApiOps::GetBalanceByAddress => {
@@ -275,7 +275,7 @@ impl Rpc {
                 let result = rpc.get_current_block_color_call(None, GetCurrentBlockColorRequest { hash }).await?;
                 self.println(&ctx, result);
             }
-            RpcApiOps::GetUtxoReturnAddress => {
+            RpcApiOps::GetRegistryUnitReturnAddress => {
                 if argv.is_empty() || argv.len() != 2 {
                     return Err(Error::custom("Please specify a txid and a accepting_block_daa_score"));
                 }
@@ -286,7 +286,7 @@ impl Rpc {
                 let accepting_block_daa_score = argv.remove(0).parse::<u64>()?;
 
                 let result =
-                    rpc.get_utxo_return_address_call(None, GetUtxoReturnAddressRequest { txid, accepting_block_daa_score }).await?;
+                    rpc.get_registry_unit_return_address_call(None, GetRegistryUnitReturnAddressRequest { txid, accepting_block_daa_score }).await?;
 
                 self.println(&ctx, result);
             }

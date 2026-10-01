@@ -1,12 +1,12 @@
 use crate::imports::*;
 use crate::result::Result;
-use crate::utxo::balance as native;
+use crate::registry_unit::balance as native;
 use sahyadri_consensus_core::network::NetworkTypeT;
 
 ///
-/// Represents a {@link UtxoContext} (account) balance.
+/// Represents a {@link RegistryUnitContext} (account) balance.
 ///
-/// @see {@link IBalance}, {@link UtxoContext}
+/// @see {@link IBalance}, {@link RegistryUnitContext}
 ///
 /// @category Wallet SDK
 ///

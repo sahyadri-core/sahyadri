@@ -10,7 +10,7 @@ pub struct SahyadridConfig {
     pub mute: bool,
     pub path: Option<String>,
     pub network: Option<NetworkId>,
-    pub utxo_index: bool,
+    pub registry_unit_index: bool,
     pub perf_metrics: bool,
     pub perf_metrics_interval_sec: Option<u64>,
     // --- TODO: these are not used yet ---
@@ -41,7 +41,7 @@ impl Default for SahyadridConfig {
             mute: false,
             path: None,
             network: None,
-            utxo_index: true,
+            registry_unit_index: true,
             enable_grpc: true,
             is_grpc_public: false,
             enable_borsh_rpc: true,
@@ -103,11 +103,11 @@ impl TryFrom<SahyadridConfig> for Vec<String> {
             argv.push(flag);
         }
 
-        // SAHYADRI: --utxoindex is a no-op now; UTXO index is disabled.
+        // SAHYADRI: --registry_unitindex is a no-op now; REGISTRY_UNIT index is disabled.
         // Forward the flag only if explicitly set, so that older scripts
         // do not break on unknown-argument errors.
-        if args.utxo_index {
-            argv.push("--utxoindex");
+        if args.registry_unit_index {
+            argv.push("--registry_unitindex");
         }
 
         // ---

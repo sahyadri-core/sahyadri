@@ -3,7 +3,7 @@ use crate::tx::{MAXIMUM_STANDARD_TRANSACTION_MASS, mass};
 use js_sys::Array;
 use sahyadri_consensus_client::*;
 use sahyadri_consensus_core::config::params::Params;
-use sahyadri_consensus_core::mass::{UtxoCell, calc_storage_mass};
+use sahyadri_consensus_core::mass::{RegistryUnitCell, calc_storage_mass};
 use sahyadri_consensus_core::network::{NetworkId, NetworkIdT};
 use sahyadri_wasm_core::types::NumberArray;
 use wasm_bindgen::prelude::*;
@@ -97,7 +97,7 @@ pub fn calculate_unsigned_transaction_fee(
 /// Note that the storage mass is only a component of the total transaction mass. You are not
 /// meant to use this function by itself and should use `calculateTransactionMass()` instead.
 /// This function purely exists for diagnostic purposes and to help with complex algorithms that
-/// may require a manual UTXO selection for identifying UTXOs and outputs needed for low storage mass.
+/// may require a manual REGISTRY_UNIT selection for identifying REGISTRY_UNITs and outputs needed for low storage mass.
 ///
 /// @category Wallet SDK
 /// @see {@link maximumStandardTransactionMass}
@@ -109,9 +109,9 @@ pub fn calculate_storage_mass(network_id: NetworkIdT, input_values: &NumberArray
     let consensus_params = Params::from(network_id);
 
     let input_values =
-        Array::from(input_values).to_vec().iter().map(|v| UtxoCell::new(1, v.as_f64().unwrap() as u64)).collect::<Vec<UtxoCell>>();
+        Array::from(input_values).to_vec().iter().map(|v| RegistryUnitCell::new(1, v.as_f64().unwrap() as u64)).collect::<Vec<RegistryUnitCell>>();
     let output_values =
-        Array::from(output_values).to_vec().iter().map(|v| UtxoCell::new(1, v.as_f64().unwrap() as u64)).collect::<Vec<UtxoCell>>();
+        Array::from(output_values).to_vec().iter().map(|v| RegistryUnitCell::new(1, v.as_f64().unwrap() as u64)).collect::<Vec<RegistryUnitCell>>();
 
     let storage_mass =
         calc_storage_mass(false, input_values.into_iter(), output_values.into_iter(), consensus_params.storage_mass_parameter);

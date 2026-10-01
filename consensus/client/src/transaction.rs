@@ -6,16 +6,16 @@
 
 use crate::imports::*;
 use crate::input::{TransactionInput, TransactionInputArrayAsArgT, TransactionInputArrayAsResultT};
-use crate::outpoint::TransactionOutpoint;
+use crate::outpoint::RegistryRef;
 use crate::output::{TransactionOutput, TransactionOutputArrayAsArgT, TransactionOutputArrayAsResultT};
 use crate::result::Result;
 use crate::serializable::{SerializableTransactionT, numeric, string};
-use crate::utxo::{UtxoEntryId, UtxoEntryReference};
+use crate::registry_unit::{RegistryUnitId, RegistryUnitRef};
 use ahash::AHashMap;
 use sahyadri_consensus_core::network::NetworkType;
 use sahyadri_consensus_core::network::NetworkTypeT;
 use sahyadri_consensus_core::subnets::{self, SubnetworkId};
-use sahyadri_consensus_core::tx::UtxoEntry;
+use sahyadri_consensus_core::tx::RegistryUnit;
 use sahyadri_txscript::extract_script_pub_key_address;
 use sahyadri_utils::hex::*;
 
@@ -83,7 +83,7 @@ pub struct TransactionInner {
 
 /// Represents a Sahyadri transaction.
 /// This is an artificial construct that includes additional
-/// transaction-related data such as additional data from UTXOs
+/// transaction-related data such as additional data from REGISTRY_UNITs
 /// used by transaction inputs.
 /// @category Consensus
 #[derive(Clone, Debug, Serialize, Deserialize, CastFromJs)]
@@ -193,11 +193,11 @@ impl Transaction {
     pub fn addresses(&self, network_type: &NetworkTypeT) -> Result<sahyadri_addresses::AddressArrayT> {
         let mut list = std::collections::HashSet::new();
         for input in &self.inner.lock().unwrap().inputs {
-            if let Some(utxo) = input.get_utxo() {
-                if let Some(address) = &utxo.utxo.address {
+            if let Some(registry_unit) = input.get_registry_unit() {
+                if let Some(address) = &registry_unit.registry_unit.address {
                     list.insert(address.clone());
                 } else if let Ok(address) =
-                    extract_script_pub_key_address(&utxo.utxo.script_public_key, NetworkType::try_from(network_type)?.into())
+                    extract_script_pub_key_address(&registry_unit.registry_unit.script_public_key, NetworkType::try_from(network_type)?.into())
                 {
                     list.insert(address);
                 }
@@ -381,19 +381,19 @@ impl From<&Transaction> for cctx::Transaction {
 }
 
 impl Transaction {
-    pub fn from_cctx_transaction(tx: &cctx::Transaction, utxos: &AHashMap<UtxoEntryId, UtxoEntryReference>) -> Self {
+    pub fn from_cctx_transaction(tx: &cctx::Transaction, registry_units: &AHashMap<RegistryUnitId, RegistryUnitRef>) -> Self {
         let inputs: Vec<TransactionInput> = tx
             .inputs
             .iter()
             .map(|input| {
-                let previous_outpoint: TransactionOutpoint = input.previous_outpoint.into();
-                let utxo = utxos.get(previous_outpoint.id()).cloned();
+                let previous_outpoint: RegistryRef = input.previous_outpoint.into();
+                let registry_unit = registry_units.get(previous_outpoint.id()).cloned();
                 TransactionInput::new(
                     previous_outpoint,
                     Some(input.signature_script.clone()),
                     input.sequence,
                     input.sig_op_count,
-                    utxo,
+                    registry_unit,
                 )
             })
             .collect::<Vec<TransactionInput>>();
@@ -412,16 +412,16 @@ impl Transaction {
         })
     }
 
-    pub fn tx_and_utxos(&self) -> Result<(cctx::Transaction, Vec<UtxoEntry>)> {
+    pub fn tx_and_registry_units(&self) -> Result<(cctx::Transaction, Vec<RegistryUnit>)> {
         let mut inputs = vec![];
         let inner = self.inner();
-        let utxos: Vec<cctx::UtxoEntry> = inner
+        let registry_units: Vec<cctx::RegistryUnit> = inner
             .inputs
             .clone()
             .into_iter()
             .map(|input| {
                 inputs.push(input.as_ref().into());
-                Ok(input.get_utxo().ok_or(Error::MissingUtxoEntry)?.entry().as_ref().into())
+                Ok(input.get_registry_unit().ok_or(Error::MissingRegistryUnit)?.entry().as_ref().into())
             })
             .collect::<Result<Vec<_>>>()?;
         let outputs: Vec<cctx::TransactionOutput> =
@@ -437,18 +437,18 @@ impl Transaction {
         )
         .with_mass(inner.mass);
 
-        Ok((tx, utxos))
+        Ok((tx, registry_units))
     }
 
-    pub fn utxo_entry_references(&self) -> Result<Vec<UtxoEntryReference>> {
+    pub fn registry_unit_entry_references(&self) -> Result<Vec<RegistryUnitRef>> {
         let inner = self.inner();
-        let utxo_entry_references = inner
+        let registry_unit_entry_references = inner
             .inputs
             .clone()
             .into_iter()
-            .map(|input| input.get_utxo().ok_or(Error::MissingUtxoEntry))
-            .collect::<Result<Vec<UtxoEntryReference>>>()?;
-        Ok(utxo_entry_references)
+            .map(|input| input.get_registry_unit().ok_or(Error::MissingRegistryUnit))
+            .collect::<Result<Vec<RegistryUnitRef>>>()?;
+        Ok(registry_unit_entry_references)
     }
 
     pub fn outputs(&self) -> Vec<cctx::TransactionOutput> {

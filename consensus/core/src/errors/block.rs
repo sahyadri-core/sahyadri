@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use crate::{
     BlueWorkType, constants,
     errors::{coinbase::CoinbaseError, tx::TxRuleError},
-    tx::{TransactionId, TransactionOutpoint},
+    tx::{TransactionId, RegistryRef},
 };
 use itertools::Itertools;
 use sahyadri_hashes::Hash;
@@ -109,10 +109,10 @@ pub enum RuleError {
     ExceedsStorageMassLimit(u64, u64),
 
     #[error("outpoint {0} is spent more than once on the same block")]
-    DoubleSpendInSameBlock(TransactionOutpoint),
+    DoubleSpendInSameBlock(RegistryRef),
 
     #[error("outpoint {0} is created and spent on the same block")]
-    ChainedTransaction(TransactionOutpoint),
+    ChainedTransaction(RegistryRef),
 
     #[error("transaction in context validation failed for tx {0}: {1}")]
     TxInContextFailed(TransactionId, TxRuleError),
@@ -141,8 +141,8 @@ pub enum RuleError {
     #[error("expected indirect parents {0} but got {1}")]
     UnexpectedIndirectParents(TwoDimVecDisplay<Hash>, TwoDimVecDisplay<Hash>),
 
-    #[error("block {0} UTXO commitment is invalid - block header indicates {1}, but calculated value is {2}")]
-    BadUTXOCommitment(Hash, Hash, Hash),
+    #[error("block {0} REGISTRY_UNIT commitment is invalid - block header indicates {1}, but calculated value is {2}")]
+    BadRegistryUnitCommitment(Hash, Hash, Hash),
 
     #[error("block {0} accepted ID merkle root is invalid - block header indicates {1}, but calculated value is {2}")]
     BadAcceptedIDMerkleRoot(Hash, Hash, Hash),
@@ -150,7 +150,7 @@ pub enum RuleError {
     #[error("coinbase transaction is not built as expected")]
     BadCoinbaseTransaction,
 
-    #[error("{0} non-coinbase transactions (out of {1}) are invalid in UTXO context")]
+    #[error("{0} non-coinbase transactions (out of {1}) are invalid in REGISTRY_UNIT context")]
     InvalidTransactionsInBlockContext(usize, usize),
 
     #[error("invalid transactions in new block template")]

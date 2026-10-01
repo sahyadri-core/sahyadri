@@ -158,7 +158,7 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "wasm32-sdk")] {
 
         pub use sahyadri_addresses::{Address, Version as AddressVersion};
-        pub use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput};
+        pub use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput};
         pub use sahyadri_pow::wasm::*;
         pub use sahyadri_txscript::wasm::*;
 
@@ -186,7 +186,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(feature = "wasm32-core")] {
 
         pub use sahyadri_addresses::{Address, Version as AddressVersion};
-        pub use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput};
+        pub use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput};
         pub use sahyadri_pow::wasm::*;
         pub use sahyadri_txscript::wasm::*;
 

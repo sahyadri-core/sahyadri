@@ -51,8 +51,8 @@ pub enum PruningImportError {
     #[error("new pruning point has some invalid transactions")]
     NewPruningPointTxErrors,
 
-    #[error("new pruning point transaction {0} is missing a UTXO entry")]
-    NewPruningPointTxMissingUTXOEntry(Hash),
+    #[error("new pruning point transaction {0} is missing a REGISTRY_UNIT entry")]
+    NewPruningPointTxMissingRegistryUnitEntry(Hash),
 
     #[error("the imported multiset hash was expected to be {0} and was actually {1}")]
     ImportedMultisetHashMismatch(Hash, Hash),

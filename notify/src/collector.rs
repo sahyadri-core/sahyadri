@@ -128,7 +128,7 @@ mod tests {
         notifier::test_helpers::NotifyMock,
         subscription::{
             context::SubscriptionContext,
-            single::{OverallSubscription, UtxosChangedSubscription, VirtualChainChangedSubscription},
+            single::{OverallSubscription, RegistryChangedSubscription, VirtualChainChangedSubscription},
         },
     };
     use derive_more::Display;
@@ -167,7 +167,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn apply_utxos_changed_subscription(&self, _: &UtxosChangedSubscription, _: &SubscriptionContext) -> Option<Self> {
+        fn apply_registry_changed_subscription(&self, _: &RegistryChangedSubscription, _: &SubscriptionContext) -> Option<Self> {
             unimplemented!()
         }
 

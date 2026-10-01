@@ -13,13 +13,13 @@ use sahyadri_consensus_core::{
     network::NetworkType,
     sign::sign,
     subnets::SUBNETWORK_ID_NATIVE,
-    tx::{MutableTransaction, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
+    tx::{MutableTransaction, Transaction, TransactionInput, RegistryRef, TransactionOutput, RegistryUnit},
 };
 use sahyadri_core::{info, sahyadrid_env::version, time::unix_now, warn};
 use sahyadri_dilithium::{DilithiumKeyPair, generate_keypair, generate_keypair_from_seed};
 use sahyadri_grpc_client::{ClientPool, GrpcClient};
 use sahyadri_notify::subscription::context::SubscriptionContext;
-use sahyadri_rpc_core::{RpcUtxoEntry, api::rpc::RpcApi, notify::mode::NotificationMode};
+use sahyadri_rpc_core::{RpcRegistryUnit, api::rpc::RpcApi, notify::mode::NotificationMode};
 use sahyadri_txscript::pay_to_address_script;
 use sha2::{Digest, Sha256};
 use tokio::time::{Instant, MissedTickBehavior, interval};
@@ -31,8 +31,8 @@ const ADDRESS_VERSION: Version = Version::PubKeyDilithium;
 
 struct Stats {
     num_txs: usize,
-    num_utxos: usize,
-    utxos_amount: u64,
+    num_registry_units: usize,
+    registry_units_amount: u64,
     num_outs: usize,
     since: u64,
 }
@@ -159,10 +159,10 @@ async fn new_rpc_client(subscription_context: &SubscriptionContext, address: &st
 struct ClientPoolArg {
     tx: Transaction,
     stats: Arc<Mutex<Stats>>,
-    selected_utxos_len: usize,
-    selected_utxos_amount: u64,
+    selected_registry_units_len: usize,
+    selected_registry_units_amount: u64,
     pending_len: usize,
-    utxos_len: usize,
+    registry_units_len: usize,
 }
 
 struct TxConfig {
@@ -178,7 +178,7 @@ async fn main() {
 
     let address_prefix = Prefix::from(args.network);
 
-    let stats = Arc::new(Mutex::new(Stats { num_txs: 0, since: unix_now(), num_utxos: 0, utxos_amount: 0, num_outs: 0 }));
+    let stats = Arc::new(Mutex::new(Stats { num_txs: 0, since: unix_now(), num_registry_units: 0, registry_units_amount: 0, num_outs: 0 }));
     let subscription_context = SubscriptionContext::new();
     let rpc_client = GrpcClient::connect_with_args(
         NotificationMode::Direct,
@@ -195,7 +195,7 @@ async fn main() {
 
     info!("Connected to RPC");
 
-    let mut pending: HashMap<TransactionOutpoint, Instant> = HashMap::new();
+    let mut pending: HashMap<RegistryRef, Instant> = HashMap::new();
 
     let dilithium_keypair = if let Some(private_key_hex) = args.private_key {
         let mut seed = [0u8; 32];
@@ -278,29 +278,29 @@ async fn main() {
 
     let submit_tx_pool = ClientPool::new(rpc_clients, 1000);
     let _ = submit_tx_pool.start(|c, arg: ClientPoolArg| async move {
-        let ClientPoolArg { tx, stats, selected_utxos_len, selected_utxos_amount, pending_len, utxos_len } = arg;
+        let ClientPoolArg { tx, stats, selected_registry_units_len, selected_registry_units_amount, pending_len, registry_units_len } = arg;
         match c.submit_transaction(tx.as_ref().into(), false).await {
             Ok(_) => {
                 let mut stats = stats.lock();
                 stats.num_txs += 1;
-                stats.num_utxos += selected_utxos_len;
-                stats.utxos_amount += selected_utxos_amount;
+                stats.num_registry_units += selected_registry_units_len;
+                stats.registry_units_amount += selected_registry_units_amount;
                 stats.num_outs += tx.outputs.len();
                 let now = unix_now();
                 let time_past = now - stats.since;
                 if time_past > 10_000 {
                     info!(
-                        "Tx rate: {:.1}/sec, avg UTXO amount: {}, avg UTXOs per tx: {}, avg outs per tx: {}, estimated available UTXOs: {}",
+                        "Tx rate: {:.1}/sec, avg REGISTRY_UNIT amount: {}, avg REGISTRY_UNITs per tx: {}, avg outs per tx: {}, estimated available REGISTRY_UNITs: {}",
                         1000f64 * (stats.num_txs as f64) / (time_past as f64),
-                        stats.utxos_amount / stats.num_utxos as u64,
-                        stats.num_utxos / stats.num_txs,
+                        stats.registry_units_amount / stats.num_registry_units as u64,
+                        stats.num_registry_units / stats.num_txs,
                         stats.num_outs / stats.num_txs,
-                        utxos_len.saturating_sub(pending_len),
+                        registry_units_len.saturating_sub(pending_len),
                     );
                     stats.since = now;
                     stats.num_txs = 0;
-                    stats.num_utxos = 0;
-                    stats.utxos_amount = 0;
+                    stats.num_registry_units = 0;
+                    stats.registry_units_amount = 0;
                     stats.num_outs = 0;
                 }
             }
@@ -317,21 +317,21 @@ async fn main() {
     let target_tps = args.tps.min(if args.unleashed { u64::MAX } else { 100 });
     let should_tick_per_second = target_tps * MILLIS_PER_TICK / 1000 == 0;
     let avg_txs_per_tick = if should_tick_per_second { target_tps } else { target_tps * MILLIS_PER_TICK / 1000 };
-    let mut utxos = refresh_utxos(&rpc_client, sahyadri_addr.clone(), &mut pending, coinbase_maturity).await;
+    let mut registry_units = refresh_registry_units(&rpc_client, sahyadri_addr.clone(), &mut pending, coinbase_maturity).await;
     let mut ticker = interval(Duration::from_millis(if should_tick_per_second { 1000 } else { MILLIS_PER_TICK }));
     ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
     let mut maximize_inputs = false;
     let mut last_refresh = unix_now();
-    // This allows us to keep track of the UTXOs we already tried to use for this period
-    // until the UTXOs are refreshed. At that point, this will be reset as well.
-    let mut next_available_utxo_index = 0;
+    // This allows us to keep track of the REGISTRY_UNITs we already tried to use for this period
+    // until the REGISTRY_UNITs are refreshed. At that point, this will be reset as well.
+    let mut next_available_registry_unit_index = 0;
     // Tracker so we can try to send as close as possible to the target TPS
     let mut remaining_txs_in_interval = target_tps;
 
     loop {
         ticker.tick().await;
-        maximize_inputs = should_maximize_inputs(maximize_inputs, &utxos, &pending);
+        maximize_inputs = should_maximize_inputs(maximize_inputs, &registry_units, &pending);
         let txs_to_send = if remaining_txs_in_interval > avg_txs_per_tick * 2 {
             remaining_txs_in_interval -= avg_txs_per_tick;
             avg_txs_per_tick
@@ -346,12 +346,12 @@ async fn main() {
             txs_to_send,
             &tx_sender,
             sahyadri_to_addr.clone(),
-            &mut utxos,
+            &mut registry_units,
             &mut pending,
             dilithium_keypair.clone(),
             stats.clone(),
             maximize_inputs,
-            &mut next_available_utxo_index,
+            &mut next_available_registry_unit_index,
             &tx_config,
         )
         .await;
@@ -359,11 +359,11 @@ async fn main() {
             info!("Has not enough funds");
         }
         if !has_funds || now - last_refresh > 60_000 {
-            info!("Refetching UTXO set");
+            info!("Refetching REGISTRY_UNIT set");
             tokio::time::sleep(Duration::from_millis(100)).await; // We don't want this operation to be too frequent since its heavy on the node, so we wait some time before executing it.
-            utxos = refresh_utxos(&rpc_client, sahyadri_addr.clone(), &mut pending, coinbase_maturity).await;
+            registry_units = refresh_registry_units(&rpc_client, sahyadri_addr.clone(), &mut pending, coinbase_maturity).await;
             last_refresh = unix_now();
-            next_available_utxo_index = 0;
+            next_available_registry_unit_index = 0;
             pause_if_mempool_is_full(&rpc_client).await;
         }
         clean_old_pending_outpoints(&mut pending);
@@ -372,14 +372,14 @@ async fn main() {
 
 fn should_maximize_inputs(
     old_value: bool,
-    utxos: &[(TransactionOutpoint, UtxoEntry)],
-    pending: &HashMap<TransactionOutpoint, Instant>,
+    registry_units: &[(RegistryRef, RegistryUnit)],
+    pending: &HashMap<RegistryRef, Instant>,
 ) -> bool {
-    let estimated_utxos = if utxos.len() > pending.len() { utxos.len() - pending.len() } else { 0 };
-    if !old_value && estimated_utxos > 1_000_000 {
+    let estimated_registry_units = if registry_units.len() > pending.len() { registry_units.len() - pending.len() } else { 0 };
+    if !old_value && estimated_registry_units > 1_000_000 {
         info!("Starting to maximize inputs");
         true
-    } else if old_value && estimated_utxos < 500_000 {
+    } else if old_value && estimated_registry_units < 500_000 {
         info!("Stopping to maximize inputs");
         false
     } else {
@@ -400,20 +400,20 @@ async fn pause_if_mempool_is_full(rpc_client: &GrpcClient) {
     }
 }
 
-async fn refresh_utxos(
+async fn refresh_registry_units(
     rpc_client: &GrpcClient,
     sahyadri_addr: Address,
-    pending: &mut HashMap<TransactionOutpoint, Instant>,
+    pending: &mut HashMap<RegistryRef, Instant>,
     coinbase_maturity: u64,
-) -> Vec<(TransactionOutpoint, UtxoEntry)> {
+) -> Vec<(RegistryRef, RegistryUnit)> {
     populate_pending_outpoints_from_mempool(rpc_client, sahyadri_addr.clone(), pending).await;
-    fetch_spendable_utxos(rpc_client, sahyadri_addr, coinbase_maturity, pending).await
+    fetch_spendable_registry_units(rpc_client, sahyadri_addr, coinbase_maturity, pending).await
 }
 
 async fn populate_pending_outpoints_from_mempool(
     rpc_client: &GrpcClient,
     sahyadri_addr: Address,
-    pending_outpoints: &mut HashMap<TransactionOutpoint, Instant>,
+    pending_outpoints: &mut HashMap<RegistryRef, Instant>,
 ) {
     let entries = rpc_client.get_mempool_entries_by_addresses(vec![sahyadri_addr], true, false).await.unwrap();
     let now = Instant::now();
@@ -427,28 +427,28 @@ async fn populate_pending_outpoints_from_mempool(
     }
 }
 
-async fn fetch_spendable_utxos(
+async fn fetch_spendable_registry_units(
     rpc_client: &GrpcClient,
     sahyadri_addr: Address,
     coinbase_maturity: u64,
-    pending: &mut HashMap<TransactionOutpoint, Instant>,
-) -> Vec<(TransactionOutpoint, UtxoEntry)> {
-    let resp = rpc_client.get_utxos_by_addresses(vec![sahyadri_addr]).await.unwrap();
+    pending: &mut HashMap<RegistryRef, Instant>,
+) -> Vec<(RegistryRef, RegistryUnit)> {
+    let resp = rpc_client.get_registry_by_addresses(vec![sahyadri_addr]).await.unwrap();
     let dag_info = rpc_client.get_sahyadri_dag_info().await.unwrap();
 
-    let mut utxos = resp.into_iter()
+    let mut registry_units = resp.into_iter()
         .filter(|entry| {
-            is_utxo_spendable(&entry.utxo_entry, dag_info.virtual_daa_score, coinbase_maturity)
+            is_registry_unit_spendable(&entry.registry_unit_entry, dag_info.virtual_daa_score, coinbase_maturity)
         })
-        .map(|entry| (TransactionOutpoint::from(entry.outpoint), UtxoEntry::from(entry.utxo_entry)))
-        // Eliminates UTXOs we already tried to spend so we don't try to spend them again in this period
+        .map(|entry| (RegistryRef::from(entry.outpoint), RegistryUnit::from(entry.registry_unit_entry)))
+        // Eliminates REGISTRY_UNITs we already tried to spend so we don't try to spend them again in this period
         .filter(|(outpoint,_)| !pending.contains_key(outpoint))
         .collect::<Vec<_>>();
-    utxos.sort_by_key(|b| std::cmp::Reverse(b.1.amount));
-    utxos
+    registry_units.sort_by_key(|b| std::cmp::Reverse(b.1.amount));
+    registry_units
 }
 
-fn is_utxo_spendable(entry: &RpcUtxoEntry, virtual_daa_score: u64, coinbase_maturity: u64) -> bool {
+fn is_registry_unit_spendable(entry: &RpcRegistryUnit, virtual_daa_score: u64, coinbase_maturity: u64) -> bool {
     let needed_confs = if !entry.is_coinbase {
         10
     } else {
@@ -461,36 +461,36 @@ async fn maybe_send_tx(
     txs_to_send: u64,
     tx_sender: &async_channel::Sender<ClientPoolArg>,
     sahyadri_addr: Address,
-    utxos: &mut [(TransactionOutpoint, UtxoEntry)],
-    pending: &mut HashMap<TransactionOutpoint, Instant>,
+    registry_units: &mut [(RegistryRef, RegistryUnit)],
+    pending: &mut HashMap<RegistryRef, Instant>,
     dilithium_keypair: DilithiumKeyPair,
     stats: Arc<Mutex<Stats>>,
     maximize_inputs: bool,
-    next_available_utxo_index: &mut usize,
+    next_available_registry_unit_index: &mut usize,
     tx_config: &TxConfig,
 ) -> bool {
     let num_outs = if maximize_inputs { 1 } else { 2 };
 
     let mut has_fund = false;
 
-    let selected_utxos_groups = (0..txs_to_send)
+    let selected_registry_units_groups = (0..txs_to_send)
         .map(|_| {
-            let (selected_utxos, selected_amount) =
-                select_utxos(utxos, DEFAULT_SEND_AMOUNT, num_outs, maximize_inputs, next_available_utxo_index, tx_config);
+            let (selected_registry_units, selected_amount) =
+                select_registry_units(registry_units, DEFAULT_SEND_AMOUNT, num_outs, maximize_inputs, next_available_registry_unit_index, tx_config);
             if selected_amount == 0 {
                 return None;
             }
 
-            // If any iteration successfully selected UTXOs, we assume to still
+            // If any iteration successfully selected REGISTRY_UNITs, we assume to still
             // have funds in this tick
             has_fund = true;
 
             let now = Instant::now();
-            for input in selected_utxos.iter() {
+            for input in selected_registry_units.iter() {
                 pending.insert(input.0, now);
             }
 
-            Some((selected_utxos, selected_amount))
+            Some((selected_registry_units, selected_amount))
         })
         .collect::<Vec<_>>();
 
@@ -498,35 +498,35 @@ async fn maybe_send_tx(
         return false;
     }
 
-    let txs = selected_utxos_groups
+    let txs = selected_registry_units_groups
         .into_par_iter()
-        .map(|utxo_option| {
-            if let Some((selected_utxos, selected_amount)) = utxo_option {
+        .map(|registry_unit_option| {
+            if let Some((selected_registry_units, selected_amount)) = registry_unit_option {
                 let tx = generate_tx(
                     dilithium_keypair.clone(),
-                    &selected_utxos,
+                    &selected_registry_units,
                     selected_amount,
                     num_outs,
                     &sahyadri_addr,
                     tx_config.payload_size,
                 );
 
-                return Some((tx, selected_utxos.len(), selected_utxos.into_iter().map(|(_, entry)| entry.amount).sum::<u64>()));
+                return Some((tx, selected_registry_units.len(), selected_registry_units.into_iter().map(|(_, entry)| entry.amount).sum::<u64>()));
             }
 
             None
         })
         .collect::<Vec<_>>();
 
-    for (tx, selected_utxos_len, selected_utxos_amount) in txs.into_iter().flatten() {
+    for (tx, selected_registry_units_len, selected_registry_units_amount) in txs.into_iter().flatten() {
         tx_sender
             .send(ClientPoolArg {
                 tx,
                 stats: stats.clone(),
-                selected_utxos_len,
-                selected_utxos_amount,
+                selected_registry_units_len,
+                selected_registry_units_amount,
                 pending_len: pending.len(),
-                utxos_len: utxos.len(),
+                registry_units_len: registry_units.len(),
             })
             .await
             .unwrap();
@@ -535,29 +535,29 @@ async fn maybe_send_tx(
     true
 }
 
-fn clean_old_pending_outpoints(pending: &mut HashMap<TransactionOutpoint, Instant>) {
+fn clean_old_pending_outpoints(pending: &mut HashMap<RegistryRef, Instant>) {
     let now = Instant::now();
     pending.retain(|_, &mut time| now.duration_since(time) <= Duration::from_secs(3600));
 }
 
-fn required_fee(num_utxos: usize, num_outs: u64) -> u64 {
-    FEE_RATE * estimated_mass(num_utxos, num_outs)
+fn required_fee(num_registry_units: usize, num_outs: u64) -> u64 {
+    FEE_RATE * estimated_mass(num_registry_units, num_outs)
 }
 
-fn estimated_mass(num_utxos: usize, num_outs: u64) -> u64 {
-    200 + 34 * num_outs + 1000 * (num_utxos as u64)
+fn estimated_mass(num_registry_units: usize, num_outs: u64) -> u64 {
+    200 + 34 * num_outs + 1000 * (num_registry_units as u64)
 }
 
 fn generate_tx(
     dilithium_keypair: DilithiumKeyPair,
-    utxos: &[(TransactionOutpoint, UtxoEntry)],
+    registry_units: &[(RegistryRef, RegistryUnit)],
     send_amount: u64,
     num_outs: u64,
     sahyadri_addr: &Address,
     payload_size: usize,
 ) -> Transaction {
     let script_public_key = pay_to_address_script(sahyadri_addr);
-    let inputs = utxos
+    let inputs = registry_units
         .iter()
         .map(|(op, _)| TransactionInput { previous_outpoint: *op, signature_script: vec![], sequence: 0, sig_op_count: 1 })
         .collect_vec();
@@ -569,27 +569,27 @@ fn generate_tx(
     rand::thread_rng().fill_bytes(&mut data);
     let unsigned_tx = Transaction::new_non_finalized(TX_VERSION, inputs, outputs, 0, SUBNETWORK_ID_NATIVE, 0, data);
     let signed_tx = sign(
-        MutableTransaction::with_entries(unsigned_tx, utxos.iter().map(|(_, entry)| entry.clone()).collect_vec()),
+        MutableTransaction::with_entries(unsigned_tx, registry_units.iter().map(|(_, entry)| entry.clone()).collect_vec()),
         &dilithium_keypair,
     );
     signed_tx.tx
 }
 
-fn select_utxos(
-    utxos: &[(TransactionOutpoint, UtxoEntry)],
+fn select_registry_units(
+    registry_units: &[(RegistryRef, RegistryUnit)],
     min_amount: u64,
     num_outs: u64,
-    maximize_utxos: bool,
-    next_available_utxo_index: &mut usize,
+    maximize_registry_units: bool,
+    next_available_registry_unit_index: &mut usize,
     tx_config: &TxConfig,
-) -> (Vec<(TransactionOutpoint, UtxoEntry)>, u64) {
-    const MAX_UTXOS: usize = 8;
+) -> (Vec<(RegistryRef, RegistryUnit)>, u64) {
+    const MAX_REGISTRY_UNITS: usize = 8;
     let mut selected_amount: u64 = 0;
     let mut selected = Vec::new();
     let mut rng = rand::thread_rng();
 
-    while next_available_utxo_index < &mut utxos.len() {
-        let (outpoint, entry) = utxos[*next_available_utxo_index].clone();
+    while next_available_registry_unit_index < &mut registry_units.len() {
+        let (outpoint, entry) = registry_units[*next_available_registry_unit_index].clone();
         selected_amount += entry.amount;
         selected.push((outpoint, entry));
 
@@ -600,13 +600,13 @@ fn select_utxos(
             tx_config.priority_fee
         };
 
-        *next_available_utxo_index += 1;
+        *next_available_registry_unit_index += 1;
 
-        if selected_amount >= min_amount + fee + priority_fee && (!maximize_utxos || selected.len() == MAX_UTXOS) {
+        if selected_amount >= min_amount + fee + priority_fee && (!maximize_registry_units || selected.len() == MAX_REGISTRY_UNITS) {
             return (selected, selected_amount - fee - priority_fee);
         }
 
-        if selected.len() > MAX_UTXOS {
+        if selected.len() > MAX_REGISTRY_UNITS {
             return (vec![], 0);
         }
     }

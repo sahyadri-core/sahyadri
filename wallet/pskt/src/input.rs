@@ -5,7 +5,7 @@ use derive_builder::Builder;
 use sahyadri_bip32::DilithiumPkHash;
 use sahyadri_consensus_core::{
     hashing::sighash_type::{SIG_HASH_ALL, SigHashType},
-    tx::{TransactionId, TransactionOutpoint, UtxoEntry},
+    tx::{TransactionId, RegistryRef, RegistryUnit},
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, marker::PhantomData, ops::Add};
@@ -17,9 +17,9 @@ use std::{collections::BTreeMap, marker::PhantomData, ops::Add};
 #[builder(setter(skip))]
 pub struct Input {
     #[builder(setter(strip_option))]
-    pub utxo_entry: Option<UtxoEntry>,
+    pub registry_unit_entry: Option<RegistryUnit>,
     #[builder(setter)]
-    pub previous_outpoint: TransactionOutpoint,
+    pub previous_outpoint: RegistryRef,
     /// The sequence number of this input.
     ///
     /// If omitted, assumed to be the final sequence number
@@ -61,7 +61,7 @@ pub struct Input {
 impl Default for Input {
     fn default() -> Self {
         Self {
-            utxo_entry: Default::default(),
+            registry_unit_entry: Default::default(),
             previous_outpoint: Default::default(),
             sequence: Default::default(),
             min_time: Default::default(),
@@ -95,11 +95,11 @@ impl Add for Input {
                 that: rhs.previous_outpoint.index,
             });
         }
-        self.utxo_entry = match (self.utxo_entry.take(), rhs.utxo_entry) {
+        self.registry_unit_entry = match (self.registry_unit_entry.take(), rhs.registry_unit_entry) {
             (None, None) => None,
-            (Some(utxo), None) | (None, Some(utxo)) => Some(utxo),
+            (Some(registry_unit), None) | (None, Some(registry_unit)) => Some(registry_unit),
             (Some(left), Some(right)) if left == right => Some(left),
-            (Some(left), Some(right)) => return Err(CombineError::NotCompatibleUtxos { this: left, that: right }),
+            (Some(left), Some(right)) => return Err(CombineError::NotCompatibleRegistryUnits { this: left, that: right }),
         };
 
         // todo discuss merging. if sequence is equal - combine, otherwise use input which has bigger sequence number as is
@@ -156,8 +156,8 @@ pub enum CombineError {
     },
     #[error("Two different redeem scripts detected")]
     NotCompatibleRedeemScripts { this: Vec<u8>, that: Vec<u8> },
-    #[error("Two different utxos detected")]
-    NotCompatibleUtxos { this: UtxoEntry, that: UtxoEntry },
+    #[error("Two different registry_units detected")]
+    NotCompatibleRegistryUnits { this: RegistryUnit, that: RegistryUnit },
 
     #[error("Two different derivations for the same key")]
     NotCompatibleBip32Derivations(#[from] CombineMapErr<DilithiumPkHash, Option<KeySource>>),

@@ -9,7 +9,7 @@ use crate::v7::{
     request_ibd_chain_block_locator::RequestIbdChainBlockLocatorFlow,
     request_pp_proof::RequestPruningPointProofFlow,
     request_pruning_point_and_anticone::PruningPointAndItsAnticoneRequestsFlow,
-    request_pruning_point_utxo_set::RequestPruningPointUtxoSetFlow,
+    request_pruning_point_registry_unit_set::RequestPruningPointRegistryUnitSetFlow,
     txrelay::flow::{RelayTransactionsFlow, RequestTransactionsFlow},
 };
 pub(crate) mod request_block_bodies;
@@ -45,8 +45,8 @@ pub fn register(ctx: FlowContext, router: Arc<Router>, protocol_version: u32) ->
                 SahyadridMessagePayloadType::PruningPoints,
                 SahyadridMessagePayloadType::PruningPointProof,
                 SahyadridMessagePayloadType::UnexpectedPruningPoint,
-                SahyadridMessagePayloadType::PruningPointUtxoSetChunk,
-                SahyadridMessagePayloadType::DonePruningPointUtxoSetChunks,
+                SahyadridMessagePayloadType::PruningPointRegistryUnitSetChunk,
+                SahyadridMessagePayloadType::DonePruningPointRegistryUnitSetChunks,
             ]),
             relay_receiver,
             body_only_ibd_permitted,
@@ -86,12 +86,12 @@ pub fn register(ctx: FlowContext, router: Arc<Router>, protocol_version: u32) ->
             ]),
             header_format,
         )),
-        Box::new(RequestPruningPointUtxoSetFlow::new(
+        Box::new(RequestPruningPointRegistryUnitSetFlow::new(
             ctx.clone(),
             router.clone(),
             router.subscribe(vec![
-                SahyadridMessagePayloadType::RequestPruningPointUtxoSet,
-                SahyadridMessagePayloadType::RequestNextPruningPointUtxoSetChunk,
+                SahyadridMessagePayloadType::RequestPruningPointRegistryUnitSet,
+                SahyadridMessagePayloadType::RequestNextPruningPointRegistryUnitSetChunk,
             ]),
         )),
         Box::new(HandleIbdBlockRequests::new(

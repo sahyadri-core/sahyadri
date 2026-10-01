@@ -139,7 +139,7 @@ impl PruningProofManager {
         self.pruning_point_store.write().set_pruning_proof_descriptor(descriptor).unwrap();
 
         // Update virtual state based on proof derived pruning point.
-        // updating of the utxoset is done separately as it requires downloading the new utxoset in its entirety.
+        // updating of the registry_unitset is done separately as it requires downloading the new registry_unitset in its entirety.
         let virtual_parents = vec![pruning_point];
         let virtual_state = Arc::new(VirtualState {
             parents: virtual_parents.clone(),

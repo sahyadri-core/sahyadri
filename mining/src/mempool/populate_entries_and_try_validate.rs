@@ -5,7 +5,7 @@ use sahyadri_consensus_core::{
         args::{TransactionValidationArgs, TransactionValidationBatchArgs},
     },
     constants::UNACCEPTED_DAA_SCORE,
-    tx::{MutableTransaction, UtxoEntry},
+    tx::{MutableTransaction, RegistryUnit},
 };
 use sahyadri_mining_errors::mempool::RuleError;
 
@@ -15,7 +15,7 @@ impl Mempool {
             if let Some(parent) = self.transaction_pool.get(&input.previous_outpoint.transaction_id) {
                 let output = &parent.mtx.tx.outputs[input.previous_outpoint.index as usize];
                 transaction.entries[i] =
-                    Some(UtxoEntry::new(output.value, output.script_public_key.clone(), UNACCEPTED_DAA_SCORE, false));
+                    Some(RegistryUnit::new(output.value, output.script_public_key.clone(), UNACCEPTED_DAA_SCORE, false));
             }
         }
     }

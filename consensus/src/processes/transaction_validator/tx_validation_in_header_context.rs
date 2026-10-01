@@ -1,5 +1,5 @@
 //! Groups transaction validations that depend on the containing header and/or
-//! its past headers (but do not depend on UTXO state or other transactions in
+//! its past headers (but do not depend on REGISTRY_UNIT state or other transactions in
 //! the containing block)
 
 use super::{

@@ -137,7 +137,7 @@ impl Account {
                                                 kana_to_sahyadri_string(balance)
                                             );
                                         } else {
-                                            tprintln!(ctx_, "Please wait... scanning for account UTXOs...");
+                                            tprintln!(ctx_, "Please wait... scanning for account REGISTRY_UNITs...");
                                         }
                                     })),
                                 )

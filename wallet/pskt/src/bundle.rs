@@ -6,7 +6,7 @@ use crate::pskt::{Inner as PSKTInner, PSKT};
 use sahyadri_addresses::{Address, Prefix};
 // use sahyadri_bip32::Prefix;
 use sahyadri_consensus_core::network::{NetworkId, NetworkType};
-use sahyadri_consensus_core::tx::{ScriptPublicKey, TransactionOutpoint, UtxoEntry};
+use sahyadri_consensus_core::tx::{ScriptPublicKey, RegistryRef, RegistryUnit};
 
 use hex;
 use sahyadri_consensus_core::constants::UNACCEPTED_DAA_SCORE;
@@ -89,11 +89,11 @@ impl Bundle {
             for (key_inner, input) in pskt.clone().inputs.iter().enumerate() {
                 result.push_str(&format!("Input #{:02}\r\n", key_inner + 1));
 
-                if let Some(utxo_entry) = &input.utxo_entry {
-                    result.push_str(&format!("  amount: {}\r\n", kana_formatter(utxo_entry.amount, &NetworkType::from(network_id))));
+                if let Some(registry_unit_entry) = &input.registry_unit_entry {
+                    result.push_str(&format!("  amount: {}\r\n", kana_formatter(registry_unit_entry.amount, &NetworkType::from(network_id))));
                     result.push_str(&format!(
                         "  address: {}\r\n",
-                        extract_script_pub_key_address(&utxo_entry.script_public_key, Prefix::from(network_id))
+                        extract_script_pub_key_address(&registry_unit_entry.script_public_key, Prefix::from(network_id))
                             .expect("Input address")
                     ));
                 }
@@ -173,15 +173,15 @@ pub fn script_sig_to_address(script_sig: &[u8], prefix: sahyadri_addresses::Pref
     extract_script_pub_key_address(&pay_to_script_hash_script(script_sig), prefix).map_err(Error::P2SHExtractError)
 }
 
-pub fn unlock_utxos_as_pskb(
-    utxo_references: Vec<(UtxoEntry, TransactionOutpoint)>,
+pub fn unlock_registry_units_as_pskb(
+    registry_unit_references: Vec<(RegistryUnit, RegistryRef)>,
     recipient: &Address,
     script_sig: Vec<u8>,
     priority_fee_kana_per_transaction: u64,
 ) -> Result<Bundle, Error> {
     // Fee per transaction.
-    // Check if each UTXO's amounts can cover priority fee.
-    utxo_references
+    // Check if each REGISTRY_UNIT's amounts can cover priority fee.
+    registry_unit_references
         .iter()
         .map(|(entry, _)| {
             if entry.amount <= priority_fee_kana_per_transaction {
@@ -192,10 +192,10 @@ pub fn unlock_utxos_as_pskb(
         .collect::<Result<Vec<_>, _>>()?;
 
     let recipient_spk = pay_to_address_script(recipient);
-    let (successes, errors): (Vec<_>, Vec<_>) = utxo_references
+    let (successes, errors): (Vec<_>, Vec<_>) = registry_unit_references
         .into_iter()
-        .map(|(utxo_entry, outpoint)| {
-            unlock_utxo(&utxo_entry, &outpoint, &recipient_spk, &script_sig, priority_fee_kana_per_transaction)
+        .map(|(registry_unit_entry, outpoint)| {
+            unlock_registry_unit(&registry_unit_entry, &outpoint, &recipient_spk, &script_sig, priority_fee_kana_per_transaction)
         })
         .partition(Result::is_ok);
 
@@ -203,7 +203,7 @@ pub fn unlock_utxos_as_pskb(
     let error_list: Vec<_> = errors.into_iter().filter_map(Result::err).collect();
 
     if !error_list.is_empty() {
-        return Err(Error::MultipleUnlockUtxoError(error_list));
+        return Err(Error::MultipleUnlockRegistryUnitError(error_list));
     }
 
     let merged_bundle = successful_bundles.into_iter().fold(None, |acc: Option<Bundle>, bundle| match acc {
@@ -220,30 +220,30 @@ pub fn unlock_utxos_as_pskb(
     }
 }
 
-pub fn unlock_utxo(
-    utxo_entry: &UtxoEntry,
-    outpoint: &TransactionOutpoint,
+pub fn unlock_registry_unit(
+    registry_unit_entry: &RegistryUnit,
+    outpoint: &RegistryRef,
     script_public_key: &ScriptPublicKey,
     script_sig: &[u8],
     priority_fee_kana: u64,
 ) -> Result<Bundle, Error> {
     let input = InputBuilder::default()
-        .utxo_entry(utxo_entry.to_owned())
+        .registry_unit_entry(registry_unit_entry.to_owned())
         .previous_outpoint(outpoint.to_owned())
         .sig_op_count(1)
         .redeem_script(script_sig.to_vec())
         .build()?;
 
     let output =
-        OutputBuilder::default().amount(utxo_entry.amount - priority_fee_kana).script_public_key(script_public_key.clone()).build()?;
+        OutputBuilder::default().amount(registry_unit_entry.amount - priority_fee_kana).script_public_key(script_public_key.clone()).build()?;
 
     let pskt: PSKT<Constructor> = PSKT::<Creator>::default().constructor().input(input).output(output);
     Ok(pskt.into())
 }
 
-// Build UTXO spending PSKB with custom input and multiple outputs
+// Build REGISTRY_UNIT spending PSKB with custom input and multiple outputs
 // to be used in atomic transaction batch.
-pub fn unlock_utxo_outputs_as_batch_transaction_pskb(
+pub fn unlock_registry_unit_outputs_as_batch_transaction_pskb(
     amount: u64,
     start_address: &Address,
     script_sig: &[u8],
@@ -251,10 +251,10 @@ pub fn unlock_utxo_outputs_as_batch_transaction_pskb(
 ) -> Result<Bundle, Error> {
     let origin_spk = pay_to_address_script(start_address);
 
-    let utxo_entry = UtxoEntry { amount, script_public_key: origin_spk, block_daa_score: UNACCEPTED_DAA_SCORE, is_coinbase: false };
+    let registry_unit_entry = RegistryUnit { amount, script_public_key: origin_spk, block_daa_score: UNACCEPTED_DAA_SCORE, is_coinbase: false };
 
     let input =
-        InputBuilder::default().utxo_entry(utxo_entry.to_owned()).sig_op_count(1).redeem_script(script_sig.to_vec()).build()?;
+        InputBuilder::default().registry_unit_entry(registry_unit_entry.to_owned()).sig_op_count(1).redeem_script(script_sig.to_vec()).build()?;
 
     let outputs: Vec<Output> = destination_outputs
         .iter()

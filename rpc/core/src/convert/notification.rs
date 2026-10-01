@@ -2,8 +2,8 @@
 
 use crate::{
     BlockAddedNotification, FinalityConflictNotification, FinalityConflictResolvedNotification, NewBlockTemplateNotification,
-    Notification, PruningPointUtxoSetOverrideNotification, RpcAcceptedTransactionIds, SinkBlueScoreChangedNotification,
-    UtxosChangedNotification, VirtualChainChangedNotification, VirtualDaaScoreChangedNotification, convert::utxo::utxo_set_into_rpc,
+    Notification, PruningPointRegistryUnitSetOverrideNotification, RpcAcceptedTransactionIds, SinkBlueScoreChangedNotification,
+    RegistryChangedNotification, VirtualChainChangedNotification, VirtualDaaScoreChangedNotification, convert::registry_unit::registry_set_into_rpc,
 };
 use sahyadri_consensus_notify::notification as consensus_notify;
 use sahyadri_index_core::notification as index_notify;
@@ -26,10 +26,9 @@ impl From<&consensus_notify::Notification> for Notification {
             consensus_notify::Notification::VirtualChainChanged(msg) => Notification::VirtualChainChanged(msg.into()),
             consensus_notify::Notification::FinalityConflict(msg) => Notification::FinalityConflict(msg.into()),
             consensus_notify::Notification::FinalityConflictResolved(msg) => Notification::FinalityConflictResolved(msg.into()),
-            consensus_notify::Notification::UtxosChanged(msg) => Notification::UtxosChanged(msg.into()),
             consensus_notify::Notification::SinkBlueScoreChanged(msg) => Notification::SinkBlueScoreChanged(msg.into()),
             consensus_notify::Notification::VirtualDaaScoreChanged(msg) => Notification::VirtualDaaScoreChanged(msg.into()),
-            consensus_notify::Notification::PruningPointUtxoSetOverride(msg) => Notification::PruningPointUtxoSetOverride(msg.into()),
+            consensus_notify::Notification::PruningPointRegistryUnitSetOverride(msg) => Notification::PruningPointRegistryUnitSetOverride(msg.into()),
             consensus_notify::Notification::NewBlockTemplate(msg) => Notification::NewBlockTemplate(msg.into()),
         }
     }
@@ -81,13 +80,6 @@ impl From<&consensus_notify::FinalityConflictResolvedNotification> for FinalityC
     }
 }
 
-impl From<&consensus_notify::UtxosChangedNotification> for UtxosChangedNotification {
-    fn from(_: &consensus_notify::UtxosChangedNotification) -> Self {
-        // TODO: investigate if this conversion is possible
-        UtxosChangedNotification::default()
-    }
-}
-
 impl From<&consensus_notify::SinkBlueScoreChangedNotification> for SinkBlueScoreChangedNotification {
     fn from(item: &consensus_notify::SinkBlueScoreChangedNotification) -> Self {
         Self { sink_blue_score: item.sink_blue_score }
@@ -100,8 +92,8 @@ impl From<&consensus_notify::VirtualDaaScoreChangedNotification> for VirtualDaaS
     }
 }
 
-impl From<&consensus_notify::PruningPointUtxoSetOverrideNotification> for PruningPointUtxoSetOverrideNotification {
-    fn from(_: &consensus_notify::PruningPointUtxoSetOverrideNotification) -> Self {
+impl From<&consensus_notify::PruningPointRegistryUnitSetOverrideNotification> for PruningPointRegistryUnitSetOverrideNotification {
+    fn from(_: &consensus_notify::PruningPointRegistryUnitSetOverrideNotification) -> Self {
         Self {}
     }
 }
@@ -125,22 +117,22 @@ impl From<index_notify::Notification> for Notification {
 impl From<&index_notify::Notification> for Notification {
     fn from(item: &index_notify::Notification) -> Self {
         match item {
-            index_notify::Notification::UtxosChanged(msg) => Notification::UtxosChanged(msg.into()),
-            index_notify::Notification::PruningPointUtxoSetOverride(msg) => Notification::PruningPointUtxoSetOverride(msg.into()),
+            index_notify::Notification::RegistryChanged(msg) => Notification::RegistryChanged(msg.into()),
+            index_notify::Notification::PruningPointRegistryUnitSetOverride(msg) => Notification::PruningPointRegistryUnitSetOverride(msg.into()),
         }
     }
 }
 
-impl From<&index_notify::PruningPointUtxoSetOverrideNotification> for PruningPointUtxoSetOverrideNotification {
-    fn from(_: &index_notify::PruningPointUtxoSetOverrideNotification) -> Self {
+impl From<&index_notify::PruningPointRegistryUnitSetOverrideNotification> for PruningPointRegistryUnitSetOverrideNotification {
+    fn from(_: &index_notify::PruningPointRegistryUnitSetOverrideNotification) -> Self {
         Self {}
     }
 }
 
-impl From<&index_notify::UtxosChangedNotification> for UtxosChangedNotification {
+impl From<&index_notify::RegistryChangedNotification> for RegistryChangedNotification {
     // This is not intended to be ever called because no address prefix is available.
     // Use sahyadri_rpc_service::converter::index::IndexConverter instead.
-    fn from(item: &index_notify::UtxosChangedNotification) -> Self {
-        Self { added: Arc::new(utxo_set_into_rpc(&item.added, None)), removed: Arc::new(utxo_set_into_rpc(&item.removed, None)) }
+    fn from(item: &index_notify::RegistryChangedNotification) -> Self {
+        Self { added: Arc::new(registry_set_into_rpc(&item.added, None)), removed: Arc::new(registry_set_into_rpc(&item.removed, None)) }
     }
 }

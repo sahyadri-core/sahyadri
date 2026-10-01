@@ -17,7 +17,7 @@ pub enum Track {
     Balance,
     Pending,
     Tx,
-    Utxo,
+    RegistryUnit,
 }
 
 impl FromStr for Track {
@@ -28,7 +28,7 @@ impl FromStr for Track {
             "balance" => Ok(Track::Balance),
             "pending" => Ok(Track::Pending),
             "tx" => Ok(Track::Tx),
-            "utxo" => Ok(Track::Utxo),
+            "registry_unit" => Ok(Track::RegistryUnit),
             _ => Err(format!("unknown attribute '{}'", s)),
         }
     }
@@ -41,7 +41,7 @@ impl fmt::Display for Track {
             Track::Balance => write!(f, "balance"),
             Track::Pending => write!(f, "pending"),
             Track::Tx => write!(f, "tx"),
-            Track::Utxo => write!(f, "utxo"),
+            Track::RegistryUnit => write!(f, "registry_unit"),
         }
     }
 }
@@ -51,7 +51,7 @@ pub struct Flags(DashMap<Track, Arc<AtomicBool>>);
 impl Default for Flags {
     fn default() -> Self {
         let mut map = DashMap::new();
-        let iter = [(Track::Daa, false), (Track::Balance, false), (Track::Pending, false), (Track::Tx, false), (Track::Utxo, false)]
+        let iter = [(Track::Daa, false), (Track::Balance, false), (Track::Pending, false), (Track::Tx, false), (Track::RegistryUnit, false)]
             .into_iter()
             .map(|(flag, default)| (flag, Arc::new(AtomicBool::new(default))));
         map.extend(iter);

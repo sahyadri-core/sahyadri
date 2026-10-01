@@ -25,7 +25,7 @@ export interface IOptionalHeader {
     parentsByLevel?: CompressedParents;
     hashMerkleRoot?: HexString;
     acceptedIdMerkleRoot?: HexString;
-    utxoCommitment?: HexString;
+    registry_unitCommitment?: HexString;
     timestamp?: bigint;
     bits?: number;
     nonce?: bigint;
@@ -51,7 +51,7 @@ pub struct OptionalHeader {
     parents_by_level: Option<WasmCompressedParents>,
     hash_merkle_root: Option<Hash>,
     accepted_id_merkle_root: Option<Hash>,
-    utxo_commitment: Option<Hash>,
+    registry_unit_commitment: Option<Hash>,
     timestamp: Option<u64>,
     bits: Option<u32>,
     nonce: Option<u64>,
@@ -69,7 +69,7 @@ impl OptionalHeader {
         parents_by_level: Option<WasmCompressedParents>,
         hash_merkle_root: Option<Hash>,
         accepted_id_merkle_root: Option<Hash>,
-        utxo_commitment: Option<Hash>,
+        registry_unit_commitment: Option<Hash>,
         timestamp: Option<u64>,
         bits: Option<u32>,
         nonce: Option<u64>,
@@ -84,7 +84,7 @@ impl OptionalHeader {
             parents_by_level,
             hash_merkle_root,
             accepted_id_merkle_root,
-            utxo_commitment,
+            registry_unit_commitment,
             timestamp,
             bits,
             nonce,
@@ -128,9 +128,9 @@ impl OptionalHeader {
         self.accepted_id_merkle_root.map(|h| h.to_hex())
     }
 
-    #[wasm_bindgen(getter, js_name = utxoCommitment)]
-    pub fn utxo_commitment(&self) -> Option<String> {
-        self.utxo_commitment.map(|h| h.to_hex())
+    #[wasm_bindgen(getter, js_name = registry_unitCommitment)]
+    pub fn registry_unit_commitment(&self) -> Option<String> {
+        self.registry_unit_commitment.map(|h| h.to_hex())
     }
 
     #[wasm_bindgen(getter)]
@@ -204,9 +204,9 @@ impl TryCastFromJs for OptionalHeader {
                         .try_get_value("acceptedIdMerkleRoot")?
                         .map(|v| v.try_into_owned().map_err(|err| Error::convert("acceptedIdMerkleRoot", err)))
                         .transpose()?,
-                    utxo_commitment: object
-                        .try_get_value("utxoCommitment")?
-                        .map(|v| v.try_into_owned().map_err(|err| Error::convert("utxoCommitment", err)))
+                    registry_unit_commitment: object
+                        .try_get_value("registry_unitCommitment")?
+                        .map(|v| v.try_into_owned().map_err(|err| Error::convert("registry_unitCommitment", err)))
                         .transpose()?,
                     timestamp: object.try_get_value("timestamp")?.map(|v| v.try_as_u64()).transpose()?,
                     bits: object.try_get_value("bits")?.map(|v| v.try_as_u32()).transpose()?,

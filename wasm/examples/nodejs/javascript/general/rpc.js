@@ -30,8 +30,8 @@ const {
     const info = await rpc.getSahyadriDagInfo();
     console.log("GetSahyadriDagInfo response:", info);
 
-    // const address = await rpc.getUtxoReturnAddress({txid: "a1f9a403e3c82e9b6dc7436682878262133ff0dd3fbc2d63c5f1973f79fa2b4e", acceptingBlockDaaScore: 165553103n})
-    // console.log("getUtxoReturnAddress response:", address);
+    // const address = await rpc.getRegistryUnitReturnAddress({txid: "a1f9a403e3c82e9b6dc7436682878262133ff0dd3fbc2d63c5f1973f79fa2b4e", acceptingBlockDaaScore: 165553103n})
+    // console.log("getRegistryUnitReturnAddress response:", address);
 
     await rpc.disconnect();
     console.log("bye!");

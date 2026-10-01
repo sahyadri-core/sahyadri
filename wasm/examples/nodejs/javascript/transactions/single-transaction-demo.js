@@ -50,36 +50,36 @@ const { networkId, encoding } = require("../utils").parseArgs();
 
 
     try {
-        const { entries : utxos } = await rpc.getUtxosByAddresses([address]);
+        const { entries : registry_units } = await rpc.getRegistryUnitsByAddresses([address]);
 
-        console.info(utxos);
+        console.info(registry_units);
 
-        if (utxos.length === 0) {
+        if (registry_units.length === 0) {
             console.info('Send some sahyadri to', address, 'before proceeding with the demo');
             return;
         }
 
 
-        let total = utxos.reduce((agg, curr) => {
+        let total = registry_units.reduce((agg, curr) => {
             return curr.amount + agg;
         }, 0n);
 
-        console.info('Amount sending', total - BigInt(utxos.length) * 2000n)
+        console.info('Amount sending', total - BigInt(registry_units.length) * 2000n)
 
         const outputs = [{
             address,
-            amount: total - BigInt(utxos.length) * 2000n,
+            amount: total - BigInt(registry_units.length) * 2000n,
         }];
 
         const changeAddress = address;
         console.log("changeAddress:", changeAddress)
         
-        // utxo_entry_source: IUtxoEntry[], 
+        // registry_unit_entry_source: IRegistryUnitEntry[], 
         // outputs: IPaymentOutput[], 
         // priority_fee: bigint, 
         // payload: HexString | Uint8Array, 
         // sig_op_count?: number
-        const tx = createTransaction(utxos, outputs, 0n, "", 1);
+        const tx = createTransaction(registry_units, outputs, 0n, "", 1);
 
 
         console.info("Transaction before signing:", tx);

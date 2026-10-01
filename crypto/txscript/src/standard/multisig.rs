@@ -135,7 +135,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //         let tx = Transaction::new(
 //             0,
 //             vec![TransactionInput {
-//                 previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: 0 },
+//                 previous_outpoint: RegistryRef { transaction_id: prev_tx_id, index: 0 },
 //                 signature_script: vec![],
 //                 sequence: 0,
 //                 sig_op_count: 4,
@@ -147,7 +147,7 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
 //             vec![],
 //         );
 //
-//         let entries = vec![UtxoEntry {
+//         let entries = vec![RegistryUnit {
 //             amount: 12793000000000,
 //             script_public_key: pay_to_script_hash_script(&script),
 //             block_daa_score: 36151168,

@@ -6,8 +6,6 @@ pub mod params;
 use sahyadri_utils::networking::{ContextualNetAddress, NetAddress};
 
 #[cfg(feature = "devnet-prealloc")]
-use crate::utxo::utxo_collection::UtxoCollection;
-#[cfg(feature = "devnet-prealloc")]
 use std::sync::Arc;
 
 use std::ops::Deref;
@@ -38,9 +36,9 @@ pub struct Config {
     /// Enable various sanity checks which might be compute-intensive (mostly performed during pruning)
     pub enable_sanity_checks: bool,
 
-    // TODO: move non-consensus parameters like utxoindex to a higher scoped Config
-    /// Enable the UTXO index
-    pub utxoindex: bool,
+    // TODO: move non-consensus parameters like registry_unitindex to a higher scoped Config
+    /// Enable the REGISTRY_UNIT index
+    pub registry_unitindex: bool,
 
     /// Enable RPC commands which affect the state of the node
     pub unsafe_rpc: bool,
@@ -64,9 +62,6 @@ pub struct Config {
 
     pub block_template_cache_lifetime: Option<u64>,
 
-    #[cfg(feature = "devnet-prealloc")]
-    pub initial_utxo_set: Arc<UtxoCollection>,
-
     pub disable_upnp: bool,
 
     /// A scale factor to apply to memory allocation bounds
@@ -88,7 +83,7 @@ impl Config {
             process_genesis: true,
             is_archival: false,
             enable_sanity_checks: false,
-            utxoindex: false,
+            registry_unitindex: false,
             unsafe_rpc: false,
             enable_unsynced_mining: false,
             enable_flash_tx: false,
@@ -97,9 +92,9 @@ impl Config {
             externalip: None,
             p2p_listen_address: ContextualNetAddress::unspecified(),
             block_template_cache_lifetime: None,
+            disable_upnp: false,
 
             #[cfg(feature = "devnet-prealloc")]
-            initial_utxo_set: Default::default(),
             disable_upnp: false,
             ram_scale: 1.0,
             retention_period_days: None,

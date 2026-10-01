@@ -12,7 +12,7 @@ use sahyadri_consensus_core::{
     block::Block,
     header::Header,
     pruning::{PruningPointProof, PruningPointsList},
-    tx::{TransactionId, TransactionOutpoint, UtxoEntry},
+    tx::{TransactionId, RegistryRef, RegistryUnit},
 };
 use sahyadri_hashes::Hash;
 use sahyadri_utils::networking::{IpAddress, PeerId};
@@ -151,18 +151,18 @@ impl TryFrom<Versioned<protowire::BlockHeadersMessage>> for Vec<Arc<Header>> {
     }
 }
 
-impl TryFrom<protowire::PruningPointUtxoSetChunkMessage> for Vec<(TransactionOutpoint, UtxoEntry)> {
+impl TryFrom<protowire::PruningPointRegistryUnitSetChunkMessage> for Vec<(RegistryRef, RegistryUnit)> {
     type Error = ConversionError;
 
-    fn try_from(msg: protowire::PruningPointUtxoSetChunkMessage) -> Result<Self, Self::Error> {
-        msg.outpoint_and_utxo_entry_pairs.into_iter().map(|p| p.try_into()).collect()
+    fn try_from(msg: protowire::PruningPointRegistryUnitSetChunkMessage) -> Result<Self, Self::Error> {
+        msg.outpoint_and_registry_unit_pairs.into_iter().map(|p| p.try_into()).collect()
     }
 }
 
-impl TryFrom<protowire::RequestPruningPointUtxoSetMessage> for Hash {
+impl TryFrom<protowire::RequestPruningPointRegistryUnitSetMessage> for Hash {
     type Error = ConversionError;
 
-    fn try_from(msg: protowire::RequestPruningPointUtxoSetMessage) -> Result<Self, Self::Error> {
+    fn try_from(msg: protowire::RequestPruningPointRegistryUnitSetMessage) -> Result<Self, Self::Error> {
         msg.pruning_point_hash.try_into_ex()
     }
 }

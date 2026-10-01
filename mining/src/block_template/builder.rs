@@ -101,8 +101,8 @@ impl BlockTemplateBuilder {
         let new_payload = consensus.modify_coinbase_payload(coinbase_tx.payload.clone(), new_miner_data)?;
         coinbase_tx.payload = new_payload;
 
-        // SURGERY: Red reward UTXO output modification removed for Account Model.
-        // We no longer rely on UTXO outputs for rewards.
+        // SURGERY: Red reward REGISTRY_UNIT output modification removed for Account Model.
+        // We no longer rely on REGISTRY_UNIT outputs for rewards.
 
         block_template.block.header.timestamp = u64::max(block_template.block.header.timestamp, unix_now());
         let new_timestamp = unix_now();

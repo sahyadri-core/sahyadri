@@ -7,7 +7,7 @@ use sahyadri_notify::listener::{ListenerId, ListenerLifespan};
 use sahyadri_notify::notifier::{Notifier, Notify};
 use sahyadri_notify::scope::Scope;
 use sahyadri_notify::subscription::context::SubscriptionContext;
-use sahyadri_notify::subscription::{MutationPolicies, UtxosChangedMutationPolicy};
+use sahyadri_notify::subscription::{MutationPolicies, RegistryChangedMutationPolicy};
 use sahyadri_rpc_core::api::ctl::RpcCtl;
 use sahyadri_rpc_core::{RpcResult, notify::connection::ChannelConnection};
 use sahyadri_rpc_core::{api::connection::DynRpcConnection, api::rpc::RpcApi, *};
@@ -30,7 +30,7 @@ pub struct RpcCoreMock {
 impl RpcCoreMock {
     pub fn new() -> Self {
         let (sync_sender, sync_receiver) = unbounded();
-        let policies = MutationPolicies::new(UtxosChangedMutationPolicy::AddressSet);
+        let policies = MutationPolicies::new(RegistryChangedMutationPolicy::AddressSet);
         let core_notifier: Arc<RpcCoreNotifier> = Arc::new(Notifier::with_sync(
             "rpc-core",
             EVENT_TYPE_ARRAY[..].into(),
@@ -102,7 +102,7 @@ impl RpcApi for RpcCoreMock {
             p2p_id: "wallet-mock".to_string(),
             mempool_size: 1234,
             server_version: "mock".to_string(),
-            is_utxo_indexed: false,
+            is_registry_unit_indexed: false,
             is_synced: false,
             has_notify_command: false,
             has_message_id: false,
@@ -313,11 +313,11 @@ impl RpcApi for RpcCoreMock {
         Err(RpcError::NotImplemented)
     }
 
-    async fn get_utxos_by_addresses_call(
+    async fn get_registry_by_addresses_call(
         &self,
         _connection: Option<&DynRpcConnection>,
-        _request: GetUtxosByAddressesRequest,
-    ) -> RpcResult<GetUtxosByAddressesResponse> {
+        _request: GetRegistryByAddressesRequest,
+    ) -> RpcResult<GetRegistryByAddressesResponse> {
         Err(RpcError::NotImplemented)
     }
 
@@ -393,11 +393,11 @@ impl RpcApi for RpcCoreMock {
         Err(RpcError::NotImplemented)
     }
 
-    async fn get_utxo_return_address_call(
+    async fn get_registry_unit_return_address_call(
         &self,
         _connection: Option<&DynRpcConnection>,
-        _request: GetUtxoReturnAddressRequest,
-    ) -> RpcResult<GetUtxoReturnAddressResponse> {
+        _request: GetRegistryUnitReturnAddressRequest,
+    ) -> RpcResult<GetRegistryUnitReturnAddressResponse> {
         Err(RpcError::NotImplemented)
     }
 

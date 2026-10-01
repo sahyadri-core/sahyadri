@@ -62,8 +62,8 @@ async fn bench_bbt_latency() {
 
     /*
     Logic:
-       1. Use the new feature for preallocating utxos
-       2. Set up a dataset with a DAG of signed txs over the preallocated utxoset
+       1. Use the new feature for preallocating registry_units
+       2. Set up a dataset with a DAG of signed txs over the preallocated registry_unitset
        3. Create constant mempool pressure by submitting txs (via rpc for now)
        4. Mine to the node (simulated)
        5. Measure bbt latency, real-time bps, real-time throughput, mempool draining rate (tbd)
@@ -91,7 +91,7 @@ async fn bench_bbt_latency() {
         simnet: true,
         disable_upnp: true, // UPnP registration might take some time and is not needed for this test
         enable_unsynced_mining: true,
-        num_prealloc_utxos: Some(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR),
+        num_prealloc_registry_units: Some(TX_LEVEL_WIDTH as u64 * CONTRACT_FACTOR),
         prealloc_address: Some(prealloc_address.to_string()),
         prealloc_amount: 500 * KANA_PER_SAHYADRI,
         block_template_cache_lifetime: Some(0),
@@ -100,9 +100,9 @@ async fn bench_bbt_latency() {
     let network = args.network();
     let params: Params = network.into();
 
-    let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
-    let txs = common::utils::generate_tx_dag(utxoset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
-    common::utils::verify_tx_dag(&utxoset, &txs);
+    let registry_unitset = args.generate_prealloc_registry_units(args.num_prealloc_registry_units.unwrap());
+    let txs = common::utils::generate_tx_dag(registry_unitset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
+    common::utils::verify_tx_dag(&registry_unitset, &txs);
     info!("Generated overall {} txs", txs.len());
 
     let fd_total_budget = fd_budget::limit();
@@ -317,8 +317,8 @@ async fn bench_bbt_latency_2() {
 
     /*
     Logic:
-       1. Use the new feature for preallocating utxos
-       2. Set up a dataset with a DAG of signed txs over the preallocated utxoset
+       1. Use the new feature for preallocating registry_units
+       2. Set up a dataset with a DAG of signed txs over the preallocated registry_unitset
        3. Create constant mempool pressure by submitting txs (via rpc for now)
        4. Mine to the node (simulated)
        5. Measure bbt latency, real-time bps, real-time throughput, mempool draining rate (tbd)
@@ -350,9 +350,9 @@ async fn bench_bbt_latency_2() {
     let network = args.network();
     let params: Params = network.into();
 
-    let utxoset = args.generate_prealloc_utxos(args.num_prealloc_utxos.unwrap());
-    let txs = common::utils::generate_tx_dag(utxoset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
-    common::utils::verify_tx_dag(&utxoset, &txs);
+    let registry_unitset = args.generate_prealloc_registry_units(args.num_prealloc_registry_units.unwrap());
+    let txs = common::utils::generate_tx_dag(registry_unitset.clone(), prealloc_kp.clone(), spk, TX_COUNT / TX_LEVEL_WIDTH, TX_LEVEL_WIDTH);
+    common::utils::verify_tx_dag(&registry_unitset, &txs);
     info!("Generated overall {} txs", txs.len());
 
     let client_manager = Arc::new(ClientManager::new(args));

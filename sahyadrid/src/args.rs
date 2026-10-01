@@ -15,7 +15,7 @@ use toml::from_str;
 #[cfg(feature = "devnet-prealloc")]
 use sahyadri_addresses::Address;
 #[cfg(feature = "devnet-prealloc")]
-use sahyadri_consensus_core::tx::{TransactionOutpoint, UtxoEntry};
+use sahyadri_consensus_core::tx::{RegistryRef, RegistryUnit};
 #[cfg(feature = "devnet-prealloc")]
 use sahyadri_txscript::pay_to_address_script;
 #[cfg(feature = "devnet-prealloc")]
@@ -52,7 +52,7 @@ pub struct Args {
     pub listen: Option<ContextualNetAddress>,
     #[serde(rename = "uacomment")]
     pub user_agent_comments: Vec<String>,
-    pub utxoindex: bool,
+    pub registry_unitindex: bool,
     pub reset_db: bool,
     #[serde(rename = "outpeers")]
     pub outbound_target: usize,
@@ -80,7 +80,7 @@ pub struct Args {
     pub block_template_cache_lifetime: Option<u64>,
 
     #[cfg(feature = "devnet-prealloc")]
-    pub num_prealloc_utxos: Option<u64>,
+    pub num_prealloc_registry_units: Option<u64>,
     #[cfg(feature = "devnet-prealloc")]
     pub prealloc_address: Option<String>,
     #[cfg(feature = "devnet-prealloc")]
@@ -110,7 +110,7 @@ impl Default for Args {
             rpclisten_json: None,
             unsafe_rpc: false,
             async_threads: num_cpus::get(),
-            utxoindex: false,
+            registry_unitindex: false,
             reset_db: false,
             outbound_target: 8,
             inbound_limit: 128,
@@ -140,7 +140,7 @@ impl Default for Args {
             block_template_cache_lifetime: None,
 
             #[cfg(feature = "devnet-prealloc")]
-            num_prealloc_utxos: None,
+            num_prealloc_registry_units: None,
             #[cfg(feature = "devnet-prealloc")]
             prealloc_address: None,
             #[cfg(feature = "devnet-prealloc")]
@@ -161,7 +161,7 @@ impl Default for Args {
 
 impl Args {
     pub fn apply_to_config(&self, config: &mut Config) {
-        config.utxoindex = self.utxoindex;
+        config.registry_unitindex = self.registry_unitindex;
         config.disable_upnp = self.disable_upnp;
         config.unsafe_rpc = self.unsafe_rpc;
         config.enable_unsynced_mining = self.enable_unsynced_mining;
@@ -178,20 +178,20 @@ impl Args {
         config.retention_period_days = self.retention_period_days;
 
         #[cfg(feature = "devnet-prealloc")]
-        if let Some(num_prealloc_utxos) = self.num_prealloc_utxos {
-            config.initial_utxo_set = Arc::new(self.generate_prealloc_utxos(num_prealloc_utxos));
+        if let Some(num_prealloc_registry_units) = self.num_prealloc_registry_units {
+            config.initial_registry_unit_set = Arc::new(self.generate_prealloc_registry_units(num_prealloc_registry_units));
         }
     }
 
     #[cfg(feature = "devnet-prealloc")]
-    pub fn generate_prealloc_utxos(&self, num_prealloc_utxos: u64) -> sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection {
+    pub fn generate_prealloc_registry_units(&self, num_prealloc_registry_units: u64) -> sahyadri_consensus_core::registry_unit::registry_unit_collection::RegistryUnitCollection {
         let addr = Address::try_from(&self.prealloc_address.as_ref().unwrap()[..]).unwrap();
         let spk = pay_to_address_script(&addr);
-        (1..=num_prealloc_utxos)
+        (1..=num_prealloc_registry_units)
             .map(|i| {
                 (
-                    TransactionOutpoint { transaction_id: i.into(), index: 0 },
-                    UtxoEntry { amount: self.prealloc_amount, script_public_key: spk.clone(), block_daa_score: 0, is_coinbase: false },
+                    RegistryRef { transaction_id: i.into(), index: 0 },
+                    RegistryUnit { amount: self.prealloc_amount, script_public_key: spk.clone(), block_daa_score: 0, is_coinbase: false },
                 )
             })
             .collect()
@@ -340,14 +340,14 @@ pub fn cli() -> Command {
                 .hide(true)
                 .help("Allow mainnet mining (currently enabled by default while the flag is kept for backwards compatibility)"),
         )
-        .arg(arg!(--utxoindex "Enable the UTXO index").env("SAHYADRID_UTXOINDEX"))
+        .arg(arg!(--registry_unitindex "Enable the REGISTRY_UNIT index").env("SAHYADRID_REGISTRY_UNITINDEX"))
         .arg(
             Arg::new("max-tracked-addresses")
                 .long("max-tracked-addresses")
                 .env("SAHYADRID_MAX_TRACKED_ADDRESSES")
                 .require_equals(true)
                 .value_parser(clap::value_parser!(usize))
-                .help(format!("Max (preallocated) number of addresses being tracked for UTXO changed events (default: {}, maximum: {}). 
+                .help(format!("Max (preallocated) number of addresses being tracked for REGISTRY_UNIT changed events (default: {}, maximum: {}). 
 Setting to 0 prevents the preallocation and sets the maximum to {}, leading to 0 memory footprint as long as unused but to sub-optimal footprint if used.", 
 0, Tracker::MAX_ADDRESS_UPPER_BOUND, Tracker::DEFAULT_MAX_ADDRESSES)),
         )
@@ -450,7 +450,7 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
 
     #[cfg(feature = "devnet-prealloc")]
     let cmd = cmd
-        .arg(Arg::new("num-prealloc-utxos").long("num-prealloc-utxos").require_equals(true).value_parser(clap::value_parser!(u64)))
+        .arg(Arg::new("num-prealloc-registry_units").long("num-prealloc-registry_units").require_equals(true).value_parser(clap::value_parser!(u64)))
         .arg(Arg::new("prealloc-address").long("prealloc-address").require_equals(true).value_parser(clap::value_parser!(String)))
         .arg(Arg::new("prealloc-amount").long("prealloc-amount").require_equals(true).value_parser(clap::value_parser!(u64)));
 
@@ -508,7 +508,7 @@ impl Args {
             enable_unsynced_mining: arg_match_unwrap_or::<bool>(&m, "enable-unsynced-mining", defaults.enable_unsynced_mining),
             enable_flash_tx: arg_match_unwrap_or::<bool>(&m, "enable-flash-tx", defaults.enable_flash_tx),
             enable_mainnet_mining: arg_match_unwrap_or::<bool>(&m, "enable-mainnet-mining", defaults.enable_mainnet_mining),
-            utxoindex: arg_match_unwrap_or::<bool>(&m, "utxoindex", defaults.utxoindex),
+            registry_unitindex: arg_match_unwrap_or::<bool>(&m, "registry_unitindex", defaults.registry_unitindex),
             testnet: arg_match_unwrap_or::<bool>(&m, "testnet", defaults.testnet),
             testnet_suffix: arg_match_unwrap_or::<u32>(&m, "netsuffix", defaults.testnet_suffix),
             devnet: arg_match_unwrap_or::<bool>(&m, "devnet", defaults.devnet),
@@ -529,7 +529,7 @@ impl Args {
             retention_period_days: m.get_one::<f64>("retention-period-days").cloned().or(defaults.retention_period_days),
 
             #[cfg(feature = "devnet-prealloc")]
-            num_prealloc_utxos: m.get_one::<u64>("num-prealloc-utxos").cloned(),
+            num_prealloc_registry_units: m.get_one::<u64>("num-prealloc-registry_units").cloned(),
             #[cfg(feature = "devnet-prealloc")]
             prealloc_address: m.get_one::<String>("prealloc-address").cloned(),
             #[cfg(feature = "devnet-prealloc")]
@@ -629,9 +629,9 @@ fn arg_match_many_unwrap_or<T: Clone + Send + Sync + 'static>(m: &clap::ArgMatch
                                             the active network.
       --reset-db                            Reset database before starting node. It's needed when switching between
                                             subnetworks.
-      --maxutxocachesize=                   Max size of loaded UTXO into ram from the disk in bytes (default:
+      --maxregistry_unitcachesize=                   Max size of loaded REGISTRY_UNIT into ram from the disk in bytes (default:
                                             5000000000)
-      --utxoindex                           Enable the UTXO index
+      --registry_unitindex                           Enable the REGISTRY_UNIT index
       --archival                            Run as an archival node: don't delete old block data when moving the
                                             pruning point (Warning: heavy disk usage)'
       --protocol-version=                   Use non default p2p protocol version (default: 5)

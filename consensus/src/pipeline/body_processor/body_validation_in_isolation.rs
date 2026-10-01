@@ -6,7 +6,7 @@ use sahyadri_consensus_core::{
     block::Block,
     mass::{ContextualMasses, Mass, NonContextualMasses},
     merkle::calc_hash_merkle_root,
-    tx::TransactionOutpoint,
+    tx::RegistryRef,
 };
 
 impl BlockBodyProcessor {
@@ -68,7 +68,7 @@ impl BlockBodyProcessor {
             // Calculate the non-contextual masses
             let NonContextualMasses { compute_mass, transient_mass } = self.mass_calculator.calc_non_contextual_masses(tx);
 
-            // Read the storage mass commitment. This value cannot be computed here w/o UTXO context
+            // Read the storage mass commitment. This value cannot be computed here w/o REGISTRY_UNIT context
             // so we use the commitment. Later on, when the transaction is verified in context, we use
             // the context to calculate the expected storage mass and verify it matches this commitment
             let storage_mass_commitment = tx.mass();
@@ -106,7 +106,7 @@ impl BlockBodyProcessor {
         let mut block_created_outpoints = HashSet::new();
         for tx in block.transactions.iter() {
             for index in 0..tx.outputs.len() {
-                block_created_outpoints.insert(TransactionOutpoint { transaction_id: tx.id(), index: index as u32 });
+                block_created_outpoints.insert(RegistryRef { transaction_id: tx.id(), index: index as u32 });
             }
         }
 
@@ -144,7 +144,7 @@ mod tests {
         header::Header,
         merkle::calc_hash_merkle_root,
         subnets::{SUBNETWORK_ID_COINBASE, SUBNETWORK_ID_NATIVE},
-        tx::{ScriptPublicKey, Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput, scriptvec},
+        tx::{ScriptPublicKey, Transaction, TransactionId, TransactionInput, RegistryRef, TransactionOutput, scriptvec},
     };
     use sahyadri_core::assert_match;
     use sahyadri_hashes::Hash;
@@ -208,7 +208,7 @@ mod tests {
                     0,
                     vec![
                         TransactionInput {
-                            previous_outpoint: TransactionOutpoint {
+                            previous_outpoint: RegistryRef {
                                 transaction_id: TransactionId::from_slice(&[
                                     0x16, 0x5e, 0x38, 0xe8, 0xb3, 0x91, 0x45, 0x95, 0xd9, 0xc6, 0x41, 0xf3, 0xb8, 0xee, 0xc2, 0xf3,
                                     0x46, 0x11, 0x89, 0x6b, 0x82, 0x1a, 0x68, 0x3b, 0x7a, 0x4e, 0xde, 0xfe, 0x2c, 0x00, 0x00, 0x00,
@@ -220,7 +220,7 @@ mod tests {
                             sig_op_count: 0,
                         },
                         TransactionInput {
-                            previous_outpoint: TransactionOutpoint {
+                            previous_outpoint: RegistryRef {
                                 transaction_id: TransactionId::from_slice(&[
                                     0x4b, 0xb0, 0x75, 0x35, 0xdf, 0xd5, 0x8e, 0x0b, 0x3c, 0xd6, 0x4f, 0xd7, 0x15, 0x52, 0x80, 0x87,
                                     0x2a, 0x04, 0x71, 0xbc, 0xf8, 0x30, 0x95, 0x52, 0x6a, 0xce, 0x0e, 0x38, 0xc6, 0x00, 0x00, 0x00,
@@ -241,7 +241,7 @@ mod tests {
                 Transaction::new(
                     0,
                     vec![TransactionInput {
-                        previous_outpoint: TransactionOutpoint {
+                        previous_outpoint: RegistryRef {
                             transaction_id: TransactionId::from_slice(&[
                                 0x03, 0x2e, 0x38, 0xe9, 0xc0, 0xa8, 0x4c, 0x60, 0x46, 0xd6, 0x87, 0xd1, 0x05, 0x56, 0xdc, 0xac, 0xc4,
                                 0x1d, 0x27, 0x5e, 0xc5, 0x5f, 0xc0, 0x07, 0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87,
@@ -302,7 +302,7 @@ mod tests {
                 Transaction::new(
                     0,
                     vec![TransactionInput {
-                        previous_outpoint: TransactionOutpoint {
+                        previous_outpoint: RegistryRef {
                             transaction_id: TransactionId::from_slice(&[
                                 0xc3, 0x3e, 0xbf, 0xf2, 0xa7, 0x09, 0xf1, 0x3d, 0x9f, 0x9a, 0x75, 0x69, 0xab, 0x16, 0xa3, 0x27, 0x86,
                                 0xaf, 0x7d, 0x7e, 0x2d, 0xe0, 0x92, 0x65, 0xe4, 0x1c, 0x61, 0xd0, 0x78, 0x29, 0x4e, 0xcf,
@@ -362,7 +362,7 @@ mod tests {
                 Transaction::new(
                     0,
                     vec![TransactionInput {
-                        previous_outpoint: TransactionOutpoint {
+                        previous_outpoint: RegistryRef {
                             transaction_id: TransactionId::from_slice(&[
                                 0x0b, 0x60, 0x72, 0xb3, 0x86, 0xd4, 0xa7, 0x73, 0x23, 0x52, 0x37, 0xf6, 0x4c, 0x11, 0x26, 0xac, 0x3b,
                                 0x24, 0x0c, 0x84, 0xb9, 0x17, 0xa3, 0x90, 0x9b, 0xa1, 0xc4, 0x3d, 0xed, 0x5f, 0x51, 0xf4,
@@ -456,7 +456,7 @@ mod tests {
 
         let mut block = example_block;
         let txs = &mut block.transactions;
-        txs[3].inputs[0].previous_outpoint = TransactionOutpoint { transaction_id: txs[2].id(), index: 0 };
+        txs[3].inputs[0].previous_outpoint = RegistryRef { transaction_id: txs[2].id(), index: 0 };
         block.header.hash_merkle_root = calc_hash_merkle_root(txs.iter());
         assert_match!(body_processor.validate_body_in_isolation(&block.to_immutable()), Err(RuleError::ChainedTransaction(_)));
 

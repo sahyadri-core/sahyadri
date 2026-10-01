@@ -9,7 +9,7 @@ use sahyadri_consensus_core::{
     header::Header,
     tx::{
         MutableTransaction, SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput,
-        TransactionQueryResult, TransactionType, UtxoEntry,
+        TransactionQueryResult, TransactionType, RegistryUnit,
     },
 };
 use sahyadri_consensus_notify::notification::{self as consensus_notify, Notification as ConsensusNotification};
@@ -23,11 +23,11 @@ use sahyadri_rpc_core::{
     RpcChainBlockAcceptedTransactions, RpcError, RpcHash, RpcHeaderVerbosity, RpcMempoolEntry, RpcMempoolEntryByAddress,
     RpcMergesetBlockAcceptanceDataVerbosity, RpcOptionalHeader, RpcOptionalTransaction, RpcOptionalTransactionInput,
     RpcOptionalTransactionInputVerboseData, RpcOptionalTransactionOutput, RpcOptionalTransactionOutputVerboseData,
-    RpcOptionalTransactionVerboseData, RpcOptionalUtxoEntry, RpcOptionalUtxoEntryVerboseData, RpcResult, RpcTransaction,
+    RpcOptionalTransactionVerboseData, RpcOptionalRegistryUnit, RpcOptionalRegistryUnitVerboseData, RpcResult, RpcTransaction,
     RpcTransactionInput, RpcTransactionInputVerboseDataVerbosity, RpcTransactionInputVerbosity, RpcTransactionOutput,
     RpcTransactionOutputVerboseData, RpcTransactionOutputVerboseDataVerbosity, RpcTransactionOutputVerbosity,
-    RpcTransactionVerboseData, RpcTransactionVerboseDataVerbosity, RpcTransactionVerbosity, RpcUtxoEntryVerboseDataVerbosity,
-    RpcUtxoEntryVerbosity,
+    RpcTransactionVerboseData, RpcTransactionVerboseDataVerbosity, RpcTransactionVerbosity, RpcRegistryUnitVerboseDataVerbosity,
+    RpcRegistryUnitVerbosity,
 };
 use sahyadri_txscript::{extract_script_pub_key_address, script_class::ScriptClass};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
@@ -212,8 +212,8 @@ impl ConsensusConverter {
             } else {
                 Default::default()
             },
-            utxo_commitment: if verbosity.include_utxo_commitment.unwrap_or(false) {
-                Some(header.utxo_commitment)
+            registry_unit_commitment: if verbosity.include_registry_unit_commitment.unwrap_or(false) {
+                Some(header.registry_unit_commitment)
             } else {
                 Default::default()
             },
@@ -231,46 +231,46 @@ impl ConsensusConverter {
         })
     }
 
-    fn convert_utxo_entry_with_verbosity(
+    fn convert_registry_unit_entry_with_verbosity(
         &self,
-        utxo: UtxoEntry,
-        verbosity: &RpcUtxoEntryVerbosity,
-    ) -> RpcResult<RpcOptionalUtxoEntry> {
-        Ok(RpcOptionalUtxoEntry {
-            amount: if verbosity.include_amount.unwrap_or(false) { Some(utxo.amount) } else { Default::default() },
+        registry_unit: RegistryUnit,
+        verbosity: &RpcRegistryUnitVerbosity,
+    ) -> RpcResult<RpcOptionalRegistryUnit> {
+        Ok(RpcOptionalRegistryUnit {
+            amount: if verbosity.include_amount.unwrap_or(false) { Some(registry_unit.amount) } else { Default::default() },
             script_public_key: if verbosity.include_script_public_key.unwrap_or(false) {
-                Some(utxo.script_public_key.clone())
+                Some(registry_unit.script_public_key.clone())
             } else {
                 Default::default()
             },
             block_daa_score: if verbosity.include_block_daa_score.unwrap_or(false) {
-                Some(utxo.block_daa_score)
+                Some(registry_unit.block_daa_score)
             } else {
                 Default::default()
             },
-            is_coinbase: if verbosity.include_is_coinbase.unwrap_or(false) { Some(utxo.is_coinbase) } else { Default::default() },
-            verbose_data: if let Some(utxo_entry_verbosity) = verbosity.verbose_data_verbosity.as_ref() {
-                Some(self.get_utxo_verbose_data_with_verbosity(&utxo, utxo_entry_verbosity)?)
+            is_coinbase: if verbosity.include_is_coinbase.unwrap_or(false) { Some(registry_unit.is_coinbase) } else { Default::default() },
+            verbose_data: if let Some(registry_unit_entry_verbosity) = verbosity.verbose_data_verbosity.as_ref() {
+                Some(self.get_registry_unit_verbose_data_with_verbosity(&registry_unit, registry_unit_entry_verbosity)?)
             } else {
                 Default::default()
             },
         })
     }
 
-    fn get_utxo_verbose_data_with_verbosity(
+    fn get_registry_unit_verbose_data_with_verbosity(
         &self,
-        utxo: &UtxoEntry,
-        verbosity: &RpcUtxoEntryVerboseDataVerbosity,
-    ) -> RpcResult<RpcOptionalUtxoEntryVerboseData> {
-        Ok(RpcOptionalUtxoEntryVerboseData {
+        registry_unit: &RegistryUnit,
+        verbosity: &RpcRegistryUnitVerboseDataVerbosity,
+    ) -> RpcResult<RpcOptionalRegistryUnitVerboseData> {
+        Ok(RpcOptionalRegistryUnitVerboseData {
             script_public_key_type: if verbosity.include_script_public_key_type.unwrap_or(false) {
-                Some(ScriptClass::from_script(&utxo.script_public_key))
+                Some(ScriptClass::from_script(&registry_unit.script_public_key))
             } else {
                 Default::default()
             },
             script_public_key_address: if verbosity.include_script_public_key_address.unwrap_or(false) {
                 Some(
-                    extract_script_pub_key_address(&utxo.script_public_key, self.config.prefix())
+                    extract_script_pub_key_address(&registry_unit.script_public_key, self.config.prefix())
                         .map_err(|_| AddressError::InvalidAddress)?,
                 )
             } else {
@@ -281,15 +281,15 @@ impl ConsensusConverter {
 
     fn get_input_verbose_data_with_verbosity(
         &self,
-        utxo: Option<UtxoEntry>,
+        registry_unit: Option<RegistryUnit>,
         verbosity: &RpcTransactionInputVerboseDataVerbosity,
     ) -> RpcResult<RpcOptionalTransactionInputVerboseData> {
         Ok(RpcOptionalTransactionInputVerboseData {
-            utxo_entry: if let Some(utxo_entry_verbosity) = verbosity.utxo_entry_verbosity.as_ref() {
-                if let Some(utxo) = utxo {
-                    Some(self.convert_utxo_entry_with_verbosity(utxo, utxo_entry_verbosity)?)
+            registry_unit_entry: if let Some(registry_unit_entry_verbosity) = verbosity.registry_unit_entry_verbosity.as_ref() {
+                if let Some(registry_unit) = registry_unit {
+                    Some(self.convert_registry_unit_entry_with_verbosity(registry_unit, registry_unit_entry_verbosity)?)
                 } else {
-                    return Err(RpcError::ConsensusConverterNotFound("UtxoEntry".to_string()));
+                    return Err(RpcError::ConsensusConverterNotFound("RegistryUnit".to_string()));
                 }
             } else {
                 Default::default()
@@ -363,7 +363,7 @@ impl ConsensusConverter {
     pub fn get_transaction_input_with_verbosity(
         &self,
         input: &TransactionInput,
-        utxo: Option<UtxoEntry>,
+        registry_unit: Option<RegistryUnit>,
         verbosity: &RpcTransactionInputVerbosity,
     ) -> RpcResult<RpcOptionalTransactionInput> {
         Ok(RpcOptionalTransactionInput {
@@ -380,7 +380,7 @@ impl ConsensusConverter {
             sequence: if verbosity.include_sequence.unwrap_or(false) { Some(input.sequence) } else { Default::default() },
             sig_op_count: if verbosity.include_sig_op_count.unwrap_or(false) { Some(input.sig_op_count) } else { Default::default() },
             verbose_data: if let Some(input_verbose_data_verbosity) = verbosity.verbose_data_verbosity.as_ref() {
-                Some(self.get_input_verbose_data_with_verbosity(utxo, input_verbose_data_verbosity)?)
+                Some(self.get_input_verbose_data_with_verbosity(registry_unit, input_verbose_data_verbosity)?)
             } else {
                 Default::default()
             },

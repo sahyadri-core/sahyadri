@@ -72,7 +72,7 @@ message BlockHeader{
   repeated BlockLevelParents parents = 12;
   Hash hashMerkleRoot = 3;
   Hash acceptedIdMerkleRoot = 4;
-  Hash utxoCommitment = 5;
+  Hash registryUnitCommitment = 5;
   int64 timestamp = 6;
   uint32 bits = 7;
   uint64 nonce = 8;
@@ -158,30 +158,30 @@ message RejectMessage{
   string reason = 1;
 }
 
-message RequestPruningPointUTXOSetMessage{
+message RequestPruningPointREGISTRY_UNITSetMessage{
   Hash pruningPointHash = 1;
 }
 
-message PruningPointUtxoSetChunkMessage{
-  repeated OutpointAndUtxoEntryPair outpointAndUtxoEntryPairs = 1;
+message PruningPointRegistryUnitSetChunkMessage{
+  repeated OutpointAndRegistryUnitPair outpointAndRegistryUnitPairs = 1;
 }
 
-message OutpointAndUtxoEntryPair{
+message OutpointAndRegistryUnitPair{
   Outpoint outpoint = 1;
-  UtxoEntry utxoEntry = 2;
+  RegistryUnit registryUnitEntry = 2;
 }
 
-message UtxoEntry {
+message RegistryUnit {
   uint64 amount = 1;
   ScriptPublicKey scriptPublicKey = 2;
   uint64 blockDaaScore = 3;
   bool isCoinbase = 4;
 }
 
-message RequestNextPruningPointUtxoSetChunkMessage {
+message RequestNextPruningPointRegistryUnitSetChunkMessage {
 }
 
-message DonePruningPointUtxoSetChunksMessage {
+message DonePruningPointRegistryUnitSetChunksMessage {
 }
 
 message RequestIBDBlocksMessage{

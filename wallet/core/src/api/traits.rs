@@ -304,7 +304,7 @@ pub trait WalletApi: Send + Sync + AnySync {
     }
     /// Activate a specific set of accounts.
     /// An account can be in 2 states - active and inactive. When an account
-    /// is activated, it performs a discovery of UTXO entries related to its
+    /// is activated, it performs a discovery of REGISTRY_UNIT entries related to its
     /// addresses, registers for appropriate notifications and starts tracking
     /// its state. As long as an account is active and the wallet is connected
     /// to the node, the account will give a consistent view of its state.
@@ -332,7 +332,7 @@ pub trait WalletApi: Send + Sync + AnySync {
     /// Performs a bip44 account discovery by scanning the account address space.
     /// Returns the last sequential bip44 index of an account that contains a balance.
     /// The discovery is performed by scanning `account_scan_extent` accounts where
-    /// each account is scanned for `address_scan_extent` addresses. If a UTXO is found
+    /// each account is scanned for `address_scan_extent` addresses. If a REGISTRY_UNIT is found
     /// during the scan, ths account index and all account indexes preceding it are
     /// considered as viable.
     async fn accounts_discovery_call(self: Arc<Self>, request: AccountsDiscoveryRequest) -> Result<AccountsDiscoveryResponse>;
@@ -442,13 +442,13 @@ pub trait WalletApi: Send + Sync + AnySync {
     /// Sign and broadcast a PSKB.
     async fn accounts_pskb_send_call(self: Arc<Self>, request: AccountsPskbSendRequest) -> Result<AccountsPskbSendResponse>;
 
-    /// Wrapper around [`accounts_get_utxos_call()`](Self::accounts_get_utxos_call)
-    async fn accounts_get_utxos(self: Arc<Self>, request: AccountsGetUtxosRequest) -> Result<AccountsGetUtxosResponse> {
-        self.accounts_get_utxos_call(request).await
+    /// Wrapper around [`accounts_get_registry_units_call()`](Self::accounts_get_registry_units_call)
+    async fn accounts_get_registry_units(self: Arc<Self>, request: AccountsGetRegistryUnitsRequest) -> Result<AccountsGetRegistryUnitsResponse> {
+        self.accounts_get_registry_units_call(request).await
     }
 
-    /// Get UTXOs for an account.
-    async fn accounts_get_utxos_call(self: Arc<Self>, request: AccountsGetUtxosRequest) -> Result<AccountsGetUtxosResponse>;
+    /// Get REGISTRY_UNITs for an account.
+    async fn accounts_get_registry_units_call(self: Arc<Self>, request: AccountsGetRegistryUnitsRequest) -> Result<AccountsGetRegistryUnitsResponse>;
 
     /// Transfer funds to another account. Returns an [`AccountsTransferResponse`]
     /// struct that contains a [`GeneratorSummary`] as well `transaction_ids`
@@ -480,7 +480,7 @@ pub trait WalletApi: Send + Sync + AnySync {
     /// Performs a transaction estimate, returning [`AccountsEstimateResponse`]
     /// that contains [`GeneratorSummary`]. This call will estimate the total
     /// amount of fees that will be required by the transaction as well as
-    /// the number of UTXOs that will be consumed by the transaction. If this
+    /// the number of REGISTRY_UNITs that will be consumed by the transaction. If this
     /// call is invoked while the previous instance of this call is already
     /// running for the same account, the previous call will be aborted returning
     /// an error.

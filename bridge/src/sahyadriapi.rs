@@ -621,19 +621,19 @@ impl SahyadriApi {
 
         let addresses = parsed_addresses.map_err(|e| anyhow::anyhow!("Failed to parse addresses: {:?}", e))?;
 
-        let utxos = self
+        let registry_units = self
             .client
-            .get_utxos_by_addresses_call(None, sahyadri_rpc_core::GetUtxosByAddressesRequest::new(addresses))
+            .get_registry_by_addresses_call(None, sahyadri_rpc_core::GetRegistryByAddressesRequest::new(addresses))
             .await
-            .context("Failed to get UTXOs by addresses")?;
+            .context("Failed to get REGISTRY_UNITs by addresses")?;
 
-        // Calculate balances from UTXOs
+        // Calculate balances from REGISTRY_UNITs
         // Group entries by address
         let mut balance_map: HashMap<String, u64> = HashMap::new();
-        for entry in utxos.entries {
+        for entry in registry_units.entries {
             if let Some(address) = entry.address {
                 let addr_str = address.to_string();
-                let amount = entry.utxo_entry.amount;
+                let amount = entry.registry_unit_entry.amount;
                 *balance_map.entry(addr_str).or_insert(0) += amount;
             }
         }

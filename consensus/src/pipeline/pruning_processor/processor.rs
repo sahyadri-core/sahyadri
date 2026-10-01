@@ -145,24 +145,24 @@ impl PruningProcessor {
         let retention_checkpoint = pruning_point_read.retention_checkpoint().unwrap();
         let retention_period_root = pruning_point_read.retention_period_root().unwrap();
         let pruning_meta_read = self.pruning_meta_stores.read();
-        let pruning_utxoset_position = pruning_meta_read.utxoset_position().unwrap();
+        let pruning_registry_unitset_position = pruning_meta_read.registry_unitset_position().unwrap();
         drop(pruning_point_read);
         drop(pruning_meta_read);
 
         debug!(
-            "[PRUNING PROCESSOR] recovery check: current pruning point: {}, retention checkpoint: {:?}, pruning utxoset position: {:?}",
-            pruning_point, retention_checkpoint, pruning_utxoset_position
+            "[PRUNING PROCESSOR] recovery check: current pruning point: {}, retention checkpoint: {:?}, pruning registry_unitset position: {:?}",
+            pruning_point, retention_checkpoint, pruning_registry_unitset_position
         );
 
         // This indicates the node crashed during a former pruning point move and we need to recover
-        if pruning_utxoset_position != pruning_point {
-            info!("Recovering pruning utxo-set from {} to the pruning point {}", pruning_utxoset_position, pruning_point);
-            if !self.advance_pruning_utxoset(pruning_utxoset_position, pruning_point) {
-                info!("Interrupted while advancing the pruning point UTXO set: Process is exiting");
+        if pruning_registry_unitset_position != pruning_point {
+            info!("Recovering pruning registry_unit-set from {} to the pruning point {}", pruning_registry_unitset_position, pruning_point);
+            if !self.advance_pruning_registry_unitset(pruning_registry_unitset_position, pruning_point) {
+                info!("Interrupted while advancing the pruning point REGISTRY_UNIT set: Process is exiting");
                 return false;
             }
         }
-        // The following two checks are implicitly checked in advance_pruning_utxoset, and hence can theoretically
+        // The following two checks are implicitly checked in advance_pruning_registry_unitset, and hence can theoretically
         // be skipped if that function was called. As these checks are cheap, we  perform them regardless
         // as to not complicate the logic.
 
@@ -229,19 +229,19 @@ impl PruningProcessor {
             // Inform the user
             info!("Periodic pruning point movement: advancing from {} to {}", current_pruning_point, new_pruning_point);
 
-            // Advance the pruning point utxoset to the state of the new pruning point using chain-block UTXO diffs
-            if !self.advance_pruning_utxoset(current_pruning_point, new_pruning_point) {
-                info!("Interrupted while advancing the pruning point UTXO set: Process is exiting");
+            // Advance the pruning point registry_unitset to the state of the new pruning point using chain-block REGISTRY_UNIT diffs
+            if !self.advance_pruning_registry_unitset(current_pruning_point, new_pruning_point) {
+                info!("Interrupted while advancing the pruning point REGISTRY_UNIT set: Process is exiting");
                 return;
             }
-            info!("Updated the pruning point UTXO set");
+            info!("Updated the pruning point REGISTRY_UNIT set");
 
             // Finally, prune data in the new pruning point past
             self.prune(new_pruning_point, adjusted_retention_period_root);
         }
     }
 
-    fn advance_pruning_utxoset(&self, utxoset_position: Hash, new_pruning_point: Hash) -> bool {
+    fn advance_pruning_registry_unitset(&self, registry_unitset_position: Hash, new_pruning_point: Hash) -> bool {
         // If the latest pruning point is the result of an IBD catchup, it is guaranteed that the headers selected tip
         // is pruning_depth on top of it
         // but crucially it is not guaranteed *virtual* is of sufficient depth above it
@@ -251,7 +251,7 @@ impl PruningProcessor {
             return false;
         }
 
-        for chain_block in self.reachability_service.forward_chain_iterator(utxoset_position, new_pruning_point, true).skip(1) {
+        for chain_block in self.reachability_service.forward_chain_iterator(registry_unitset_position, new_pruning_point, true).skip(1) {
             if self.is_consensus_exiting.load(Ordering::Relaxed) {
                 return false;
             }
@@ -263,17 +263,17 @@ impl PruningProcessor {
             }
             let mut pruning_meta_write = RwLockUpgradableReadGuard::upgrade(pruning_meta_read);
 
-            // SAHYADRI: UTXO set removed. We only track the pruning position;
+            // SAHYADRI: REGISTRY_UNIT set removed. We only track the pruning position;
             // the actual state lives in the SMT (`account_roots_store`).
             let mut batch = WriteBatch::default();
-            pruning_meta_write.set_utxoset_position(&mut batch, chain_block).unwrap();
+            pruning_meta_write.set_registry_unitset_position(&mut batch, chain_block).unwrap();
             self.db.write(batch).unwrap();
             drop(pruning_meta_write);
         }
 
         if self.config.enable_sanity_checks {
-            info!("Performing a sanity check that the new UTXO set has the expected UTXO commitment");
-            self.assert_utxo_commitment(new_pruning_point);
+            info!("Performing a sanity check that the new REGISTRY_UNIT set has the expected REGISTRY_UNIT commitment");
+            self.assert_registry_unit_commitment(new_pruning_point);
         }
         true
     }
@@ -281,14 +281,14 @@ impl PruningProcessor {
     /// SAHYADRI: verify that the pruning point's header commitment matches
     /// the SMT root we have stored for that block. Non-panicking so a
     /// transient miss during pruning does not crash the node.
-    fn assert_utxo_commitment(&self, pruning_point: Hash) {
+    fn assert_registry_unit_commitment(&self, pruning_point: Hash) {
         info!("Verifying the new pruning point account commitment (sanity test)");
         if pruning_point == self.config.genesis.hash {
             info!("Pruning point is genesis; skipping commitment check");
             return;
         }
         let header_commitment = match self.headers_store.get_header(pruning_point) {
-            Ok(h) => h.utxo_commitment,
+            Ok(h) => h.registry_unit_commitment,
             Err(e) => {
                 warn!("Pruning point header missing for {}: {:?}", pruning_point, e);
                 return;
@@ -503,7 +503,7 @@ impl PruningProcessor {
                 let mut staging_reachability = StagingReachabilityStore::new(reachability_read);
                 let mut statuses_write = self.statuses_store.write();
 
-                // Prune data related to block bodies and UTXO state
+                // Prune data related to block bodies and REGISTRY_UNIT state
                 self.acceptance_data_store.delete_batch(&mut batch, current).unwrap();
                 self.block_transactions_store.delete_batch(&mut batch, current).unwrap();
 

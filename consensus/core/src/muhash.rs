@@ -1,15 +1,15 @@
 use crate::{
     hashing::HasherExtensions,
-    tx::{TransactionOutpoint, UtxoEntry, VerifiableTransaction},
+    tx::{RegistryRef, RegistryUnit, VerifiableTransaction},
 };
 use sahyadri_hashes::HasherBase;
 use sahyadri_muhash::MuHash;
 
 pub trait MuHashExtensions {
     fn add_transaction(&mut self, tx: &impl VerifiableTransaction, block_daa_score: u64);
-    fn add_utxo(&mut self, outpoint: &TransactionOutpoint, entry: &UtxoEntry);
+    fn add_registry_unit(&mut self, outpoint: &RegistryRef, entry: &RegistryUnit);
     fn from_transaction(tx: &impl VerifiableTransaction, block_daa_score: u64) -> Self;
-    fn from_utxo(outpoint: &TransactionOutpoint, entry: &UtxoEntry) -> Self;
+    fn from_registry_unit(outpoint: &RegistryRef, entry: &RegistryUnit) -> Self;
 }
 
 impl MuHashExtensions for MuHash {
@@ -17,19 +17,19 @@ impl MuHashExtensions for MuHash {
         let tx_id = tx.id();
         for (input, entry) in tx.populated_inputs() {
             let mut writer = self.remove_element_builder();
-            write_utxo(&mut writer, entry, &input.previous_outpoint);
+            write_registry_unit(&mut writer, entry, &input.previous_outpoint);
             writer.finalize();
         }
         for (i, output) in tx.outputs().iter().enumerate() {
-            let outpoint = TransactionOutpoint::new(tx_id, i as u32);
-            let entry = UtxoEntry::new(output.value, output.script_public_key.clone(), block_daa_score, tx.is_coinbase());
-            self.add_utxo(&outpoint, &entry);
+            let outpoint = RegistryRef::new(tx_id, i as u32);
+            let entry = RegistryUnit::new(output.value, output.script_public_key.clone(), block_daa_score, tx.is_coinbase());
+            self.add_registry_unit(&outpoint, &entry);
         }
     }
 
-    fn add_utxo(&mut self, outpoint: &TransactionOutpoint, entry: &UtxoEntry) {
+    fn add_registry_unit(&mut self, outpoint: &RegistryRef, entry: &RegistryUnit) {
         let mut writer = self.add_element_builder();
-        write_utxo(&mut writer, entry, outpoint);
+        write_registry_unit(&mut writer, entry, outpoint);
         writer.finalize();
     }
 
@@ -39,19 +39,19 @@ impl MuHashExtensions for MuHash {
         mh
     }
 
-    fn from_utxo(outpoint: &TransactionOutpoint, entry: &UtxoEntry) -> Self {
+    fn from_registry_unit(outpoint: &RegistryRef, entry: &RegistryUnit) -> Self {
         let mut mh = Self::new();
-        mh.add_utxo(outpoint, entry);
+        mh.add_registry_unit(outpoint, entry);
         mh
     }
 }
 
-fn write_utxo(writer: &mut impl HasherBase, entry: &UtxoEntry, outpoint: &TransactionOutpoint) {
+fn write_registry_unit(writer: &mut impl HasherBase, entry: &RegistryUnit, outpoint: &RegistryRef) {
     writer
         // Outpoint
         .update(outpoint.transaction_id)
         .update(outpoint.index.to_le_bytes())
-        // Utxo entry
+        // RegistryUnit entry
         .update(entry.block_daa_score.to_le_bytes())
         .update(entry.amount.to_le_bytes())
         .write_bool(entry.is_coinbase)

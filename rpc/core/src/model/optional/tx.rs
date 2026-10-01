@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use sahyadri_addresses::Address;
 use sahyadri_consensus_core::tx::{
-    ScriptPublicKey, TransactionId, TransactionIndexType, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
+    ScriptPublicKey, TransactionId, TransactionIndexType, TransactionInput, RegistryRef, TransactionOutput, RegistryUnit,
 };
 use sahyadri_utils::{hex::ToHex, serde_bytes_fixed_ref};
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcOptionalUtxoEntry {
+pub struct RpcOptionalRegistryUnit {
     /// Level: High
     pub amount: Option<u64>,
     /// Level: High
@@ -24,10 +24,10 @@ pub struct RpcOptionalUtxoEntry {
     pub block_daa_score: Option<u64>,
     /// Level: High
     pub is_coinbase: Option<bool>,
-    pub verbose_data: Option<RpcOptionalUtxoEntryVerboseData>,
+    pub verbose_data: Option<RpcOptionalRegistryUnitVerboseData>,
 }
 
-impl RpcOptionalUtxoEntry {
+impl RpcOptionalRegistryUnit {
     pub fn is_empty(&self) -> bool {
         self.amount.is_none()
             && self.script_public_key.is_none()
@@ -41,14 +41,14 @@ impl RpcOptionalUtxoEntry {
         script_public_key: Option<ScriptPublicKey>,
         block_daa_score: Option<u64>,
         is_coinbase: Option<bool>,
-        verbose_data: Option<RpcOptionalUtxoEntryVerboseData>,
+        verbose_data: Option<RpcOptionalRegistryUnitVerboseData>,
     ) -> Self {
         Self { amount, script_public_key, block_daa_score, is_coinbase, verbose_data }
     }
 }
 
-impl From<UtxoEntry> for RpcOptionalUtxoEntry {
-    fn from(entry: UtxoEntry) -> Self {
+impl From<RegistryUnit> for RpcOptionalRegistryUnit {
+    fn from(entry: RegistryUnit) -> Self {
         Self {
             amount: Some(entry.amount),
             script_public_key: Some(entry.script_public_key),
@@ -59,46 +59,46 @@ impl From<UtxoEntry> for RpcOptionalUtxoEntry {
     }
 }
 
-impl TryFrom<RpcOptionalUtxoEntry> for UtxoEntry {
+impl TryFrom<RpcOptionalRegistryUnit> for RegistryUnit {
     type Error = RpcError;
 
-    fn try_from(entry: RpcOptionalUtxoEntry) -> RpcResult<Self> {
+    fn try_from(entry: RpcOptionalRegistryUnit) -> RpcResult<Self> {
         Ok(Self {
-            amount: entry.amount.ok_or(RpcError::MissingRpcFieldError("RpcUtxoEntry".to_string(), "amount".to_string()))?,
+            amount: entry.amount.ok_or(RpcError::MissingRpcFieldError("RpcRegistryUnit".to_string(), "amount".to_string()))?,
             script_public_key: entry
                 .script_public_key
-                .ok_or(RpcError::MissingRpcFieldError("RpcUtxoEntry".to_string(), "script_public_key".to_string()))?,
+                .ok_or(RpcError::MissingRpcFieldError("RpcRegistryUnit".to_string(), "script_public_key".to_string()))?,
             block_daa_score: entry
                 .block_daa_score
-                .ok_or(RpcError::MissingRpcFieldError("RpcUtxoEntry".to_string(), "block_daa_score".to_string()))?,
+                .ok_or(RpcError::MissingRpcFieldError("RpcRegistryUnit".to_string(), "block_daa_score".to_string()))?,
             is_coinbase: entry
                 .is_coinbase
-                .ok_or(RpcError::MissingRpcFieldError("RpcUtxoEntry".to_string(), "is_coinbase".to_string()))?,
+                .ok_or(RpcError::MissingRpcFieldError("RpcRegistryUnit".to_string(), "is_coinbase".to_string()))?,
         })
     }
 }
 
-impl Serializer for RpcOptionalUtxoEntry {
+impl Serializer for RpcOptionalRegistryUnit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
         store!(Option<u64>, &self.amount, writer)?;
         store!(Option<ScriptPublicKey>, &self.script_public_key, writer)?;
         store!(Option<u64>, &self.block_daa_score, writer)?;
         store!(Option<bool>, &self.is_coinbase, writer)?;
-        serialize!(Option<RpcOptionalUtxoEntryVerboseData>, &self.verbose_data, writer)?;
+        serialize!(Option<RpcOptionalRegistryUnitVerboseData>, &self.verbose_data, writer)?;
 
         Ok(())
     }
 }
 
-impl Deserializer for RpcOptionalUtxoEntry {
+impl Deserializer for RpcOptionalRegistryUnit {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
         let amount = load!(Option<u64>, reader)?;
         let script_public_key = load!(Option<ScriptPublicKey>, reader)?;
         let block_daa_score = load!(Option<u64>, reader)?;
         let is_coinbase = load!(Option<bool>, reader)?;
-        let verbose_data = deserialize!(Option<RpcOptionalUtxoEntryVerboseData>, reader)?;
+        let verbose_data = deserialize!(Option<RpcOptionalRegistryUnitVerboseData>, reader)?;
 
         Ok(Self { amount, script_public_key, block_daa_score, is_coinbase, verbose_data })
     }
@@ -106,14 +106,14 @@ impl Deserializer for RpcOptionalUtxoEntry {
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcOptionalUtxoEntryVerboseData {
+pub struct RpcOptionalRegistryUnitVerboseData {
     /// Level: Low
     pub script_public_key_type: Option<RpcScriptClass>,
     /// Level: Low
     pub script_public_key_address: Option<Address>,
 }
 
-impl RpcOptionalUtxoEntryVerboseData {
+impl RpcOptionalRegistryUnitVerboseData {
     pub fn is_empty(&self) -> bool {
         self.script_public_key_type.is_none() && self.script_public_key_address.is_none()
     }
@@ -123,7 +123,7 @@ impl RpcOptionalUtxoEntryVerboseData {
     }
 }
 
-impl Serializer for RpcOptionalUtxoEntryVerboseData {
+impl Serializer for RpcOptionalRegistryUnitVerboseData {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
         store!(Option<RpcScriptClass>, &self.script_public_key_type, writer)?;
@@ -133,7 +133,7 @@ impl Serializer for RpcOptionalUtxoEntryVerboseData {
     }
 }
 
-impl Deserializer for RpcOptionalUtxoEntryVerboseData {
+impl Deserializer for RpcOptionalRegistryUnitVerboseData {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
         let script_public_key_type = load!(Option<RpcScriptClass>, reader)?;
@@ -147,46 +147,46 @@ impl Deserializer for RpcOptionalUtxoEntryVerboseData {
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde_nested]
 #[serde(rename_all = "camelCase")]
-pub struct RpcOptionalTransactionOutpoint {
+pub struct RpcOptionalRegistryRef {
     #[serde_nested(sub = "TransactionId", serde(with = "serde_bytes_fixed_ref"))]
     pub transaction_id: Option<TransactionId>,
     pub index: Option<TransactionIndexType>,
 }
 
-impl From<TransactionOutpoint> for RpcOptionalTransactionOutpoint {
-    fn from(outpoint: TransactionOutpoint) -> Self {
+impl From<RegistryRef> for RpcOptionalRegistryRef {
+    fn from(outpoint: RegistryRef) -> Self {
         Self { transaction_id: Some(outpoint.transaction_id), index: Some(outpoint.index) }
     }
 }
 
-impl TryFrom<RpcOptionalTransactionOutpoint> for TransactionOutpoint {
+impl TryFrom<RpcOptionalRegistryRef> for RegistryRef {
     type Error = RpcError;
 
-    fn try_from(outpoint: RpcOptionalTransactionOutpoint) -> RpcResult<Self> {
+    fn try_from(outpoint: RpcOptionalRegistryRef) -> RpcResult<Self> {
         Ok(Self {
             transaction_id: outpoint
                 .transaction_id
-                .ok_or(RpcError::MissingRpcFieldError("RpcTransactionOutpoint".to_string(), "transaction_id".to_string()))?,
-            index: outpoint.index.ok_or(RpcError::MissingRpcFieldError("RpcTransactionOutpoint".to_string(), "index".to_string()))?,
+                .ok_or(RpcError::MissingRpcFieldError("RpcRegistryRef".to_string(), "transaction_id".to_string()))?,
+            index: outpoint.index.ok_or(RpcError::MissingRpcFieldError("RpcRegistryRef".to_string(), "index".to_string()))?,
         })
     }
 }
 
-impl From<sahyadri_consensus_client::TransactionOutpoint> for RpcOptionalTransactionOutpoint {
-    fn from(outpoint: sahyadri_consensus_client::TransactionOutpoint) -> Self {
-        TransactionOutpoint::from(outpoint).into()
+impl From<sahyadri_consensus_client::RegistryRef> for RpcOptionalRegistryRef {
+    fn from(outpoint: sahyadri_consensus_client::RegistryRef) -> Self {
+        RegistryRef::from(outpoint).into()
     }
 }
 
-impl TryFrom<RpcOptionalTransactionOutpoint> for sahyadri_consensus_client::TransactionOutpoint {
+impl TryFrom<RpcOptionalRegistryRef> for sahyadri_consensus_client::RegistryRef {
     type Error = RpcError;
 
-    fn try_from(outpoint: RpcOptionalTransactionOutpoint) -> RpcResult<Self> {
-        Ok(TransactionOutpoint::try_from(outpoint)?.into())
+    fn try_from(outpoint: RpcOptionalRegistryRef) -> RpcResult<Self> {
+        Ok(RegistryRef::try_from(outpoint)?.into())
     }
 }
 
-impl Serializer for RpcOptionalTransactionOutpoint {
+impl Serializer for RpcOptionalRegistryRef {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
         store!(Option<TransactionId>, &self.transaction_id, writer)?;
@@ -196,7 +196,7 @@ impl Serializer for RpcOptionalTransactionOutpoint {
     }
 }
 
-impl Deserializer for RpcOptionalTransactionOutpoint {
+impl Deserializer for RpcOptionalRegistryRef {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
         let transaction_id = load!(Option<TransactionId>, reader)?;
@@ -212,7 +212,7 @@ impl Deserializer for RpcOptionalTransactionOutpoint {
 #[serde(rename_all = "camelCase")]
 pub struct RpcOptionalTransactionInput {
     /// Level: High
-    pub previous_outpoint: Option<RpcOptionalTransactionOutpoint>,
+    pub previous_outpoint: Option<RpcOptionalRegistryRef>,
     #[serde_nested(sub = "Vec<u8>", serde(with = "hex::serde"))]
     /// Level: Low
     pub signature_script: Option<Vec<u8>>,
@@ -265,7 +265,7 @@ impl RpcOptionalTransactionInput {
 impl Serializer for RpcOptionalTransactionInput {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
-        serialize!(Option<RpcOptionalTransactionOutpoint>, &self.previous_outpoint, writer)?;
+        serialize!(Option<RpcOptionalRegistryRef>, &self.previous_outpoint, writer)?;
         store!(Option<Vec<u8>>, &self.signature_script, writer)?;
         store!(Option<u64>, &self.sequence, writer)?;
         store!(Option<u8>, &self.sig_op_count, writer)?;
@@ -278,7 +278,7 @@ impl Serializer for RpcOptionalTransactionInput {
 impl Deserializer for RpcOptionalTransactionInput {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
-        let previous_outpoint = deserialize!(Option<RpcOptionalTransactionOutpoint>, reader)?;
+        let previous_outpoint = deserialize!(Option<RpcOptionalRegistryRef>, reader)?;
         let signature_script = load!(Option<Vec<u8>>, reader)?;
         let sequence = load!(Option<u64>, reader)?;
         let sig_op_count = load!(Option<u8>, reader)?;
@@ -292,19 +292,19 @@ impl Deserializer for RpcOptionalTransactionInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcOptionalTransactionInputVerboseData {
-    pub utxo_entry: Option<RpcOptionalUtxoEntry>,
+    pub registry_unit_entry: Option<RpcOptionalRegistryUnit>,
 }
 
 impl RpcOptionalTransactionInputVerboseData {
     pub fn is_empty(&self) -> bool {
-        self.utxo_entry.is_none() || self.utxo_entry.as_ref().is_some_and(|x| x.is_empty())
+        self.registry_unit_entry.is_none() || self.registry_unit_entry.as_ref().is_some_and(|x| x.is_empty())
     }
 }
 
 impl Serializer for RpcOptionalTransactionInputVerboseData {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
-        serialize!(Option<RpcOptionalUtxoEntry>, &self.utxo_entry, writer)?;
+        serialize!(Option<RpcOptionalRegistryUnit>, &self.registry_unit_entry, writer)?;
         Ok(())
     }
 }
@@ -312,8 +312,8 @@ impl Serializer for RpcOptionalTransactionInputVerboseData {
 impl Deserializer for RpcOptionalTransactionInputVerboseData {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
-        let utxo_entry = deserialize!(Option<RpcOptionalUtxoEntry>, reader)?;
-        Ok(Self { utxo_entry })
+        let registry_unit_entry = deserialize!(Option<RpcOptionalRegistryUnit>, reader)?;
+        Ok(Self { registry_unit_entry })
     }
 }
 

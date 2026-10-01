@@ -3,10 +3,10 @@ use crate::{
     error::Result,
     events::EventType,
     listener::ListenerId,
-    scope::{Scope, UtxosChangedScope, VirtualChainChangedScope},
+    scope::{Scope, RegistryChangedScope, VirtualChainChangedScope},
     subscription::{
         BroadcastingSingle, Command, DynSubscription, Mutation, MutationOutcome, MutationPolicies, Single, Subscription,
-        UtxosChangedMutationPolicy, context::SubscriptionContext,
+        RegistryChangedMutationPolicy, context::SubscriptionContext,
     },
 };
 use itertools::Itertools;
@@ -172,18 +172,18 @@ impl Subscription for VirtualChainChangedSubscription {
     }
 }
 
-static UTXOS_CHANGED_SUBSCRIPTIONS: AtomicUsize = AtomicUsize::new(0);
+static REGISTRY_UNITS_CHANGED_SUBSCRIPTIONS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum UtxosChangedMutation {
+enum RegistryChangedMutation {
     None,
     Remove,
     Add,
     All,
 }
 
-impl From<(Command, &UtxosChangedScope)> for UtxosChangedMutation {
-    fn from((command, scope): (Command, &UtxosChangedScope)) -> Self {
+impl From<(Command, &RegistryChangedScope)> for RegistryChangedMutation {
+    fn from((command, scope): (Command, &RegistryChangedScope)) -> Self {
         match (command, scope.addresses.is_empty()) {
             (Command::Stop, true) => Self::None,
             (Command::Stop, false) => Self::Remove,
@@ -194,7 +194,7 @@ impl From<(Command, &UtxosChangedScope)> for UtxosChangedMutation {
 }
 
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq)]
-pub enum UtxosChangedState {
+pub enum RegistryChangedState {
     /// Inactive
     #[default]
     None,
@@ -206,31 +206,31 @@ pub enum UtxosChangedState {
     All,
 }
 
-impl UtxosChangedState {
+impl RegistryChangedState {
     pub fn active(&self) -> bool {
         match self {
-            UtxosChangedState::None => false,
-            UtxosChangedState::Selected | UtxosChangedState::All => true,
+            RegistryChangedState::None => false,
+            RegistryChangedState::Selected | RegistryChangedState::All => true,
         }
     }
 }
 
-impl Display for UtxosChangedState {
+impl Display for RegistryChangedState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UtxosChangedState::None => write!(f, "none"),
-            UtxosChangedState::Selected => write!(f, "selected"),
-            UtxosChangedState::All => write!(f, "all"),
+            RegistryChangedState::None => write!(f, "none"),
+            RegistryChangedState::Selected => write!(f, "selected"),
+            RegistryChangedState::All => write!(f, "all"),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct UtxosChangedSubscriptionData {
+pub struct RegistryChangedSubscriptionData {
     /// State of the subscription
     ///
     /// Can be mutated without affecting neither equality nor hash of the struct
-    state: UtxosChangedState,
+    state: RegistryChangedState,
 
     /// Address indexes in `SubscriptionContext`
     ///
@@ -238,14 +238,14 @@ pub struct UtxosChangedSubscriptionData {
     indexes: Indexes,
 }
 
-impl UtxosChangedSubscriptionData {
-    fn with_capacity(state: UtxosChangedState, capacity: usize) -> Self {
+impl RegistryChangedSubscriptionData {
+    fn with_capacity(state: RegistryChangedState, capacity: usize) -> Self {
         let indexes = Indexes::with_capacity(capacity);
         Self { state, indexes }
     }
 
     #[inline(always)]
-    pub fn update_state(&mut self, new_state: UtxosChangedState) {
+    pub fn update_state(&mut self, new_state: RegistryChangedState) {
         self.state = new_state;
     }
 
@@ -293,23 +293,23 @@ impl UtxosChangedSubscriptionData {
     }
 
     pub fn to_all(&self) -> bool {
-        matches!(self.state, UtxosChangedState::All)
+        matches!(self.state, RegistryChangedState::All)
     }
 }
 
-impl Display for UtxosChangedSubscriptionData {
+impl Display for RegistryChangedSubscriptionData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.state {
-            UtxosChangedState::None | UtxosChangedState::All => write!(f, "{}", self.state),
-            UtxosChangedState::Selected => write!(f, "{}({})", self.state, self.indexes.len()),
+            RegistryChangedState::None | RegistryChangedState::All => write!(f, "{}", self.state),
+            RegistryChangedState::Selected => write!(f, "{}({})", self.state, self.indexes.len()),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct UtxosChangedSubscription {
+pub struct RegistryChangedSubscription {
     /// Mutable inner data
-    data: RwLock<UtxosChangedSubscriptionData>,
+    data: RwLock<RegistryChangedSubscriptionData>,
 
     /// ID of the listener owning this subscription
     ///
@@ -317,17 +317,17 @@ pub struct UtxosChangedSubscription {
     listener_id: ListenerId,
 }
 
-impl UtxosChangedSubscription {
-    pub fn new(state: UtxosChangedState, listener_id: ListenerId) -> Self {
+impl RegistryChangedSubscription {
+    pub fn new(state: RegistryChangedState, listener_id: ListenerId) -> Self {
         Self::with_capacity(state, listener_id, 0)
     }
 
-    pub fn with_capacity(state: UtxosChangedState, listener_id: ListenerId, capacity: usize) -> Self {
-        let data = RwLock::new(UtxosChangedSubscriptionData::with_capacity(state, capacity));
+    pub fn with_capacity(state: RegistryChangedState, listener_id: ListenerId, capacity: usize) -> Self {
+        let data = RwLock::new(RegistryChangedSubscriptionData::with_capacity(state, capacity));
         let subscription = Self { data, listener_id };
         trace!(
-            "UtxosChangedSubscription: {} in total (new {})",
-            UTXOS_CHANGED_SUBSCRIPTIONS.fetch_add(1, Ordering::SeqCst) + 1,
+            "RegistryChangedSubscription: {} in total (new {})",
+            REGISTRY_UNITS_CHANGED_SUBSCRIPTIONS.fetch_add(1, Ordering::SeqCst) + 1,
             subscription
         );
         subscription
@@ -336,77 +336,77 @@ impl UtxosChangedSubscription {
     #[cfg(test)]
     pub fn with_addresses(active: bool, addresses: Vec<Address>, listener_id: ListenerId, context: &SubscriptionContext) -> Self {
         let state = match (active, addresses.is_empty()) {
-            (false, _) => UtxosChangedState::None,
-            (true, false) => UtxosChangedState::Selected,
-            (true, true) => UtxosChangedState::All,
+            (false, _) => RegistryChangedState::None,
+            (true, false) => RegistryChangedState::Selected,
+            (true, true) => RegistryChangedState::All,
         };
         let subscription = Self::with_capacity(state, listener_id, addresses.len());
         let _ = subscription.data_mut().register(addresses, context);
         subscription
     }
 
-    pub fn data(&self) -> RwLockReadGuard<'_, UtxosChangedSubscriptionData> {
+    pub fn data(&self) -> RwLockReadGuard<'_, RegistryChangedSubscriptionData> {
         self.data.read()
     }
 
-    pub fn data_mut(&self) -> RwLockWriteGuard<'_, UtxosChangedSubscriptionData> {
+    pub fn data_mut(&self) -> RwLockWriteGuard<'_, RegistryChangedSubscriptionData> {
         self.data.write()
     }
 
     #[inline(always)]
-    pub fn state(&self) -> UtxosChangedState {
+    pub fn state(&self) -> RegistryChangedState {
         self.data().state
     }
 
     pub fn to_all(&self) -> bool {
-        matches!(self.data().state, UtxosChangedState::All)
+        matches!(self.data().state, RegistryChangedState::All)
     }
 }
 
-impl Clone for UtxosChangedSubscription {
+impl Clone for RegistryChangedSubscription {
     fn clone(&self) -> Self {
         let subscription = Self { data: RwLock::new(self.data().clone()), listener_id: self.listener_id };
         trace!(
-            "UtxosChangedSubscription: {} in total (clone {})",
-            UTXOS_CHANGED_SUBSCRIPTIONS.fetch_add(1, Ordering::SeqCst) + 1,
+            "RegistryChangedSubscription: {} in total (clone {})",
+            REGISTRY_UNITS_CHANGED_SUBSCRIPTIONS.fetch_add(1, Ordering::SeqCst) + 1,
             subscription
         );
         subscription
     }
 }
 
-impl Display for UtxosChangedSubscription {
+impl Display for RegistryChangedSubscription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.data())
     }
 }
 
-impl Drop for UtxosChangedSubscription {
+impl Drop for RegistryChangedSubscription {
     fn drop(&mut self) {
         trace!(
-            "UtxosChangedSubscription: {} in total (drop {})",
-            UTXOS_CHANGED_SUBSCRIPTIONS.fetch_sub(1, Ordering::SeqCst) - 1,
+            "RegistryChangedSubscription: {} in total (drop {})",
+            REGISTRY_UNITS_CHANGED_SUBSCRIPTIONS.fetch_sub(1, Ordering::SeqCst) - 1,
             self
         );
     }
 }
 
-impl PartialEq for UtxosChangedSubscription {
+impl PartialEq for RegistryChangedSubscription {
     /// Equality is specifically bound to the listener ID
     fn eq(&self, other: &Self) -> bool {
         self.listener_id == other.listener_id
     }
 }
-impl Eq for UtxosChangedSubscription {}
+impl Eq for RegistryChangedSubscription {}
 
-impl Hash for UtxosChangedSubscription {
+impl Hash for RegistryChangedSubscription {
     /// Hash is specifically bound to the listener ID
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.listener_id.hash(state);
     }
 }
 
-impl Single for UtxosChangedSubscription {
+impl Single for RegistryChangedSubscription {
     fn apply_mutation(
         &self,
         current: &Arc<dyn Single>,
@@ -415,71 +415,71 @@ impl Single for UtxosChangedSubscription {
         context: &SubscriptionContext,
     ) -> Result<MutationOutcome> {
         assert_eq!(self.event_type(), mutation.event_type());
-        let outcome = if let Scope::UtxosChanged(scope) = mutation.scope {
+        let outcome = if let Scope::RegistryChanged(scope) = mutation.scope {
             let mut data = self.data_mut();
             let state = data.state;
-            let mutation_type = UtxosChangedMutation::from((mutation.command, &scope));
+            let mutation_type = RegistryChangedMutation::from((mutation.command, &scope));
             match (state, mutation_type) {
-                (UtxosChangedState::None, UtxosChangedMutation::None | UtxosChangedMutation::Remove) => {
+                (RegistryChangedState::None, RegistryChangedMutation::None | RegistryChangedMutation::Remove) => {
                     // State None + Mutations None or Remove(R) => No change
                     MutationOutcome::new()
                 }
-                (UtxosChangedState::None, UtxosChangedMutation::Add) => {
+                (RegistryChangedState::None, RegistryChangedMutation::Add) => {
                     // State None + Mutation Add(A) => Mutated new state Selected(A)
                     let addresses = data.register(scope.addresses, context)?;
-                    data.update_state(UtxosChangedState::Selected);
-                    let mutations = match policies.utxo_changed {
-                        UtxosChangedMutationPolicy::AddressSet => {
-                            vec![Mutation::new(mutation.command, UtxosChangedScope::new(addresses).into())]
+                    data.update_state(RegistryChangedState::Selected);
+                    let mutations = match policies.registry_unit_changed {
+                        RegistryChangedMutationPolicy::AddressSet => {
+                            vec![Mutation::new(mutation.command, RegistryChangedScope::new(addresses).into())]
                         }
-                        UtxosChangedMutationPolicy::Wildcard => {
-                            vec![Mutation::new(mutation.command, UtxosChangedScope::default().into())]
+                        RegistryChangedMutationPolicy::Wildcard => {
+                            vec![Mutation::new(mutation.command, RegistryChangedScope::default().into())]
                         }
                     };
                     MutationOutcome::with_mutated(current.clone(), mutations)
                 }
-                (UtxosChangedState::None, UtxosChangedMutation::All) => {
+                (RegistryChangedState::None, RegistryChangedMutation::All) => {
                     // State None + Mutation All => Mutated new state All
-                    data.update_state(UtxosChangedState::All);
-                    let mutations = vec![Mutation::new(mutation.command, UtxosChangedScope::default().into())];
+                    data.update_state(RegistryChangedState::All);
+                    let mutations = vec![Mutation::new(mutation.command, RegistryChangedScope::default().into())];
                     MutationOutcome::with_mutated(current.clone(), mutations)
                 }
-                (UtxosChangedState::Selected, UtxosChangedMutation::None) => {
+                (RegistryChangedState::Selected, RegistryChangedMutation::None) => {
                     // State Selected(S) + Mutation None => Mutated new state None
-                    data.update_state(UtxosChangedState::None);
+                    data.update_state(RegistryChangedState::None);
                     let removed = data.unregister_indexes(context);
                     assert!(!removed.is_empty(), "state Selected implies a non empty address set");
-                    let mutations = match policies.utxo_changed {
-                        UtxosChangedMutationPolicy::AddressSet => {
-                            vec![Mutation::new(Command::Stop, UtxosChangedScope::new(removed).into())]
+                    let mutations = match policies.registry_unit_changed {
+                        RegistryChangedMutationPolicy::AddressSet => {
+                            vec![Mutation::new(Command::Stop, RegistryChangedScope::new(removed).into())]
                         }
-                        UtxosChangedMutationPolicy::Wildcard => {
-                            vec![Mutation::new(Command::Stop, UtxosChangedScope::default().into())]
+                        RegistryChangedMutationPolicy::Wildcard => {
+                            vec![Mutation::new(Command::Stop, RegistryChangedScope::default().into())]
                         }
                     };
                     MutationOutcome::with_mutated(current.clone(), mutations)
                 }
-                (UtxosChangedState::Selected, UtxosChangedMutation::Remove) => {
+                (RegistryChangedState::Selected, RegistryChangedMutation::Remove) => {
                     // State Selected(S) + Mutation Remove(R) => Mutated state Selected(S – R) or mutated new state None or no change
                     let removed = data.unregister(scope.addresses, context);
                     match (removed.is_empty(), data.indexes.is_empty()) {
                         (false, false) => {
-                            let mutations = match policies.utxo_changed {
-                                UtxosChangedMutationPolicy::AddressSet => {
-                                    vec![Mutation::new(Command::Stop, UtxosChangedScope::new(removed).into())]
+                            let mutations = match policies.registry_unit_changed {
+                                RegistryChangedMutationPolicy::AddressSet => {
+                                    vec![Mutation::new(Command::Stop, RegistryChangedScope::new(removed).into())]
                                 }
-                                UtxosChangedMutationPolicy::Wildcard => vec![],
+                                RegistryChangedMutationPolicy::Wildcard => vec![],
                             };
                             MutationOutcome::with_mutations(mutations)
                         }
                         (false, true) => {
-                            data.update_state(UtxosChangedState::None);
-                            let mutations = match policies.utxo_changed {
-                                UtxosChangedMutationPolicy::AddressSet => {
-                                    vec![Mutation::new(Command::Stop, UtxosChangedScope::new(removed).into())]
+                            data.update_state(RegistryChangedState::None);
+                            let mutations = match policies.registry_unit_changed {
+                                RegistryChangedMutationPolicy::AddressSet => {
+                                    vec![Mutation::new(Command::Stop, RegistryChangedScope::new(removed).into())]
                                 }
-                                UtxosChangedMutationPolicy::Wildcard => {
-                                    vec![Mutation::new(Command::Stop, UtxosChangedScope::default().into())]
+                                RegistryChangedMutationPolicy::Wildcard => {
+                                    vec![Mutation::new(Command::Stop, RegistryChangedScope::default().into())]
                                 }
                             };
                             MutationOutcome::with_mutated(current.clone(), mutations)
@@ -487,60 +487,60 @@ impl Single for UtxosChangedSubscription {
                         (true, _) => MutationOutcome::new(),
                     }
                 }
-                (UtxosChangedState::Selected, UtxosChangedMutation::Add) => {
+                (RegistryChangedState::Selected, RegistryChangedMutation::Add) => {
                     // State Selected(S) + Mutation Add(A) => Mutated state Selected(A ∪ S)
                     let added = data.register(scope.addresses, context)?;
                     match added.is_empty() {
                         false => {
-                            let mutations = match policies.utxo_changed {
-                                UtxosChangedMutationPolicy::AddressSet => {
-                                    vec![Mutation::new(Command::Start, UtxosChangedScope::new(added).into())]
+                            let mutations = match policies.registry_unit_changed {
+                                RegistryChangedMutationPolicy::AddressSet => {
+                                    vec![Mutation::new(Command::Start, RegistryChangedScope::new(added).into())]
                                 }
-                                UtxosChangedMutationPolicy::Wildcard => vec![],
+                                RegistryChangedMutationPolicy::Wildcard => vec![],
                             };
                             MutationOutcome::with_mutations(mutations)
                         }
                         true => MutationOutcome::new(),
                     }
                 }
-                (UtxosChangedState::Selected, UtxosChangedMutation::All) => {
+                (RegistryChangedState::Selected, RegistryChangedMutation::All) => {
                     // State Selected(S) + Mutation All => Mutated new state All
                     let removed = data.unregister_indexes(context);
                     assert!(!removed.is_empty(), "state Selected implies a non empty address set");
-                    data.update_state(UtxosChangedState::All);
-                    let mutations = match policies.utxo_changed {
-                        UtxosChangedMutationPolicy::AddressSet => vec![
-                            Mutation::new(Command::Stop, UtxosChangedScope::new(removed).into()),
-                            Mutation::new(Command::Start, UtxosChangedScope::default().into()),
+                    data.update_state(RegistryChangedState::All);
+                    let mutations = match policies.registry_unit_changed {
+                        RegistryChangedMutationPolicy::AddressSet => vec![
+                            Mutation::new(Command::Stop, RegistryChangedScope::new(removed).into()),
+                            Mutation::new(Command::Start, RegistryChangedScope::default().into()),
                         ],
-                        UtxosChangedMutationPolicy::Wildcard => vec![],
+                        RegistryChangedMutationPolicy::Wildcard => vec![],
                     };
                     MutationOutcome::with_mutated(current.clone(), mutations)
                 }
-                (UtxosChangedState::All, UtxosChangedMutation::None) => {
+                (RegistryChangedState::All, RegistryChangedMutation::None) => {
                     // State All + Mutation None => Mutated new state None
-                    data.update_state(UtxosChangedState::None);
-                    let mutations = vec![Mutation::new(Command::Stop, UtxosChangedScope::default().into())];
+                    data.update_state(RegistryChangedState::None);
+                    let mutations = vec![Mutation::new(Command::Stop, RegistryChangedScope::default().into())];
                     MutationOutcome::with_mutated(current.clone(), mutations)
                 }
-                (UtxosChangedState::All, UtxosChangedMutation::Remove) => {
+                (RegistryChangedState::All, RegistryChangedMutation::Remove) => {
                     // State All + Mutation Remove(R) => No change
                     MutationOutcome::new()
                 }
-                (UtxosChangedState::All, UtxosChangedMutation::Add) => {
+                (RegistryChangedState::All, RegistryChangedMutation::Add) => {
                     // State All + Mutation Add(A) => Mutated new state Selectee(A)
                     let added = data.register(scope.addresses, context)?;
-                    data.update_state(UtxosChangedState::Selected);
-                    let mutations = match policies.utxo_changed {
-                        UtxosChangedMutationPolicy::AddressSet => vec![
-                            Mutation::new(Command::Start, UtxosChangedScope::new(added).into()),
-                            Mutation::new(Command::Stop, UtxosChangedScope::default().into()),
+                    data.update_state(RegistryChangedState::Selected);
+                    let mutations = match policies.registry_unit_changed {
+                        RegistryChangedMutationPolicy::AddressSet => vec![
+                            Mutation::new(Command::Start, RegistryChangedScope::new(added).into()),
+                            Mutation::new(Command::Stop, RegistryChangedScope::default().into()),
                         ],
-                        UtxosChangedMutationPolicy::Wildcard => vec![],
+                        RegistryChangedMutationPolicy::Wildcard => vec![],
                     };
                     MutationOutcome::with_mutated(current.clone(), mutations)
                 }
-                (UtxosChangedState::All, UtxosChangedMutation::All) => {
+                (RegistryChangedState::All, RegistryChangedMutation::All) => {
                     // State All <= Mutation All
                     MutationOutcome::new()
                 }
@@ -552,9 +552,9 @@ impl Single for UtxosChangedSubscription {
     }
 }
 
-impl Subscription for UtxosChangedSubscription {
+impl Subscription for RegistryChangedSubscription {
     fn event_type(&self) -> EventType {
-        EventType::UtxosChanged
+        EventType::RegistryChanged
     }
 
     fn active(&self) -> bool {
@@ -563,17 +563,17 @@ impl Subscription for UtxosChangedSubscription {
 
     fn scope(&self, context: &SubscriptionContext) -> Scope {
         // TODO: consider using a provided prefix
-        UtxosChangedScope::new(self.data().to_addresses(Prefix::Mainnet, context)).into()
+        RegistryChangedScope::new(self.data().to_addresses(Prefix::Mainnet, context)).into()
     }
 }
 
 impl BroadcastingSingle for DynSubscription {
     fn broadcasting(self, context: &SubscriptionContext) -> DynSubscription {
         match self.event_type() {
-            EventType::UtxosChanged => {
-                let utxos_changed_subscription = self.as_any().downcast_ref::<UtxosChangedSubscription>().unwrap();
-                match utxos_changed_subscription.to_all() {
-                    true => context.utxos_changed_subscription_to_all.clone(),
+            EventType::RegistryChanged => {
+                let registry_changed_subscription = self.as_any().downcast_ref::<RegistryChangedSubscription>().unwrap();
+                match registry_changed_subscription.to_all() {
+                    true => context.registry_changed_subscription_to_all.clone(),
                     false => self,
                 }
             }
@@ -681,14 +681,14 @@ mod tests {
                 ],
             },
             Test {
-                name: "test utxos changed subscription",
+                name: "test registry_units changed subscription",
                 subscriptions: vec![
-                    Arc::new(UtxosChangedSubscription::with_addresses(false, vec![], 0, &context)),
-                    Arc::new(UtxosChangedSubscription::with_addresses(true, addresses[0..2].to_vec(), 1, &context)),
-                    Arc::new(UtxosChangedSubscription::with_addresses(true, addresses[0..3].to_vec(), 2, &context)),
-                    Arc::new(UtxosChangedSubscription::with_addresses(true, sorted_addresses[0..3].to_vec(), 2, &context)),
-                    Arc::new(UtxosChangedSubscription::with_addresses(true, vec![], 3, &context)),
-                    Arc::new(UtxosChangedSubscription::with_addresses(true, vec![], 4, &context)),
+                    Arc::new(RegistryChangedSubscription::with_addresses(false, vec![], 0, &context)),
+                    Arc::new(RegistryChangedSubscription::with_addresses(true, addresses[0..2].to_vec(), 1, &context)),
+                    Arc::new(RegistryChangedSubscription::with_addresses(true, addresses[0..3].to_vec(), 2, &context)),
+                    Arc::new(RegistryChangedSubscription::with_addresses(true, sorted_addresses[0..3].to_vec(), 2, &context)),
+                    Arc::new(RegistryChangedSubscription::with_addresses(true, vec![], 3, &context)),
+                    Arc::new(RegistryChangedSubscription::with_addresses(true, vec![], 4, &context)),
                 ],
                 comparisons: vec![
                     Comparison::new(0, 0, true),
@@ -927,18 +927,18 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_utxos_changed_mutation() {
+    fn test_registry_changed_mutation() {
         let context = SubscriptionContext::new();
         let a_stock = get_3_addresses(true);
 
         let av = |indexes: &[usize]| indexes.iter().map(|idx| (a_stock[*idx]).clone()).collect::<Vec<_>>();
         let ah = |indexes: &[usize]| indexes.iter().map(|idx| (a_stock[*idx]).clone()).collect::<Vec<_>>();
         let s = |active: bool, indexes: &[usize]| {
-            Arc::new(UtxosChangedSubscription::with_addresses(active, ah(indexes).to_vec(), MutationTests::LISTENER_ID, &context))
+            Arc::new(RegistryChangedSubscription::with_addresses(active, ah(indexes).to_vec(), MutationTests::LISTENER_ID, &context))
                 as DynSubscription
         };
         let m = |command: Command, indexes: &[usize]| -> Mutation {
-            Mutation { command, scope: Scope::UtxosChanged(UtxosChangedScope::new(av(indexes))) }
+            Mutation { command, scope: Scope::RegistryChanged(RegistryChangedScope::new(av(indexes))) }
         };
 
         // Subscriptions
@@ -964,112 +964,112 @@ mod tests {
         // Tests
         let tests = MutationTests::new(vec![
             MutationTest {
-                name: "UtxosChangedSubscription None to All (add all)",
+                name: "RegistryChangedSubscription None to All (add all)",
                 state: none(),
                 mutation: start_all(),
                 new_state: all(),
                 outcome: MutationOutcome::with_mutated(all(), vec![start_all()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription None to Selected 0 (add set)",
+                name: "RegistryChangedSubscription None to Selected 0 (add set)",
                 state: none(),
                 mutation: start_0(),
                 new_state: selected_0(),
                 outcome: MutationOutcome::with_mutated(selected_0(), vec![start_0()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription None to None (stop set)",
+                name: "RegistryChangedSubscription None to None (stop set)",
                 state: none(),
                 mutation: stop_0(),
                 new_state: none(),
                 outcome: MutationOutcome::new(),
             },
             MutationTest {
-                name: "UtxosChangedSubscription None to None (stop all)",
+                name: "RegistryChangedSubscription None to None (stop all)",
                 state: none(),
                 mutation: stop_all(),
                 new_state: none(),
                 outcome: MutationOutcome::new(),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 01 to All (add all)",
+                name: "RegistryChangedSubscription Selected 01 to All (add all)",
                 state: selected_01(),
                 mutation: start_all(),
                 new_state: all(),
                 outcome: MutationOutcome::with_mutated(all(), vec![stop_01(), start_all()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 01 to 01 (add set with total intersection)",
+                name: "RegistryChangedSubscription Selected 01 to 01 (add set with total intersection)",
                 state: selected_01(),
                 mutation: start_1(),
                 new_state: selected_01(),
                 outcome: MutationOutcome::new(),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 0 to 01 (add set with partial intersection)",
+                name: "RegistryChangedSubscription Selected 0 to 01 (add set with partial intersection)",
                 state: selected_0(),
                 mutation: start_01(),
                 new_state: selected_01(),
                 outcome: MutationOutcome::with_mutations(vec![start_1()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 2 to 012 (add set with no intersection)",
+                name: "RegistryChangedSubscription Selected 2 to 012 (add set with no intersection)",
                 state: selected_2(),
                 mutation: start_01(),
                 new_state: selected_012(),
                 outcome: MutationOutcome::with_mutations(vec![start_01()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 01 to None (remove superset)",
+                name: "RegistryChangedSubscription Selected 01 to None (remove superset)",
                 state: selected_1(),
                 mutation: stop_01(),
                 new_state: none(),
                 outcome: MutationOutcome::with_mutated(none(), vec![stop_1()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 01 to None (remove set with total intersection)",
+                name: "RegistryChangedSubscription Selected 01 to None (remove set with total intersection)",
                 state: selected_01(),
                 mutation: stop_01(),
                 new_state: none(),
                 outcome: MutationOutcome::with_mutated(none(), vec![stop_01()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 02 to 2 (remove set with partial intersection)",
+                name: "RegistryChangedSubscription Selected 02 to 2 (remove set with partial intersection)",
                 state: selected_02(),
                 mutation: stop_01(),
                 new_state: selected_2(),
                 outcome: MutationOutcome::with_mutations(vec![stop_0()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription Selected 02 to 02 (remove set with no intersection)",
+                name: "RegistryChangedSubscription Selected 02 to 02 (remove set with no intersection)",
                 state: selected_02(),
                 mutation: stop_1(),
                 new_state: selected_02(),
                 outcome: MutationOutcome::new(),
             },
             MutationTest {
-                name: "UtxosChangedSubscription All to All (add all)",
+                name: "RegistryChangedSubscription All to All (add all)",
                 state: all(),
                 mutation: start_all(),
                 new_state: all(),
                 outcome: MutationOutcome::new(),
             },
             MutationTest {
-                name: "UtxosChangedSubscription All to Selected 01 (add set)",
+                name: "RegistryChangedSubscription All to Selected 01 (add set)",
                 state: all(),
                 mutation: start_01(),
                 new_state: selected_01(),
                 outcome: MutationOutcome::with_mutated(selected_01(), vec![start_01(), stop_all()]),
             },
             MutationTest {
-                name: "UtxosChangedSubscription All to All (remove set)",
+                name: "RegistryChangedSubscription All to All (remove set)",
                 state: all(),
                 mutation: stop_01(),
                 new_state: all(),
                 outcome: MutationOutcome::new(),
             },
             MutationTest {
-                name: "UtxosChangedSubscription All to None (remove all)",
+                name: "RegistryChangedSubscription All to None (remove all)",
                 state: all(),
                 mutation: stop_all(),
                 new_state: none(),

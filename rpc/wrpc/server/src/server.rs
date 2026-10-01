@@ -12,7 +12,7 @@ use sahyadri_notify::{
     notifier::Notifier,
     scope::Scope,
     subscriber::Subscriber,
-    subscription::{MutationPolicies, UtxosChangedMutationPolicy},
+    subscription::{MutationPolicies, RegistryChangedMutationPolicy},
 };
 use sahyadri_rpc_core::{
     Notification, RpcResult,
@@ -54,8 +54,8 @@ const WRPC_SERVER: &str = "wrpc-server";
 
 impl Server {
     pub fn new(tasks: usize, encoding: Encoding, core_service: Option<Arc<RpcCoreService>>, options: Arc<Options>) -> Self {
-        // This notifier UTXOs subscription granularity to rpc-core notifier
-        let policies = MutationPolicies::new(UtxosChangedMutationPolicy::AddressSet);
+        // This notifier REGISTRY_UNITs subscription granularity to rpc-core notifier
+        let policies = MutationPolicies::new(RegistryChangedMutationPolicy::AddressSet);
 
         // Either get a core service or be called from the proxy and rely each connection having its own gRPC client
         assert_eq!(

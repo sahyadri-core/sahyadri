@@ -2,7 +2,7 @@ use crate::common::{
     client::ListeningClient,
     client_notify::ChannelNotify,
     daemon::Daemon,
-    utils::{fetch_spendable_utxos, generate_tx, mine_block, wait_for},
+    utils::{mine_block, wait_for},
 };
 use sahyadri_addresses::Address;
 use sahyadri_alloc::init_allocator_with_default_settings;
@@ -11,7 +11,7 @@ use sahyadri_consensus_core::header::Header;
 use sahyadri_consensusmanager::ConsensusManager;
 use sahyadri_core::{task::runtime::AsyncRuntime, trace};
 use sahyadri_grpc_client::GrpcClient;
-use sahyadri_notify::scope::{BlockAddedScope, UtxosChangedScope, VirtualDaaScoreChangedScope};
+use sahyadri_notify::scope::{BlockAddedScope, RegistryChangedScope, VirtualDaaScoreChangedScope};
 use sahyadri_rpc_core::{Notification, RpcTransactionId, api::rpc::RpcApi};
 use sahyadri_txscript::pay_to_address_script;
 use sahyadrid_lib::args::Args;
@@ -123,10 +123,10 @@ async fn daemon_mining_test() {
     }
 }
 
-/// `cargo test --release --package sahyadri-testing-integration --lib -- daemon_integration_tests::daemon_utxos_propagation_test`
+/// `cargo test --release --package sahyadri-testing-integration --lib -- daemon_integration_tests::daemon_registry_units_propagation_test`
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[ignore]
-async fn daemon_utxos_propagation_test() {
+async fn daemon_registry_units_propagation_test() {
     #[cfg(feature = "heap")]
     let _profiler = dhat::Profiler::builder().file_name("sahyadri-testing-integration-heap.json").build();
 
@@ -139,7 +139,7 @@ async fn daemon_utxos_propagation_test() {
         unsafe_rpc: true,
         enable_unsynced_mining: true,
         disable_upnp: true, // UPnP registration might take some time and is not needed for this test
-        utxoindex: true,
+        registry_unitindex: true,
         ..Default::default()
     };
     let total_fd_limit = 10;
@@ -253,11 +253,11 @@ async fn daemon_utxos_propagation_test() {
     // ...and subscribe each to some notifications
     for x in clients.iter_mut() {
         x.start_notify(BlockAddedScope {}.into()).await.unwrap();
-        x.start_notify(UtxosChangedScope::new(vec![miner_address.clone(), user_address.clone()]).into()).await.unwrap();
+        x.start_notify(RegistryChangedScope::new(vec![miner_address.clone(), user_address.clone()]).into()).await.unwrap();
         x.start_notify(VirtualDaaScoreChangedScope {}.into()).await.unwrap();
     }
 
-    // Mine some extra blocks so the latest miner reward is added to its balance and some UTXOs reach maturity
+    // Mine some extra blocks so the latest miner reward is added to its balance and some REGISTRY_UNITs reach maturity
     const EXTRA_BLOCKS: usize = 10;
     for _ in 0..EXTRA_BLOCKS {
         mine_block(blank_address.clone(), &rpc_client1, &clients).await;
@@ -269,25 +269,25 @@ async fn daemon_utxos_propagation_test() {
     let miner_balance = rpc_client1.get_balance_by_address(miner_address.clone()).await.unwrap();
     assert_eq!(miner_balance, initial_blocks * SIMNET_PARAMS.pre_deflationary_phase_base_subsidy);
 
-    // Get the miner UTXOs
-    let utxos = fetch_spendable_utxos(&rpc_client1, miner_address.clone(), coinbase_maturity).await;
-    assert_eq!(utxos.len(), EXTRA_BLOCKS - 1);
-    for utxo in utxos.iter() {
-        assert!(utxo.1.is_coinbase);
-        assert_eq!(utxo.1.amount, SIMNET_PARAMS.pre_deflationary_phase_base_subsidy);
-        assert_eq!(utxo.1.script_public_key, miner_spk);
+    // Get the miner REGISTRY_UNITs
+// REGISTRY_UNIT-REMOVED:     let registry_units = fetch_spendable_registry_units(&rpc_client1, miner_address.clone(), coinbase_maturity).await;
+    assert_eq!(registry_units.len(), EXTRA_BLOCKS - 1);
+    for registry_unit in registry_units.iter() {
+        assert!(registry_unit.1.is_coinbase);
+        assert_eq!(registry_unit.1.amount, SIMNET_PARAMS.pre_deflationary_phase_base_subsidy);
+        assert_eq!(registry_unit.1.script_public_key, miner_spk);
     }
 
-    // Drain UTXOs and Virtual DAA score changed notification channels
-    clients.iter().for_each(|x| x.utxos_changed_listener().unwrap().drain());
+    // Drain REGISTRY_UNITs and Virtual DAA score changed notification channels
+    clients.iter().for_each(|x| x.registry_changed_listener().unwrap().drain());
     clients.iter().for_each(|x| x.virtual_daa_score_changed_listener().unwrap().drain());
 
     // Spend some coins - sending funds from miner address to user address
-    // The transaction here is later used to verify utxo return address RPC
+    // The transaction here is later used to verify registry_unit return address RPC
     const NUMBER_INPUTS: u64 = 2;
     const NUMBER_OUTPUTS: u64 = 2;
     const TX_AMOUNT: u64 = SIMNET_PARAMS.pre_deflationary_phase_base_subsidy * (NUMBER_INPUTS * 5 - 1) / 5;
-    let transaction = generate_tx(miner_kp.clone(), &utxos[0..NUMBER_INPUTS as usize], TX_AMOUNT, NUMBER_OUTPUTS, &user_address);
+    let transaction = generate_tx(miner_kp.clone(), &registry_units[0..NUMBER_INPUTS as usize], TX_AMOUNT, NUMBER_OUTPUTS, &user_address);
     rpc_client1.submit_transaction((&transaction).into(), false).await.unwrap();
 
     let check_client = rpc_client1.clone();
@@ -308,9 +308,9 @@ async fn daemon_utxos_propagation_test() {
 
     mine_block(blank_address.clone(), &rpc_client1, &clients).await;
 
-    // Check UTXOs changed notifications
+    // Check REGISTRY_UNITs changed notifications
     for x in clients.iter() {
-        let Notification::UtxosChanged(uc) = x.utxos_changed_listener().unwrap().receiver.recv().await.unwrap() else {
+        let Notification::RegistryChanged(uc) = x.registry_changed_listener().unwrap().receiver.recv().await.unwrap() else {
             panic!("wrong notification type")
         };
         assert!(uc.removed.iter().all(|x| x.address.is_some() && *x.address.as_ref().unwrap() == miner_address));
@@ -318,10 +318,10 @@ async fn daemon_utxos_propagation_test() {
         assert_eq!(uc.removed.len() as u64, NUMBER_INPUTS);
         assert_eq!(uc.added.len() as u64, NUMBER_OUTPUTS);
         assert_eq!(
-            uc.removed.iter().map(|x| x.utxo_entry.amount).sum::<u64>(),
+            uc.removed.iter().map(|x| x.registry_unit_entry.amount).sum::<u64>(),
             SIMNET_PARAMS.pre_deflationary_phase_base_subsidy * NUMBER_INPUTS
         );
-        assert_eq!(uc.added.iter().map(|x| x.utxo_entry.amount).sum::<u64>(), TX_AMOUNT);
+        assert_eq!(uc.added.iter().map(|x| x.registry_unit_entry.amount).sum::<u64>(), TX_AMOUNT);
     }
 
     // Check the balance of both miner and user addresses
@@ -333,22 +333,22 @@ async fn daemon_utxos_propagation_test() {
         assert_eq!(user_balance, TX_AMOUNT);
     }
 
-    // UTXO Return Address Test
+    // REGISTRY_UNIT Return Address Test
     // Mine another block to accept the transactions from the previous block
     // The tx above is sending from miner address to user address
     mine_block(blank_address.clone(), &rpc_client1, &clients).await;
-    let new_utxos = rpc_client1.get_utxos_by_addresses(vec![user_address]).await.unwrap();
-    let new_utxo = new_utxos
+    let new_registry_units = rpc_client1.get_registry_by_addresses(vec![user_address]).await.unwrap();
+    let new_registry_unit = new_registry_units
         .iter()
-        .find(|utxo| utxo.outpoint.transaction_id == transaction.id())
-        .expect("Did not find a utxo for the tx we just created but expected to");
+        .find(|registry_unit| registry_unit.outpoint.transaction_id == transaction.id())
+        .expect("Did not find a registry_unit for the tx we just created but expected to");
 
-    let utxo_return_address = rpc_client1
-        .get_utxo_return_address(new_utxo.outpoint.transaction_id, new_utxo.utxo_entry.block_daa_score)
+    let registry_unit_return_address = rpc_client1
+        .get_registry_unit_return_address(new_registry_unit.outpoint.transaction_id, new_registry_unit.registry_unit_entry.block_daa_score)
         .await
-        .expect("We just created the tx and utxo here");
+        .expect("We just created the tx and registry_unit here");
 
-    assert_eq!(miner_address, utxo_return_address);
+    assert_eq!(miner_address, registry_unit_return_address);
 
     // Terminate multi-listener clients
     for x in clients.iter() {

@@ -33,7 +33,7 @@ use sahyadri_consensus_core::header::Header;
 use sahyadri_consensus_core::mining_rules::MiningRules;
 use sahyadri_consensus_core::subnets::SubnetworkId;
 use sahyadri_consensus_core::tx::{
-    MutableTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
+    MutableTransaction, ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput, RegistryUnit,
 };
 use sahyadri_consensus_notify::root::ConsensusNotificationRoot;
 use sahyadri_consensus_notify::service::NotifyService;
@@ -46,7 +46,7 @@ use sahyadri_rpc_core::RpcHeader;
 use sahyadri_utils::arc::ArcExtensions;
 
 use crate::common;
-use crate::common::json::{json_line_to_block, json_line_to_trusted_block, json_line_to_utxo_pairs};
+use crate::common::json::{json_line_to_block, json_line_to_trusted_block};
 use flate2::read::GzDecoder;
 use futures_util::future::try_join_all;
 use itertools::Itertools;
@@ -811,13 +811,13 @@ async fn json_test(file_path: &str, concurrency: bool) {
     }
 
     if proof_exists {
-        info!("Importing the UTXO set...");
+        info!("Importing the REGISTRY_UNIT set...");
         let mut multiset = MuHash::new();
-        for outpoint_utxo_pairs in gzip_file_lines(&main_path.join("pp-utxo.json.gz")).map(json_line_to_utxo_pairs) {
-            tc.append_imported_pruning_point_utxos(&outpoint_utxo_pairs, &mut multiset);
+// REGISTRY_UNIT-REMOVED:         for outpoint_registry_unit_pairs in gzip_file_lines(&main_path.join("pp-registry_unit.json.gz")).map(json_line_to_registry_unit_pairs) {
+            tc.append_imported_pruning_point_registry_units(&outpoint_registry_unit_pairs, &mut multiset);
         }
 
-        tc.import_pruning_point_utxo_set(pruning_point.unwrap(), multiset).unwrap();
+        tc.import_pruning_point_registry_unit_set(pruning_point.unwrap(), multiset).unwrap();
         // TODO: Add consensus validation that the pruning point is actually the right block according to the rules (in pruning depth etc).
     }
 
@@ -834,32 +834,32 @@ async fn json_test(file_path: &str, concurrency: bool) {
         for chunk in iter {
             let current_joins = submit_body_chunk(&tc, &external_block_store, chunk);
             let statuses = try_join_all(prev_joins).await.unwrap();
-            assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
+            assert!(statuses.iter().all(|s| s.is_state_valid_or_pending()));
             prev_joins = current_joins;
         }
 
         let statuses = try_join_all(prev_joins).await.unwrap();
-        assert!(statuses.iter().all(|s| s.is_utxo_valid_or_pending()));
+        assert!(statuses.iter().all(|s| s.is_state_valid_or_pending()));
     } else {
         for hash in missing_bodies {
             let block = Block::from_arcs(tc.get_header(hash).unwrap(), external_block_store.get(hash).unwrap());
             let status =
                 tc.validate_and_insert_block(block).virtual_state_task.await.unwrap_or_else(|e| panic!("block {hash} failed: {e}"));
-            assert!(status.is_utxo_valid_or_pending());
+            assert!(status.is_state_valid_or_pending());
         }
     }
 
     core.shutdown();
     core.join(joins);
 
-    // Assert that at least one body tip was resolved with valid UTXO
-    assert!(tc.body_tips().iter().copied().any(|h| tc.block_status(h) == BlockStatus::StatusUTXOValid));
+    // Assert that at least one body tip was resolved with valid REGISTRY_UNIT
+    assert!(tc.body_tips().iter().copied().any(|h| tc.block_status(h) == BlockStatus::StatusStateValid));
     // Assert that the indexed selected chain store matches the virtual chain obtained
     // through the reachability iterator
     assert_selected_chain_store_matches_virtual_chain(&tc);
-    let virtual_utxos: HashSet<TransactionOutpoint> =
-        HashSet::from_iter(tc.get_virtual_utxos(None, usize::MAX, false).into_iter().map(|(outpoint, _)| outpoint));
-    // SAHYADRI: UTXO index removed — the virtual UTXO check no longer applies.
+    let virtual_registry_units: HashSet<RegistryRef> =
+        HashSet::from_iter(tc.get_virtual_registry(None, usize::MAX, false).into_iter().map(|(outpoint, _)| outpoint));
+    // SAHYADRI: REGISTRY_UNIT index removed — the virtual REGISTRY_UNIT check no longer applies.
 }
 
 fn submit_header_chunk(
@@ -1084,7 +1084,7 @@ async fn difficulty_test() {
             parents_by_level: Vec::<Vec<Hash>>::new().try_into().unwrap(),
             hash_merkle_root: 0.into(),
             accepted_id_merkle_root: 0.into(),
-            utxo_commitment: 0.into(),
+            registry_unit_commitment: 0.into(),
             timestamp: 0,
             bits: 0,
             nonce: 0,
@@ -1297,12 +1297,12 @@ async fn selected_chain_test() {
     let consensus = TestConsensus::new(&config);
     let wait_handles = consensus.init();
 
-    consensus.add_utxo_valid_block_with_parents(1.into(), vec![config.genesis.hash], vec![]).await.unwrap();
+    consensus.add_registry_unit_valid_block_with_parents(1.into(), vec![config.genesis.hash], vec![]).await.unwrap();
     for i in 2..7 {
         let hash = i.into();
-        consensus.add_utxo_valid_block_with_parents(hash, vec![(i - 1).into()], vec![]).await.unwrap();
+        consensus.add_registry_unit_valid_block_with_parents(hash, vec![(i - 1).into()], vec![]).await.unwrap();
     }
-    consensus.add_utxo_valid_block_with_parents(7.into(), vec![1.into()], vec![]).await.unwrap(); // Adding a non chain block shouldn't affect the selected chain store.
+    consensus.add_registry_unit_valid_block_with_parents(7.into(), vec![1.into()], vec![]).await.unwrap(); // Adding a non chain block shouldn't affect the selected chain store.
 
     assert_eq!(consensus.selected_chain_store.read().get_by_index(0).unwrap(), config.genesis.hash);
     for i in 1..7 {
@@ -1310,10 +1310,10 @@ async fn selected_chain_test() {
     }
     assert!(consensus.selected_chain_store.read().get_by_index(7).is_err());
 
-    consensus.add_utxo_valid_block_with_parents(8.into(), vec![config.genesis.hash], vec![]).await.unwrap();
+    consensus.add_registry_unit_valid_block_with_parents(8.into(), vec![config.genesis.hash], vec![]).await.unwrap();
     for i in 9..15 {
         let hash = i.into();
-        consensus.add_utxo_valid_block_with_parents(hash, vec![(i - 1).into()], vec![]).await.unwrap();
+        consensus.add_registry_unit_valid_block_with_parents(hash, vec![(i - 1).into()], vec![]).await.unwrap();
     }
 
     assert_eq!(consensus.selected_chain_store.read().get_by_index(0).unwrap(), config.genesis.hash);
@@ -1324,9 +1324,9 @@ async fn selected_chain_test() {
 
     // We now check a situation where there's a shorter selected chain (3 blocks) with more blue work
     for i in 15..23 {
-        consensus.add_utxo_valid_block_with_parents(i.into(), vec![config.genesis.hash], vec![]).await.unwrap();
+        consensus.add_registry_unit_valid_block_with_parents(i.into(), vec![config.genesis.hash], vec![]).await.unwrap();
     }
-    consensus.add_utxo_valid_block_with_parents(23.into(), (15..23).map(|i| i.into()).collect_vec(), vec![]).await.unwrap();
+    consensus.add_registry_unit_valid_block_with_parents(23.into(), (15..23).map(|i| i.into()).collect_vec(), vec![]).await.unwrap();
 
     assert_eq!(consensus.selected_chain_store.read().get_by_index(0).unwrap(), config.genesis.hash);
     assert_eq!(consensus.selected_chain_store.read().get_by_index(1).unwrap(), 22.into()); // We expect 23's selected parent to be 22 because of SAHYADRI_CONSENSUS tie-breaking rules.
@@ -1420,10 +1420,10 @@ async fn kip10_test() {
             .drain();
     let spk = pay_to_script_hash_script(&redeem_script);
 
-    // Set up initial UTXO with our test script
-    let initial_utxo_collection = [(
-        TransactionOutpoint::new(1.into(), 0),
-        UtxoEntry { amount: KANA_PER_SAHYADRI, script_public_key: spk.clone(), block_daa_score: 0, is_coinbase: false },
+    // Set up initial REGISTRY_UNIT with our test script
+    let initial_registry_unit_collection = [(
+        RegistryRef::new(1.into(), 0),
+        RegistryUnit { amount: KANA_PER_SAHYADRI, script_public_key: spk.clone(), block_daa_score: 0, is_coinbase: false },
     )];
 
     // Initialize consensus with KIP-10 activation point
@@ -1431,10 +1431,10 @@ async fn kip10_test() {
         .skip_proof_of_work()
         .apply_args(|cfg| {
             let mut genesis_multiset = MuHash::new();
-            initial_utxo_collection.iter().for_each(|(outpoint, utxo)| {
-                genesis_multiset.add_utxo(outpoint, utxo);
+            initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
+                genesis_multiset.add_registry_unit(outpoint, registry_unit);
             });
-            cfg.params.genesis.utxo_commitment = genesis_multiset.finalize();
+            cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
             let genesis_header: Header = (&cfg.params.genesis).into();
             cfg.params.genesis.hash = genesis_header.hash;
         })
@@ -1445,8 +1445,8 @@ async fn kip10_test() {
 
     let consensus = TestConsensus::new(&config);
     let mut genesis_multiset = MuHash::new();
-    consensus.append_imported_pruning_point_utxos(&initial_utxo_collection, &mut genesis_multiset);
-    consensus.import_pruning_point_utxo_set(config.genesis.hash, genesis_multiset).unwrap();
+    consensus.append_imported_pruning_point_registry_units(&initial_registry_unit_collection, &mut genesis_multiset);
+    consensus.import_pruning_point_registry_unit_set(config.genesis.hash, genesis_multiset).unwrap();
     consensus.init();
 
     // Start from genesis block
@@ -1456,12 +1456,12 @@ async fn kip10_test() {
     let mut tx = Transaction::new(
         0,
         vec![TransactionInput::new(
-            initial_utxo_collection[0].0,
+            initial_registry_unit_collection[0].0,
             ScriptBuilder::new().add_data(&redeem_script).unwrap().drain(),
             0,
             0,
         )],
-        vec![TransactionOutput::new(initial_utxo_collection[0].1.amount - 5000, spk)],
+        vec![TransactionOutput::new(initial_registry_unit_collection[0].1.amount - 5000, spk)],
         0,
         SUBNETWORK_ID_NATIVE,
         0,
@@ -1475,8 +1475,8 @@ async fn kip10_test() {
     let _ = consensus.validate_mempool_transaction(&mut tx, &TransactionValidationArgs::default());
     let tx = tx.tx.unwrap_or_clone();
     // Verify the transaction with KIP-10 opcodes is accepted
-    let status = consensus.add_utxo_valid_block_with_parents((index + 1).into(), vec![config.genesis.hash], vec![tx.clone()]).await;
-    assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+    let status = consensus.add_registry_unit_valid_block_with_parents((index + 1).into(), vec![config.genesis.hash], vec![tx.clone()]).await;
+    assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
     assert!(consensus.lkg_virtual_state.load().accepted_tx_ids.contains(&tx_id));
 }
 
@@ -1494,9 +1494,9 @@ async fn payload_test() {
     let wait_handles = consensus.init();
 
     let miner_data = MinerData::new(ScriptPublicKey::from_vec(0, vec![OpTrue]), vec![]);
-    let b = consensus.build_utxo_valid_block_with_parents(1.into(), vec![config.genesis.hash], miner_data.clone(), vec![]);
+    let b = consensus.build_registry_unit_valid_block_with_parents(1.into(), vec![config.genesis.hash], miner_data.clone(), vec![]);
     consensus.validate_and_insert_block(b.to_immutable()).virtual_state_task.await.unwrap();
-    let funding_block = consensus.build_utxo_valid_block_with_parents(2.into(), vec![1.into()], miner_data, vec![]);
+    let funding_block = consensus.build_registry_unit_valid_block_with_parents(2.into(), vec![1.into()], miner_data, vec![]);
     let (cb_id, cb_amount) = {
         let mut cb = funding_block.transactions[0].clone();
         cb.finalize();
@@ -1506,7 +1506,7 @@ async fn payload_test() {
     consensus.validate_and_insert_block(funding_block.to_immutable()).virtual_state_task.await.unwrap();
     let mut txx = Transaction::new(
         0,
-        vec![TransactionInput::new(TransactionOutpoint { transaction_id: cb_id, index: 0 }, vec![], 0, 0)],
+        vec![TransactionInput::new(RegistryRef { transaction_id: cb_id, index: 0 }, vec![], 0, 0)],
         vec![TransactionOutput::new(cb_amount / 2, ScriptPublicKey::default())],
         0,
         SubnetworkId::default(),
@@ -1519,7 +1519,7 @@ async fn payload_test() {
     let mut tx = MutableTransaction::from_tx(txx.clone());
     // This triggers storage mass population
     consensus.validate_mempool_transaction(&mut tx, &TransactionValidationArgs::default()).unwrap();
-    let consensus_res = consensus.add_utxo_valid_block_with_parents(4.into(), vec![2.into()], vec![tx.tx.unwrap_or_clone()]).await;
+    let consensus_res = consensus.add_registry_unit_valid_block_with_parents(4.into(), vec![2.into()], vec![tx.tx.unwrap_or_clone()]).await;
     assert_match!(consensus_res, Err(RuleError::ExceedsTransientMassLimit(_, _)));
 
     // Fix the payload to be below the limit
@@ -1527,8 +1527,8 @@ async fn payload_test() {
     let mut tx = MutableTransaction::from_tx(txx.clone());
     // This triggers storage mass population
     consensus.validate_mempool_transaction(&mut tx, &TransactionValidationArgs::default()).unwrap();
-    let status = consensus.add_utxo_valid_block_with_parents(3.into(), vec![2.into()], vec![tx.tx.unwrap_or_clone()]).await;
-    assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+    let status = consensus.add_registry_unit_valid_block_with_parents(3.into(), vec![2.into()], vec![tx.tx.unwrap_or_clone()]).await;
+    assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 
     consensus.shutdown(wait_handles);
 }
@@ -1540,10 +1540,10 @@ async fn payload_for_native_tx_test() {
 
     init_allocator_with_default_settings();
 
-    // Create initial UTXO to fund our test transactions
-    let initial_utxo_collection = [(
-        TransactionOutpoint::new(1.into(), 0),
-        UtxoEntry {
+    // Create initial REGISTRY_UNIT to fund our test transactions
+    let initial_registry_unit_collection = [(
+        RegistryRef::new(1.into(), 0),
+        RegistryUnit {
             amount: KANA_PER_SAHYADRI,
             script_public_key: ScriptPublicKey::from_vec(0, vec![OpTrue]),
             block_daa_score: 0,
@@ -1556,10 +1556,10 @@ async fn payload_for_native_tx_test() {
         .skip_proof_of_work()
         .apply_args(|cfg| {
             let mut genesis_multiset = MuHash::new();
-            initial_utxo_collection.iter().for_each(|(outpoint, utxo)| {
-                genesis_multiset.add_utxo(outpoint, utxo);
+            initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
+                genesis_multiset.add_registry_unit(outpoint, registry_unit);
             });
-            cfg.params.genesis.utxo_commitment = genesis_multiset.finalize();
+            cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
             let genesis_header: Header = (&cfg.params.genesis).into();
             cfg.params.genesis.hash = genesis_header.hash;
         })
@@ -1567,8 +1567,8 @@ async fn payload_for_native_tx_test() {
 
     let consensus = TestConsensus::new(&config);
     let mut genesis_multiset = MuHash::new();
-    consensus.append_imported_pruning_point_utxos(&initial_utxo_collection, &mut genesis_multiset);
-    consensus.import_pruning_point_utxo_set(config.genesis.hash, genesis_multiset).unwrap();
+    consensus.append_imported_pruning_point_registry_units(&initial_registry_unit_collection, &mut genesis_multiset);
+    consensus.import_pruning_point_registry_unit_set(config.genesis.hash, genesis_multiset).unwrap();
     consensus.init();
 
     // Create transaction with large payload
@@ -1576,12 +1576,12 @@ async fn payload_for_native_tx_test() {
     let mut tx_with_payload = Transaction::new(
         0,
         vec![TransactionInput::new(
-            initial_utxo_collection[0].0,
+            initial_registry_unit_collection[0].0,
             vec![], // Empty signature script since we're using OpTrue
             0,
             0,
         )],
-        vec![TransactionOutput::new(initial_utxo_collection[0].1.amount - 5000, ScriptPublicKey::from_vec(0, vec![OpTrue]))],
+        vec![TransactionOutput::new(initial_registry_unit_collection[0].1.amount - 5000, ScriptPublicKey::from_vec(0, vec![OpTrue]))],
         0,
         SUBNETWORK_ID_NATIVE,
         0,
@@ -1595,9 +1595,9 @@ async fn payload_for_native_tx_test() {
     let _ = consensus.validate_mempool_transaction(&mut tx, &TransactionValidationArgs::default());
 
     // Test 2: Verify the same transaction is accepted after activation
-    let status = consensus.add_utxo_valid_block_with_parents(1.into(), vec![config.genesis.hash], vec![tx.tx.unwrap_or_clone()]).await;
+    let status = consensus.add_registry_unit_valid_block_with_parents(1.into(), vec![config.genesis.hash], vec![tx.tx.unwrap_or_clone()]).await;
 
-    assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+    assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
     assert!(consensus.lkg_virtual_state.load().accepted_tx_ids.contains(&tx_id));
 }
 
@@ -1648,20 +1648,20 @@ async fn payload_for_native_tx_test() {
 //
 //     let script_pub_key = sahyadri_txscript::pay_to_script_hash_script(&redeem_script);
 //
-//     // Set up initial UTXO with P2SH script
-//     let initial_utxo_collection = [(
-//         TransactionOutpoint::new(1.into(), 0),
-//         UtxoEntry { amount: KANA_PER_SAHYADRI, script_public_key: script_pub_key.clone(), block_daa_score: 0, is_coinbase: false },
+//     // Set up initial REGISTRY_UNIT with P2SH script
+//     let initial_registry_unit_collection = [(
+//         RegistryRef::new(1.into(), 0),
+//         RegistryUnit { amount: KANA_PER_SAHYADRI, script_public_key: script_pub_key.clone(), block_daa_score: 0, is_coinbase: false },
 //     )];
 //
 //     let config = ConfigBuilder::new(DEVNET_PARAMS)
 //         .skip_proof_of_work()
 //         .apply_args(|cfg| {
 //             let mut genesis_multiset = MuHash::new();
-//             initial_utxo_collection.iter().for_each(|(outpoint, utxo)| {
-//                 genesis_multiset.add_utxo(outpoint, utxo);
+//             initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
+//                 genesis_multiset.add_registry_unit(outpoint, registry_unit);
 //             });
-//             cfg.params.genesis.utxo_commitment = genesis_multiset.finalize();
+//             cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
 //             let genesis_header: Header = (&cfg.params.genesis).into();
 //             cfg.params.genesis.hash = genesis_header.hash;
 //         })
@@ -1672,8 +1672,8 @@ async fn payload_for_native_tx_test() {
 //
 //     let consensus = TestConsensus::new(&config);
 //     let mut genesis_multiset = MuHash::new();
-//     consensus.append_imported_pruning_point_utxos(&initial_utxo_collection, &mut genesis_multiset);
-//     consensus.import_pruning_point_utxo_set(config.genesis.hash, genesis_multiset).unwrap();
+//     consensus.append_imported_pruning_point_registry_units(&initial_registry_unit_collection, &mut genesis_multiset);
+//     consensus.import_pruning_point_registry_unit_set(config.genesis.hash, genesis_multiset).unwrap();
 //     consensus.init();
 //
 //     // Build blockchain up to one block before activation
@@ -1683,12 +1683,12 @@ async fn payload_for_native_tx_test() {
 //     let mut tx = Transaction::new(
 //         0,
 //         vec![TransactionInput::new(
-//             initial_utxo_collection[0].0,
+//             initial_registry_unit_collection[0].0,
 //             vec![], // Placeholder for signature script
 //             0,
 //             1, // Script declares 1 sig op (will execute only 1 despite having 3 CheckSig opcodes)
 //         )],
-//         vec![TransactionOutput::new(initial_utxo_collection[0].1.amount - 5000, ScriptPublicKey::from_vec(0, vec![OpTrue]))],
+//         vec![TransactionOutput::new(initial_registry_unit_collection[0].1.amount - 5000, ScriptPublicKey::from_vec(0, vec![OpTrue]))],
 //         0,
 //         SUBNETWORK_ID_NATIVE,
 //         0,
@@ -1697,7 +1697,7 @@ async fn payload_for_native_tx_test() {
 //
 //     // Sign transaction
 //     let mut tx_for_signing = MutableTransaction::new(tx.clone());
-//     tx_for_signing.entries = vec![Some(initial_utxo_collection[0].1.clone())];
+//     tx_for_signing.entries = vec![Some(initial_registry_unit_collection[0].1.clone())];
 //
 //     let signature = {
 //         let hash = calc_Dilithium3_signature_hash(&tx_for_signing.as_verifiable(), 0, SIG_HASH_ALL, &reused_values);
@@ -1721,8 +1721,8 @@ async fn payload_for_native_tx_test() {
 //
 //     // Verify transaction is accepted with runtime sig op counting from genesis
 //     // Runtime counting sees only 1 executed sig op (in the IF branch), not the 3 total CheckSig opcodes
-//     let status = consensus.add_utxo_valid_block_with_parents((index + 1).into(), vec![config.genesis.hash], vec![tx]).await;
-//     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+//     let status = consensus.add_registry_unit_valid_block_with_parents((index + 1).into(), vec![config.genesis.hash], vec![tx]).await;
+//     assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 // }
 //
 // #[tokio::test]
@@ -1748,17 +1748,17 @@ async fn payload_for_native_tx_test() {
 //     let p2sh_script = pay_to_script_hash_script(&redeem_script);
 //     let op_true_spk = ScriptPublicKey::from_vec(0, vec![OpTrue]);
 //
-//     let mut initial_utxo_collection: Vec<(TransactionOutpoint, UtxoEntry)> = Vec::new();
+//     let mut initial_registry_unit_collection: Vec<(RegistryRef, RegistryUnit)> = Vec::new();
 //     for i in 0..6 {
-//         initial_utxo_collection.push((
-//             TransactionOutpoint::new((i + 1).into(), 0),
-//             UtxoEntry { amount: KANA_PER_SAHYADRI / 10, script_public_key: p2sh_script.clone(), block_daa_score: 0, is_coinbase: false },
+//         initial_registry_unit_collection.push((
+//             RegistryRef::new((i + 1).into(), 0),
+//             RegistryUnit { amount: KANA_PER_SAHYADRI / 10, script_public_key: p2sh_script.clone(), block_daa_score: 0, is_coinbase: false },
 //         ));
 //     }
 //     for i in 0..3 {
-//         initial_utxo_collection.push((
-//             TransactionOutpoint::new((i + 7).into(), 0),
-//             UtxoEntry { amount: KANA_PER_SAHYADRI / 20, script_public_key: op_true_spk.clone(), block_daa_score: 0, is_coinbase: false },
+//         initial_registry_unit_collection.push((
+//             RegistryRef::new((i + 7).into(), 0),
+//             RegistryUnit { amount: KANA_PER_SAHYADRI / 20, script_public_key: op_true_spk.clone(), block_daa_score: 0, is_coinbase: false },
 //         ));
 //     }
 //
@@ -1766,10 +1766,10 @@ async fn payload_for_native_tx_test() {
 //         .skip_proof_of_work()
 //         .apply_args(|cfg| {
 //             let mut genesis_multiset = MuHash::new();
-//             initial_utxo_collection.iter().for_each(|(outpoint, utxo)| {
-//                 genesis_multiset.add_utxo(outpoint, utxo);
+//             initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
+//                 genesis_multiset.add_registry_unit(outpoint, registry_unit);
 //             });
-//             cfg.params.genesis.utxo_commitment = genesis_multiset.finalize();
+//             cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
 //             let genesis_header: Header = (&cfg.params.genesis).into();
 //             cfg.params.genesis.hash = genesis_header.hash;
 //         })
@@ -1777,14 +1777,14 @@ async fn payload_for_native_tx_test() {
 //
 //     let consensus = TestConsensus::new(&config);
 //     let mut genesis_multiset = MuHash::new();
-//     consensus.append_imported_pruning_point_utxos(&initial_utxo_collection, &mut genesis_multiset);
-//     consensus.import_pruning_point_utxo_set(config.genesis.hash, genesis_multiset).unwrap();
+//     consensus.append_imported_pruning_point_registry_units(&initial_registry_unit_collection, &mut genesis_multiset);
+//     consensus.import_pruning_point_registry_unit_set(config.genesis.hash, genesis_multiset).unwrap();
 //     consensus.init();
 //
-//     let make_sig_script = |tx: &Transaction, utxo: &UtxoEntry, sig_hash: SigHashType| -> Vec<u8> {
+//     let make_sig_script = |tx: &Transaction, registry_unit: &RegistryUnit, sig_hash: SigHashType| -> Vec<u8> {
 //         let reused_values = SigHashReusedValuesUnsync::new();
 //         let mut tx_for_signing = MutableTransaction::from_tx(tx.clone());
-//         tx_for_signing.entries[0] = Some(utxo.clone());
+//         tx_for_signing.entries[0] = Some(registry_unit.clone());
 //         let hash = calc_Dilithium3_signature_hash(&tx_for_signing.as_verifiable(), 0, sig_hash, &reused_values);
 //         let msg = Dilithium::Message::from_digest_slice(hash.as_bytes().as_slice()).unwrap();
 //         let sig = keypair.sign_Dilithium3(msg);
@@ -1798,55 +1798,55 @@ async fn payload_for_native_tx_test() {
 //     // SIGHASH_ALL commits to every input and output. Signed transaction is accepted as-is.
 //     let mut tx_all = Transaction::new(
 //         0,
-//         vec![TransactionInput::new(initial_utxo_collection[0].0, vec![], 0, 1)],
-//         vec![TransactionOutput::new(initial_utxo_collection[0].1.amount - 1_000, op_true_spk.clone())],
+//         vec![TransactionInput::new(initial_registry_unit_collection[0].0, vec![], 0, 1)],
+//         vec![TransactionOutput::new(initial_registry_unit_collection[0].1.amount - 1_000, op_true_spk.clone())],
 //         0,
 //         SUBNETWORK_ID_NATIVE,
 //         0,
 //         vec![],
 //     );
-//     let sig_script = make_sig_script(&tx_all, &initial_utxo_collection[0].1, SIG_HASH_ALL);
+//     let sig_script = make_sig_script(&tx_all, &initial_registry_unit_collection[0].1, SIG_HASH_ALL);
 //     tx_all.inputs[0].signature_script = sig_script;
 //     tx_all.finalize();
 //     let mut tx_all = MutableTransaction::from_tx(tx_all);
 //     let _ = consensus.validate_mempool_transaction(&mut tx_all, &TransactionValidationArgs::default());
 //     let tx_all = tx_all.tx.unwrap_or_clone();
-//     let status = consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_all]).await;
+//     let status = consensus.add_registry_unit_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_all]).await;
 //     block_index += 1;
-//     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+//     assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 //
 //     // SIGHASH_NONE commits to inputs only; outputs can be added after signing.
 //     let mut tx_none = Transaction::new(
 //         0,
-//         vec![TransactionInput::new(initial_utxo_collection[1].0, vec![], 0, 1)],
+//         vec![TransactionInput::new(initial_registry_unit_collection[1].0, vec![], 0, 1)],
 //         vec![],
 //         0,
 //         SUBNETWORK_ID_NATIVE,
 //         0,
 //         vec![],
 //     );
-//     let sig_script = make_sig_script(&tx_none, &initial_utxo_collection[1].1, SIG_HASH_NONE);
+//     let sig_script = make_sig_script(&tx_none, &initial_registry_unit_collection[1].1, SIG_HASH_NONE);
 //     tx_none.inputs[0].signature_script = sig_script;
-//     tx_none.outputs.push(TransactionOutput::new(initial_utxo_collection[1].1.amount - 2_000, op_true_spk.clone()));
+//     tx_none.outputs.push(TransactionOutput::new(initial_registry_unit_collection[1].1.amount - 2_000, op_true_spk.clone()));
 //     tx_none.finalize();
 //     let mut tx_none = MutableTransaction::from_tx(tx_none);
 //     let _ = consensus.validate_mempool_transaction(&mut tx_none, &TransactionValidationArgs::default());
 //     let tx_none = tx_none.tx.unwrap_or_clone();
-//     let status = consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_none]).await;
+//     let status = consensus.add_registry_unit_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_none]).await;
 //     block_index += 1;
-//     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+//     assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 //
 //     // SIGHASH_SINGLE commits input 0 to output 0 only; later outputs do not invalidate the signature.
 //     let mut tx_single = Transaction::new(
 //         0,
-//         vec![TransactionInput::new(initial_utxo_collection[2].0, vec![], 0, 1)],
-//         vec![TransactionOutput::new(initial_utxo_collection[2].1.amount - 5_500_000, op_true_spk.clone())],
+//         vec![TransactionInput::new(initial_registry_unit_collection[2].0, vec![], 0, 1)],
+//         vec![TransactionOutput::new(initial_registry_unit_collection[2].1.amount - 5_500_000, op_true_spk.clone())],
 //         0,
 //         SUBNETWORK_ID_NATIVE,
 //         0,
 //         vec![],
 //     );
-//     let sig_script = make_sig_script(&tx_single, &initial_utxo_collection[2].1, SIG_HASH_SINGLE);
+//     let sig_script = make_sig_script(&tx_single, &initial_registry_unit_collection[2].1, SIG_HASH_SINGLE);
 //     tx_single.inputs[0].signature_script = sig_script;
 //     tx_single.outputs.push(TransactionOutput::new(5_000_000, op_true_spk.clone()));
 //     tx_single.finalize();
@@ -1854,16 +1854,16 @@ async fn payload_for_native_tx_test() {
 //     let _ = consensus.validate_mempool_transaction(&mut tx_single, &TransactionValidationArgs::default());
 //     let tx_single = tx_single.tx.unwrap_or_clone();
 //     let status =
-//         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_single]).await;
+//         consensus.add_registry_unit_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_single]).await;
 //     block_index += 1;
-//     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+//     assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 //
 //     // SIGHASH_ALL | ANYONECANPAY commits to this input and all outputs; adding inputs later remains valid.
 //     let mut tx_all_acp = Transaction::new(
 //         0,
-//         vec![TransactionInput::new(initial_utxo_collection[3].0, vec![], 0, 1)],
+//         vec![TransactionInput::new(initial_registry_unit_collection[3].0, vec![], 0, 1)],
 //         vec![TransactionOutput::new(
-//             initial_utxo_collection[3].1.amount + initial_utxo_collection[6].1.amount - 4_000, // The first inputs signs an output that will be feasible only after adding the second input
+//             initial_registry_unit_collection[3].1.amount + initial_registry_unit_collection[6].1.amount - 4_000, // The first inputs signs an output that will be feasible only after adding the second input
 //             op_true_spk.clone(),
 //         )],
 //         0,
@@ -1871,62 +1871,62 @@ async fn payload_for_native_tx_test() {
 //         0,
 //         vec![],
 //     );
-//     let sig_script = make_sig_script(&tx_all_acp, &initial_utxo_collection[3].1, SIG_HASH_ALL | SIG_HASH_ANY_ONE_CAN_PAY);
+//     let sig_script = make_sig_script(&tx_all_acp, &initial_registry_unit_collection[3].1, SIG_HASH_ALL | SIG_HASH_ANY_ONE_CAN_PAY);
 //     tx_all_acp.inputs[0].signature_script = sig_script;
-//     tx_all_acp.inputs.push(TransactionInput::new(initial_utxo_collection[6].0, vec![], 0, 0));
+//     tx_all_acp.inputs.push(TransactionInput::new(initial_registry_unit_collection[6].0, vec![], 0, 0));
 //     tx_all_acp.finalize();
 //     let mut tx_all_acp = MutableTransaction::from_tx(tx_all_acp);
 //     let _ = consensus.validate_mempool_transaction(&mut tx_all_acp, &TransactionValidationArgs::default());
 //     let tx_all_acp = tx_all_acp.tx.unwrap_or_clone();
 //     let status =
-//         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_all_acp]).await;
+//         consensus.add_registry_unit_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_all_acp]).await;
 //     block_index += 1;
-//     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+//     assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 //
 //     // SIGHASH_NONE | ANYONECANPAY commits to this input only; outputs and additional inputs may be appended after signing.
 //     let mut tx_none_acp = Transaction::new(
 //         0,
-//         vec![TransactionInput::new(initial_utxo_collection[4].0, vec![], 0, 1)],
+//         vec![TransactionInput::new(initial_registry_unit_collection[4].0, vec![], 0, 1)],
 //         vec![],
 //         0,
 //         SUBNETWORK_ID_NATIVE,
 //         0,
 //         vec![],
 //     );
-//     let sig_script = make_sig_script(&tx_none_acp, &initial_utxo_collection[4].1, SIG_HASH_NONE | SIG_HASH_ANY_ONE_CAN_PAY);
+//     let sig_script = make_sig_script(&tx_none_acp, &initial_registry_unit_collection[4].1, SIG_HASH_NONE | SIG_HASH_ANY_ONE_CAN_PAY);
 //     tx_none_acp.inputs[0].signature_script = sig_script;
-//     tx_none_acp.inputs.push(TransactionInput::new(initial_utxo_collection[7].0, vec![], 0, 0));
-//     tx_none_acp.outputs.push(TransactionOutput::new(initial_utxo_collection[4].1.amount - 5_000, op_true_spk.clone()));
+//     tx_none_acp.inputs.push(TransactionInput::new(initial_registry_unit_collection[7].0, vec![], 0, 0));
+//     tx_none_acp.outputs.push(TransactionOutput::new(initial_registry_unit_collection[4].1.amount - 5_000, op_true_spk.clone()));
 //     tx_none_acp.finalize();
 //     let mut tx_none_acp = MutableTransaction::from_tx(tx_none_acp);
 //     let _ = consensus.validate_mempool_transaction(&mut tx_none_acp, &TransactionValidationArgs::default());
 //     let tx_none_acp = tx_none_acp.tx.unwrap_or_clone();
 //     let status =
-//         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_none_acp]).await;
+//         consensus.add_registry_unit_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_none_acp]).await;
 //     block_index += 1;
-//     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+//     assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 //
 //     // SIGHASH_SINGLE | ANYONECANPAY commits to this input and its matching output; other outputs and inputs are free to change.
 //     let mut tx_single_acp = Transaction::new(
 //         0,
-//         vec![TransactionInput::new(initial_utxo_collection[5].0, vec![], 0, 1)],
-//         vec![TransactionOutput::new(initial_utxo_collection[5].1.amount - 5_500_000, op_true_spk.clone())],
+//         vec![TransactionInput::new(initial_registry_unit_collection[5].0, vec![], 0, 1)],
+//         vec![TransactionOutput::new(initial_registry_unit_collection[5].1.amount - 5_500_000, op_true_spk.clone())],
 //         0,
 //         SUBNETWORK_ID_NATIVE,
 //         0,
 //         vec![],
 //     );
-//     let sig_script = make_sig_script(&tx_single_acp, &initial_utxo_collection[5].1, SIG_HASH_SINGLE | SIG_HASH_ANY_ONE_CAN_PAY);
+//     let sig_script = make_sig_script(&tx_single_acp, &initial_registry_unit_collection[5].1, SIG_HASH_SINGLE | SIG_HASH_ANY_ONE_CAN_PAY);
 //     tx_single_acp.inputs[0].signature_script = sig_script;
-//     tx_single_acp.inputs.push(TransactionInput::new(initial_utxo_collection[8].0, vec![], 0, 0));
+//     tx_single_acp.inputs.push(TransactionInput::new(initial_registry_unit_collection[8].0, vec![], 0, 0));
 //     tx_single_acp.outputs.push(TransactionOutput::new(5_000_000, op_true_spk.clone()));
 //     tx_single_acp.finalize();
 //     let mut tx_single_acp = MutableTransaction::from_tx(tx_single_acp);
 //     let _ = consensus.validate_mempool_transaction(&mut tx_single_acp, &TransactionValidationArgs::default());
 //     let tx_single_acp = tx_single_acp.tx.unwrap_or_clone();
 //     let status =
-//         consensus.add_utxo_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_single_acp]).await;
-//     assert!(matches!(status, Ok(BlockStatus::StatusUTXOValid)));
+//         consensus.add_registry_unit_valid_block_with_parents((block_index + 1).into(), vec![config.genesis.hash], vec![tx_single_acp]).await;
+//     assert!(matches!(status, Ok(BlockStatus::StatusStateValid)));
 // }
 //
 // // Checks that pruning works and that we do not allow attaching a body to a pruned block
@@ -1952,24 +1952,24 @@ async fn pruning_test() {
     let mut selected_chain = vec![config.genesis.hash];
 
     let genesis_child = 1.into();
-    consensus.add_empty_utxo_valid_block_with_parents(genesis_child, vec![*selected_chain.last().unwrap()]).await.unwrap();
+    consensus.add_empty_registry_unit_valid_block_with_parents(genesis_child, vec![*selected_chain.last().unwrap()]).await.unwrap();
     selected_chain.push(genesis_child);
     let genesis_child_block = consensus.get_block(genesis_child).unwrap();
 
     let genesis_child_child = 2.into();
-    consensus.add_empty_utxo_valid_block_with_parents(genesis_child_child, vec![*selected_chain.last().unwrap()]).await.unwrap();
+    consensus.add_empty_registry_unit_valid_block_with_parents(genesis_child_child, vec![*selected_chain.last().unwrap()]).await.unwrap();
     selected_chain.push(genesis_child_child);
     let genesis_child_child_block = consensus.get_block(genesis_child_child).unwrap();
 
     for i in 3..config.pruning_depth() + config.finality_depth() + 100 {
         let hash: Hash = i.into();
-        consensus.add_empty_utxo_valid_block_with_parents(hash, vec![*selected_chain.last().unwrap()]).await.unwrap();
+        consensus.add_empty_registry_unit_valid_block_with_parents(hash, vec![*selected_chain.last().unwrap()]).await.unwrap();
         selected_chain.push(hash);
     }
 
     // Waiting for genesis_child_child to get pruned
     let start = Instant::now();
-    while consensus.get_block_status(genesis_child_child).unwrap() == BlockStatus::StatusUTXOValid {
+    while consensus.get_block_status(genesis_child_child).unwrap() == BlockStatus::StatusStateValid {
         if start.elapsed() > Duration::from_secs(10) {
             panic!("Timed out waiting 10 seconds for pruning to occur");
         }

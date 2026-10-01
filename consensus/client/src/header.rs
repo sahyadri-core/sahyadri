@@ -29,7 +29,7 @@ export interface IHeader {
     parentsByLevel: Array<Array<HexString>>;
     hashMerkleRoot: HexString;
     acceptedIdMerkleRoot: HexString;
-    utxoCommitment: HexString;
+    registry_unitCommitment: HexString;
     timestamp: bigint;
     bits: number;
     nonce: bigint;
@@ -52,7 +52,7 @@ export interface IRawHeader {
     parentsByLevel: Array<Array<HexString>>;
     hashMerkleRoot: HexString;
     acceptedIdMerkleRoot: HexString;
-    utxoCommitment: HexString;
+    registry_unitCommitment: HexString;
     timestamp: bigint;
     bits: number;
     nonce: bigint;
@@ -205,14 +205,14 @@ impl Header {
         self.inner_mut().accepted_id_merkle_root = Hash::from_slice(&js_value.try_as_vec_u8().expect("accepted id merkle root"));
     }
 
-    #[wasm_bindgen(getter = utxoCommitment)]
-    pub fn get_utxo_commitment_as_hex(&self) -> String {
-        self.inner().utxo_commitment.to_hex()
+    #[wasm_bindgen(getter = registry_unitCommitment)]
+    pub fn get_registry_unit_commitment_as_hex(&self) -> String {
+        self.inner().registry_unit_commitment.to_hex()
     }
 
-    #[wasm_bindgen(setter = utxoCommitment)]
-    pub fn set_utxo_commitment_from_js_value(&mut self, js_value: JsValue) {
-        self.inner_mut().utxo_commitment = Hash::from_slice(&js_value.try_as_vec_u8().expect("utxo commitment"));
+    #[wasm_bindgen(setter = registry_unitCommitment)]
+    pub fn set_registry_unit_commitment_from_js_value(&mut self, js_value: JsValue) {
+        self.inner_mut().registry_unit_commitment = Hash::from_slice(&js_value.try_as_vec_u8().expect("registry_unit commitment"));
     }
 
     #[wasm_bindgen(getter = pruningPoint)]
@@ -300,10 +300,10 @@ impl TryCastFromJs for Header {
                         .get_value("acceptedIdMerkleRoot")?
                         .try_into_owned()
                         .map_err(|err| Error::convert("acceptedIdMerkleRoot", err))?,
-                    utxo_commitment: object
-                        .get_value("utxoCommitment")?
+                    registry_unit_commitment: object
+                        .get_value("registry_unitCommitment")?
                         .try_into_owned()
-                        .map_err(|err| Error::convert("utxoCommitment", err))?,
+                        .map_err(|err| Error::convert("registry_unitCommitment", err))?,
                     nonce: object.get_u64("nonce")?,
                     timestamp: object.get_u64("timestamp")?,
                     daa_score: object.get_u64("daaScore")?,

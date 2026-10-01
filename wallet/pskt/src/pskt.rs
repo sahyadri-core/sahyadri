@@ -93,7 +93,7 @@ impl Signature {
 /// exposing private keys.
 ///
 /// Please note that due to transaction mass limits and potential of
-/// a wallet aggregating large UTXO sets, the PSKT [`Bundle`](crate::bundle::Bundle) primitive
+/// a wallet aggregating large REGISTRY_UNIT sets, the PSKT [`Bundle`](crate::bundle::Bundle) primitive
 /// is used to represent a collection of PSKTs and should be used for
 /// PSKT serialization and transport. PSKT is an internal implementation
 /// primitive that represents each transaction in the bundle.
@@ -153,7 +153,7 @@ impl<R> PSKT<R> {
             // Only include payload if version supports it (Version::One or higher)
             if self.global.version >= Version::One { self.global.payload.clone().unwrap_or_default() } else { vec![] },
         );
-        let entries = self.inputs.iter().filter_map(|Input { utxo_entry, .. }| utxo_entry.clone()).collect();
+        let entries = self.inputs.iter().filter_map(|Input { registry_unit_entry, .. }| registry_unit_entry.clone()).collect();
         SignableTransaction::with_entries(tx, entries)
     }
 
@@ -330,7 +330,7 @@ impl PSKT<Signer> {
         PSKT { inner_pskt: self.inner_pskt, role: Default::default() }
     }
 
-    // Unorphan batch transaction UTXO.
+    // Unorphan batch transaction REGISTRY_UNIT.
     pub fn set_input_prev_transaction_id(self, transaction_id: Hash) -> PSKT<Signer> {
         let mut new_inputs = self.inner_pskt.inputs.clone();
 

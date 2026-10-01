@@ -5,7 +5,7 @@
 use sahyadri_consensus_core::{
     errors::consensus::ConsensusError,
     header::Header,
-    tx::{TransactionOutpoint, UtxoEntry},
+    tx::{RegistryRef, RegistryUnit},
 };
 use sahyadri_core::{debug, info};
 use sahyadri_p2p_lib::{
@@ -14,7 +14,7 @@ use sahyadri_p2p_lib::{
     convert::{header::HeaderFormat, header::Versioned, model::trusted::TrustedDataEntry},
     make_message,
     pb::{
-        RequestNextHeadersMessage, RequestNextPruningPointAndItsAnticoneBlocksMessage, RequestNextPruningPointUtxoSetChunkMessage,
+        RequestNextHeadersMessage, RequestNextPruningPointAndItsAnticoneBlocksMessage, RequestNextPruningPointRegistryUnitSetChunkMessage,
         sahyadrid_message::Payload,
     },
 };
@@ -136,29 +136,29 @@ impl<'a, 'b> HeadersChunkStream<'a, 'b> {
     }
 }
 
-/// A chunk of UTXOs
-pub type UtxosetChunk = Vec<(TransactionOutpoint, UtxoEntry)>;
+/// A chunk of REGISTRY_UNITs
+pub type RegistryUnitsetChunk = Vec<(RegistryRef, RegistryUnit)>;
 
-pub struct PruningPointUtxosetChunkStream<'a, 'b> {
+pub struct PruningPointRegistryUnitsetChunkStream<'a, 'b> {
     router: &'a Router,
     incoming_route: &'b mut IncomingRoute,
     i: usize, // Chunk index
-    utxo_count: usize,
+    registry_unit_count: usize,
 }
 
-impl<'a, 'b> PruningPointUtxosetChunkStream<'a, 'b> {
+impl<'a, 'b> PruningPointRegistryUnitsetChunkStream<'a, 'b> {
     pub fn new(router: &'a Router, incoming_route: &'b mut IncomingRoute) -> Self {
-        Self { router, incoming_route, i: 0, utxo_count: 0 }
+        Self { router, incoming_route, i: 0, registry_unit_count: 0 }
     }
 
-    pub async fn next(&mut self) -> Result<Option<UtxosetChunk>, ProtocolError> {
-        let res: Result<Option<UtxosetChunk>, ProtocolError> = match timeout(DEFAULT_TIMEOUT, self.incoming_route.recv()).await {
+    pub async fn next(&mut self) -> Result<Option<RegistryUnitsetChunk>, ProtocolError> {
+        let res: Result<Option<RegistryUnitsetChunk>, ProtocolError> = match timeout(DEFAULT_TIMEOUT, self.incoming_route.recv()).await {
             Ok(op) => {
                 if let Some(msg) = op {
                     match msg.payload {
-                        Some(Payload::PruningPointUtxoSetChunk(payload)) => Ok(Some(payload.try_into()?)),
-                        Some(Payload::DonePruningPointUtxoSetChunks(_)) => {
-                            info!("Finished receiving the UTXO set. Total UTXOs: {}", self.utxo_count);
+                        Some(Payload::PruningPointRegistryUnitSetChunk(payload)) => Ok(Some(payload.try_into()?)),
+                        Some(Payload::DonePruningPointRegistryUnitSetChunks(_)) => {
+                            info!("Finished receiving the REGISTRY_UNIT set. Total REGISTRY_UNITs: {}", self.registry_unit_count);
                             Ok(None)
                         }
                         Some(Payload::UnexpectedPruningPoint(_)) => {
@@ -168,8 +168,8 @@ impl<'a, 'b> PruningPointUtxosetChunkStream<'a, 'b> {
                         }
                         _ => Err(ProtocolError::UnexpectedMessage(
                             stringify!(
-                                Payload::PruningPointUtxoSetChunk
-                                    | Payload::DonePruningPointUtxoSetChunks
+                                Payload::PruningPointRegistryUnitSetChunk
+                                    | Payload::DonePruningPointRegistryUnitSetChunks
                                     | Payload::UnexpectedPruningPoint
                             ),
                             msg.payload.as_ref().map(|v| v.into()),
@@ -185,13 +185,13 @@ impl<'a, 'b> PruningPointUtxosetChunkStream<'a, 'b> {
         // Request the next batch only if the stream is still live
         if let Ok(Some(chunk)) = res {
             self.i += 1;
-            self.utxo_count += chunk.len();
+            self.registry_unit_count += chunk.len();
             if self.i.is_multiple_of(IBD_BATCH_SIZE) {
-                info!("Received {} UTXO set chunks so far, totaling in {} UTXOs", self.i, self.utxo_count);
+                info!("Received {} REGISTRY_UNIT set chunks so far, totaling in {} REGISTRY_UNITs", self.i, self.registry_unit_count);
                 self.router
                     .enqueue(make_message!(
-                        Payload::RequestNextPruningPointUtxoSetChunk,
-                        RequestNextPruningPointUtxoSetChunkMessage {}
+                        Payload::RequestNextPruningPointRegistryUnitSetChunk,
+                        RequestNextPruningPointRegistryUnitSetChunkMessage {}
                     ))
                     .await?;
             }

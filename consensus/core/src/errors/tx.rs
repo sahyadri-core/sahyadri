@@ -1,6 +1,6 @@
 use crate::constants::MAX_KANA;
 use crate::subnets::SubnetworkId;
-use crate::tx::TransactionOutpoint;
+use crate::tx::RegistryRef;
 use sahyadri_txscript_errors::TxScriptError;
 use thiserror::Error;
 
@@ -63,7 +63,7 @@ pub enum TxRuleError {
         "transaction input #{0} tried to spend coinbase outpoint {1} with daa score of {2} 
     while the merging block daa score is {3} and the coinbase maturity period of {4} hasn't passed yet"
     )]
-    ImmatureCoinbaseSpend(usize, TransactionOutpoint, u64, u64, u64),
+    ImmatureCoinbaseSpend(usize, RegistryRef, u64, u64, u64),
 
     #[error("transaction total inputs spending amount overflowed u64")]
     InputAmountOverflow,
@@ -89,7 +89,7 @@ pub enum TxRuleError {
     #[error("one of the transaction sequence locks conditions was not met")]
     SequenceLockConditionsAreNotMet,
 
-    #[error("outpoints corresponding to some transaction inputs are missing from current utxo context")]
+    #[error("outpoints corresponding to some transaction inputs are missing from current registry_unit context")]
     MissingTxOutpoints,
 
     #[error("failed to verify the signature script: {0}")]

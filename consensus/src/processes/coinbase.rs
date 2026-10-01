@@ -277,7 +277,7 @@ impl CoinbaseManager {
     ///
     /// Note that this function is called only if daa_score >= self.deflationary_phase_daa_score
     fn _subsidy_month(&self, _daa_score: u64) -> u64 {
-        // Disabled logic for unused UTXO math
+        // Disabled logic for unused REGISTRY_UNIT math
         0
     }
 

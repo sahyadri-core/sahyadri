@@ -10,13 +10,13 @@ use crate::mempool::{
 };
 use sahyadri_consensus_core::{
     tx::MutableTransaction,
-    tx::{TransactionId, TransactionOutpoint},
+    tx::{TransactionId, RegistryRef},
 };
 use sahyadri_core::{debug, warn};
 use sahyadri_utils::iter::IterExtensions;
 use std::sync::Arc;
 
-/// Pool of orphan transactions depending on some missing utxo entries
+/// Pool of orphan transactions depending on some missing registry_unit entries
 ///
 /// ### Rust rewrite notes
 ///
@@ -51,11 +51,11 @@ impl OrphanPool {
         }
     }
 
-    pub(crate) fn outpoint_orphan(&self, outpoint: &TransactionOutpoint) -> Option<&MempoolTransaction> {
+    pub(crate) fn outpoint_orphan(&self, outpoint: &RegistryRef) -> Option<&MempoolTransaction> {
         self.outpoint_owner_id.get(outpoint).and_then(|id| self.all_orphans.get(id))
     }
 
-    pub(crate) fn outpoint_orphan_mut(&mut self, outpoint: &TransactionOutpoint) -> Option<&mut MempoolTransaction> {
+    pub(crate) fn outpoint_orphan_mut(&mut self, outpoint: &RegistryRef) -> Option<&mut MempoolTransaction> {
         self.outpoint_owner_id.get(outpoint).and_then(|id| self.all_orphans.get_mut(id))
     }
 
@@ -141,7 +141,7 @@ impl OrphanPool {
             entry.insert(id);
         }
         // ... outgoing
-        let mut outpoint = TransactionOutpoint::new(id, 0);
+        let mut outpoint = RegistryRef::new(id, 0);
         for i in 0..transaction.mtx.tx.outputs.len() {
             outpoint.index = i as u32;
             if let Some(chained) = self.outpoint_orphan(&outpoint).map(|x| x.id()) {
@@ -242,7 +242,7 @@ impl OrphanPool {
             return self.remove_redeemers_of(&removed_transaction_id);
         }
 
-        let mut outpoint = TransactionOutpoint::new(removed_transaction_id, 0);
+        let mut outpoint = RegistryRef::new(removed_transaction_id, 0);
         for i in 0..removed_transaction.mtx.tx.outputs.len() {
             outpoint.index = i as u32;
             if let Some(orphan) = self.outpoint_orphan_mut(&outpoint) {

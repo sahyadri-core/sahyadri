@@ -49,7 +49,7 @@ pub mod sahyadrid_request_convert {
     impl_into_sahyadrid_request!(GetSahyadriDagInfo);
     impl_into_sahyadrid_request!(ResolveFinalityConflict);
     impl_into_sahyadrid_request!(GetHeaders);
-    impl_into_sahyadrid_request!(GetUtxosByAddresses);
+    impl_into_sahyadrid_request!(GetRegistryByAddresses);
     impl_into_sahyadrid_request!(GetBalanceByAddress);
     impl_into_sahyadrid_request!(GetDaaScore);
     impl_into_sahyadrid_request!(GetBalancesByAddresses);
@@ -69,13 +69,13 @@ pub mod sahyadrid_request_convert {
     impl_into_sahyadrid_request!(GetFeeEstimate);
     impl_into_sahyadrid_request!(GetFeeEstimateExperimental);
     impl_into_sahyadrid_request!(GetCurrentBlockColor);
-    impl_into_sahyadrid_request!(GetUtxoReturnAddress);
+    impl_into_sahyadrid_request!(GetRegistryUnitReturnAddress);
     impl_into_sahyadrid_request!(GetVirtualChainFromBlockV2);
 
     impl_into_sahyadrid_request!(NotifyBlockAdded);
     impl_into_sahyadrid_request!(NotifyNewBlockTemplate);
-    impl_into_sahyadrid_request!(NotifyUtxosChanged);
-    impl_into_sahyadrid_request!(NotifyPruningPointUtxoSetOverride);
+    impl_into_sahyadrid_request!(NotifyRegistryChanged);
+    impl_into_sahyadrid_request!(NotifyPruningPointRegistryUnitSetOverride);
     impl_into_sahyadrid_request!(NotifyFinalityConflict);
     impl_into_sahyadrid_request!(NotifyVirtualDaaScoreChanged);
     impl_into_sahyadrid_request!(NotifyVirtualChainChanged);
@@ -194,7 +194,7 @@ pub mod sahyadrid_response_convert {
     impl_into_sahyadrid_response!(GetSahyadriDagInfo);
     impl_into_sahyadrid_response!(ResolveFinalityConflict);
     impl_into_sahyadrid_response!(GetHeaders);
-    impl_into_sahyadrid_response!(GetUtxosByAddresses);
+    impl_into_sahyadrid_response!(GetRegistryByAddresses);
     impl_into_sahyadrid_response!(GetBalanceByAddress);
     impl_into_sahyadrid_response!(GetDaaScore);
     impl_into_sahyadrid_response!(GetBalancesByAddresses);
@@ -214,20 +214,20 @@ pub mod sahyadrid_response_convert {
     impl_into_sahyadrid_response!(GetFeeEstimate);
     impl_into_sahyadrid_response!(GetFeeEstimateExperimental);
     impl_into_sahyadrid_response!(GetCurrentBlockColor);
-    impl_into_sahyadrid_response!(GetUtxoReturnAddress);
+    impl_into_sahyadrid_response!(GetRegistryUnitReturnAddress);
     impl_into_sahyadrid_response!(GetVirtualChainFromBlockV2);
 
     impl_into_sahyadrid_notify_response!(NotifyBlockAdded);
     impl_into_sahyadrid_notify_response!(NotifyNewBlockTemplate);
-    impl_into_sahyadrid_notify_response!(NotifyUtxosChanged);
-    impl_into_sahyadrid_notify_response!(NotifyPruningPointUtxoSetOverride);
+    impl_into_sahyadrid_notify_response!(NotifyRegistryChanged);
+    impl_into_sahyadrid_notify_response!(NotifyPruningPointRegistryUnitSetOverride);
     impl_into_sahyadrid_notify_response!(NotifyFinalityConflict);
     impl_into_sahyadrid_notify_response!(NotifyVirtualDaaScoreChanged);
     impl_into_sahyadrid_notify_response!(NotifyVirtualChainChanged);
     impl_into_sahyadrid_notify_response!(NotifySinkBlueScoreChanged);
 
-    impl_into_sahyadrid_notify_response!(NotifyUtxosChanged, StopNotifyingUtxosChanged);
-    impl_into_sahyadrid_notify_response!(NotifyPruningPointUtxoSetOverride, StopNotifyingPruningPointUtxoSetOverride);
+    impl_into_sahyadrid_notify_response!(NotifyRegistryChanged, StopNotifyingRegistryChanged);
+    impl_into_sahyadrid_notify_response!(NotifyPruningPointRegistryUnitSetOverride, StopNotifyingPruningPointRegistryUnitSetOverride);
 
     macro_rules! impl_into_sahyadrid_response {
         ($name:tt) => {

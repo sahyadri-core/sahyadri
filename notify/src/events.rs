@@ -46,10 +46,10 @@ event_type_enum! {
         VirtualChainChanged,
         FinalityConflict,
         FinalityConflictResolved,
-        UtxosChanged,
+        RegistryChanged,
         SinkBlueScoreChanged,
         VirtualDaaScoreChanged,
-        PruningPointUtxoSetOverride,
+        PruningPointRegistryUnitSetOverride,
         NewBlockTemplate,
     }
 }
@@ -65,10 +65,10 @@ impl FromStr for EventType {
             "virtual-chain-changed" => Ok(EventType::VirtualChainChanged),
             "finality-conflict" => Ok(EventType::FinalityConflict),
             "finality-conflict-resolved" => Ok(EventType::FinalityConflictResolved),
-            "utxos-changed" => Ok(EventType::UtxosChanged),
+            "registry-changed" => Ok(EventType::RegistryChanged),
             "sink-blue-score-changed" => Ok(EventType::SinkBlueScoreChanged),
             "virtual-daa-score-changed" => Ok(EventType::VirtualDaaScoreChanged),
-            "pruning-point-utxo-set-override" => Ok(EventType::PruningPointUtxoSetOverride),
+            "pruning-point-registry_unit-set-override" => Ok(EventType::PruningPointRegistryUnitSetOverride),
             "new-block-template" => Ok(EventType::NewBlockTemplate),
             _ => Err(Error::InvalidEventType(s.to_string())),
         }

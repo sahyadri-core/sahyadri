@@ -5,12 +5,12 @@ use sahyadri_consensus_core::{
     Hash,
     constants::TX_VERSION,
     subnets::SUBNETWORK_ID_NATIVE,
-    tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput},
+    tx::{ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput},
 };
 
 fn constuct_tx() -> Transaction {
     let inputs = vec![TransactionInput {
-        previous_outpoint: TransactionOutpoint { transaction_id: Hash::from_bytes([0xFF; 32]), index: 0 },
+        previous_outpoint: RegistryRef { transaction_id: Hash::from_bytes([0xFF; 32]), index: 0 },
         signature_script: vec![],
         sequence: 0,
         sig_op_count: 1,

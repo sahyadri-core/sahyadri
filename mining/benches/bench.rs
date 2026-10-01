@@ -3,7 +3,7 @@ use itertools::Itertools;
 use rand::{Rng, thread_rng};
 use sahyadri_consensus_core::{
     subnets::SUBNETWORK_ID_NATIVE,
-    tx::{Transaction, TransactionInput, TransactionOutpoint},
+    tx::{Transaction, TransactionInput, RegistryRef},
 };
 use sahyadri_hashes::{HasherBase, TransactionID};
 use sahyadri_mining::{FeerateTransactionKey, Frontier, Policy, model::topological_index::TopologicalIndex};
@@ -81,7 +81,7 @@ pub fn bench_compare_topological_index_fns(c: &mut Criterion) {
 fn generate_unique_tx(i: u64) -> Arc<Transaction> {
     let mut hasher = TransactionID::new();
     let prev = hasher.update(i.to_le_bytes()).clone().finalize();
-    let input = TransactionInput::new(TransactionOutpoint::new(prev, 0), vec![], 0, 0);
+    let input = TransactionInput::new(RegistryRef::new(prev, 0), vec![], 0, 0);
     Arc::new(Transaction::new(0, vec![input], vec![], 0, SUBNETWORK_ID_NATIVE, 0, vec![]))
 }
 

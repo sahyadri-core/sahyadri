@@ -8,11 +8,11 @@ use sahyadri_consensus_core::hashing::sighash::SigHashReusedValues;
 use sahyadri_consensus_core::hashing::*;
 use sahyadri_consensus_core::hashing::sighash_type::{SigHashType, SIG_HASH_ALL};
 use sahyadri_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
-use sahyadri_consensus_core::tx::{TransactionOutpoint, TransactionOutput, VerifiableTransaction};
+use sahyadri_consensus_core::tx::{RegistryRef, TransactionOutput, VerifiableTransaction};
 // use sahyadri_hashes::{Hash, Hasher, HasherBase, TransactionSigningHash};
 use crate::transaction::{Transaction,ITransaction};
 use crate::input::{ITransactionInput, TransactionInput};
-use crate::utxo::{IUtxoEntry,UtxoEntryReference};
+use crate::registry_unit::{IRegistryUnit,RegistryUnitRef};
 use sahyadri_hashes::{Hash, Hasher, HasherBase, TransactionSigningHash, TransactionSigningHashECDSA, ZERO_HASH};
 use sahyadri_consensus_core::hashing::HasherExtensions;
 use sahyadri_consensus_core::hashing::sighash::*;
@@ -136,7 +136,7 @@ impl SigHashCache {
         }
     }
 
-    pub fn hash_outpoint(hasher: &mut impl Hasher, outpoint: TransactionOutpoint) {
+    pub fn hash_outpoint(hasher: &mut impl Hasher, outpoint: RegistryRef) {
         hasher.update(outpoint.transaction_id);
         hasher.write_u32(outpoint.index);
     }
@@ -155,7 +155,7 @@ impl SigHashCache {
 pub fn calc_signature_hash(
     tx : ITransaction,
     input : ITransactionInput,
-    // utxo : IUtxoEntry,
+    // registry_unit : IRegistryUnit,
 //    verifiable_tx: &impl VerifiableTransaction,
     input_index: usize,
     // hash_type: SigHashType,
@@ -167,15 +167,15 @@ pub fn calc_signature_hash(
     let input = TransactionInput::try_cast_from(input)?;
     // let input = TransactionInput::try_cast_from(input.as_ref())?;
 
-    // let utxo = input.
+    // let registry_unit = input.
 
-    let utxo = input.as_ref().utxo().ok_or(Error::MissingUtxoEntry)?;
+    let registry_unit = input.as_ref().registry_unit().ok_or(Error::MissingRegistryUnit)?;
 
-    // let utxo = UtxoEntryReference::try_cast_from(utxo.as_ref())?;
+    // let registry_unit = RegistryUnitRef::try_cast_from(registry_unit.as_ref())?;
 
     let tx = cctx::Transaction::from(tx.as_ref());
     let input = cctx::TransactionInput::from(input.as_ref());
-    let utxo = cctx::UtxoEntry::from(utxo.as_ref());
+    let registry_unit = cctx::RegistryUnit::from(registry_unit.as_ref());
 
     let hash_type = SIG_HASH_ALL;
     let reused_values = SigHashReusedValuesUnsync::new();
@@ -189,9 +189,9 @@ pub fn calc_signature_hash(
         .update(sequences_hash(&tx, hash_type, &reused_values))
         .update(sig_op_counts_hash(&tx, hash_type, &reused_values));
     hash_outpoint(&mut hasher, input.previous_outpoint);
-    hash_script_public_key(&mut hasher, &utxo.script_public_key);
+    hash_script_public_key(&mut hasher, &registry_unit.script_public_key);
     hasher
-        .write_u64(utxo.amount)
+        .write_u64(registry_unit.amount)
         .write_u64(input.sequence)
         .write_u8(input.sig_op_count)
         .update(outputs_hash(&tx, hash_type, &reused_values, input_index))

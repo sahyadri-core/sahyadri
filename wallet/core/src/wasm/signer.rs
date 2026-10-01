@@ -53,8 +53,8 @@ pub fn js_sign_transaction(tx: &Transaction, signer: &PrivateKeyArrayT, verify_s
 fn sign_transaction<'a>(tx: &'a Transaction, private_keys: &[[u8; 32]], verify_sig: bool) -> Result<&'a Transaction> {
     let tx = sign(tx, private_keys)?;
     if verify_sig {
-        let (cctx, utxos) = tx.tx_and_utxos()?;
-        let populated_transaction = PopulatedTransaction::new(&cctx, utxos);
+        let (cctx, registry_units) = tx.tx_and_registry_units()?;
+        let populated_transaction = PopulatedTransaction::new(&cctx, registry_units);
         verify(&populated_transaction)?;
     }
     Ok(tx)
@@ -76,8 +76,8 @@ pub fn create_input_signature(
     private_key: &PrivateKey,
     sighash_type: Option<SighashType>,
 ) -> Result<HexString> {
-    let (cctx, utxos) = tx.tx_and_utxos()?;
-    let populated_transaction = PopulatedTransaction::new(&cctx, utxos);
+    let (cctx, registry_units) = tx.tx_and_registry_units()?;
+    let populated_transaction = PopulatedTransaction::new(&cctx, registry_units);
 
     let keypair = sahyadri_dilithium::generate_keypair_from_seed(&private_key.seed_bytes());
     let signature = sign_input(&populated_transaction, input_index.into(), &keypair, sighash_type.unwrap_or(SighashType::All).into());

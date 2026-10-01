@@ -1,7 +1,7 @@
 use sahyadri_hashes::Hash;
 use thiserror::Error;
 
-use crate::{tx::TransactionIndexType, utxo::utxo_inquirer::UtxoInquirerError};
+use crate::{tx::TransactionIndexType};
 
 use super::{difficulty::DifficultyError, sync::SyncManagerError, traversal::TraversalError};
 
@@ -28,6 +28,9 @@ pub enum ConsensusError {
     #[error("got unexpected pruning point")]
     UnexpectedPruningPoint,
 
+    #[error("operation not supported in account model: {0}")]
+    UnsupportedInAccountModel(String),
+
     #[error("pruning point is not at sufficient depth from virtual, cannot obtain its final anticone at this stage")]
     PruningPointInsufficientDepth,
 
@@ -42,9 +45,6 @@ pub enum ConsensusError {
 
     #[error("{0}")]
     General(&'static str),
-
-    #[error("utxo inquirer error: {0}")]
-    UtxoInquirerError(#[from] UtxoInquirerError),
 
     #[error("{0}")]
     GeneralOwned(String),

@@ -95,11 +95,11 @@ impl WalletApi for super::Wallet {
 
             self.set_network_id(&network_id)?;
 
-            let processor = self.utxo_processor().clone();
+            let processor = self.registry_unit_processor().clone();
             let (sender, receiver) = oneshot();
 
             // set connection signaler that gets triggered
-            // by utxo processor when connection occurs
+            // by registry_unit processor when connection occurs
             processor.set_connection_signaler(sender);
 
             // connect rpc
@@ -428,13 +428,13 @@ impl WalletApi for super::Wallet {
         Ok(AccountsPskbBroadcastResponse { transaction_ids })
     }
 
-    async fn accounts_get_utxos_call(self: Arc<Self>, request: AccountsGetUtxosRequest) -> Result<AccountsGetUtxosResponse> {
-        let AccountsGetUtxosRequest { account_id, addresses, min_amount_kana } = request;
+    async fn accounts_get_registry_units_call(self: Arc<Self>, request: AccountsGetRegistryUnitsRequest) -> Result<AccountsGetRegistryUnitsResponse> {
+        let AccountsGetRegistryUnitsRequest { account_id, addresses, min_amount_kana } = request;
         let guard = self.guard();
         let guard = guard.lock().await;
         let account = self.get_account_by_id(&account_id, &guard).await?.ok_or(Error::AccountNotFound(account_id))?;
-        let utxos = account.get_utxos(addresses, min_amount_kana).await?;
-        Ok(AccountsGetUtxosResponse { utxos: utxos.into_iter().map(|entry| entry.into()).collect::<Vec<UtxoEntryWrapper>>() })
+        let registry_units = account.get_registry_units(addresses, min_amount_kana).await?;
+        Ok(AccountsGetRegistryUnitsResponse { registry_units: registry_units.into_iter().map(|entry| entry.into()).collect::<Vec<RegistryUnitWrapper>>() })
     }
 
     async fn accounts_pskb_send_call(self: Arc<Self>, request: AccountsPskbSendRequest) -> Result<AccountsPskbSendResponse> {
@@ -674,7 +674,7 @@ impl WalletApi for super::Wallet {
 
     async fn fee_rate_poller_enable_call(self: Arc<Self>, request: FeeRatePollerEnableRequest) -> Result<FeeRatePollerEnableResponse> {
         let FeeRatePollerEnableRequest { interval_seconds } = request;
-        self.utxo_processor().start_fee_rate_poller(Duration::from_secs(interval_seconds)).await?;
+        self.registry_unit_processor().start_fee_rate_poller(Duration::from_secs(interval_seconds)).await?;
         Ok(FeeRatePollerEnableResponse {})
     }
 
@@ -682,7 +682,7 @@ impl WalletApi for super::Wallet {
         self: Arc<Self>,
         _request: FeeRatePollerDisableRequest,
     ) -> Result<FeeRatePollerDisableResponse> {
-        self.utxo_processor().stop_fee_rate_poller().await?;
+        self.registry_unit_processor().stop_fee_rate_poller().await?;
         Ok(FeeRatePollerDisableResponse {})
     }
 }

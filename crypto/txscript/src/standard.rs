@@ -101,7 +101,7 @@ pub mod test_helpers {
     use sahyadri_consensus_core::{
         constants::TX_VERSION,
         subnets::SUBNETWORK_ID_NATIVE,
-        tx::{Transaction, TransactionInput, TransactionOutpoint, TransactionOutput},
+        tx::{Transaction, TransactionInput, RegistryRef, TransactionOutput},
     };
 
     /// Returns a P2SH script paying to an anyone-can-spend address,
@@ -118,7 +118,7 @@ pub mod test_helpers {
     pub fn create_transaction(tx_to_spend: &Transaction, fee: u64) -> Transaction {
         let (script_public_key, redeem_script) = op_true_script();
         let signature_script = pay_to_script_hash_signature_script(redeem_script, vec![]).expect("the script is canonical");
-        let previous_outpoint = TransactionOutpoint::new(tx_to_spend.id(), 0);
+        let previous_outpoint = RegistryRef::new(tx_to_spend.id(), 0);
         let input = TransactionInput::new(previous_outpoint, signature_script, MAX_TX_IN_SEQUENCE_NUM, 1);
         let output = TransactionOutput::new(tx_to_spend.outputs[0].value - fee, script_public_key);
         Transaction::new(TX_VERSION, vec![input], vec![output], 0, SUBNETWORK_ID_NATIVE, 0, vec![])
@@ -144,7 +144,7 @@ pub mod test_helpers {
         for tx_to_spend in txs_to_spend {
             for i in output_indexes.iter().copied() {
                 if i < tx_to_spend.outputs.len() {
-                    let previous_outpoint = TransactionOutpoint::new(tx_to_spend.id(), i as u32);
+                    let previous_outpoint = RegistryRef::new(tx_to_spend.id(), i as u32);
                     inputs.push(TransactionInput::new(previous_outpoint, signature_script.clone(), MAX_TX_IN_SEQUENCE_NUM, 1));
                     inputs_value += tx_to_spend.outputs[i].value;
                 }

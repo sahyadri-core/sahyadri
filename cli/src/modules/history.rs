@@ -23,7 +23,7 @@ impl History {
         let binding = Binding::from(&account);
         let current_daa_score = ctx.wallet().current_daa_score();
 
-        let (last, include_utxo) = match argv.remove(0).as_str() {
+        let (last, include_registry_unit) = match argv.remove(0).as_str() {
             "lookup" => {
                 let transaction_id = if argv.is_empty() {
                     tprintln!(ctx, "usage: history lookup <transaction id>");
@@ -116,7 +116,7 @@ impl History {
                                 &ctx.wallet(),
                                 None,
                                 current_daa_score,
-                                include_utxo,
+                                include_registry_unit,
                                 true,
                                 Some(account.clone()),
                                 &guard,
@@ -143,7 +143,7 @@ impl History {
         ctx.term().help(
             &[
                 ("list [<last N transactions>]", "List transactions"),
-                ("details [<last N transactions>]", "List transactions with UTXO details"),
+                ("details [<last N transactions>]", "List transactions with REGISTRY_UNIT details"),
                 ("lookup <transaction id>", "Lookup transaction in the history"),
             ],
             None,

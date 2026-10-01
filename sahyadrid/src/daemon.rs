@@ -66,7 +66,7 @@ use crate::args::Args;
 
 const DEFAULT_DATA_DIR: &str = "datadir";
 const CONSENSUS_DB: &str = "consensus";
-const UTXOINDEX_DB: &str = "utxoindex";
+const REGISTRY_UNITINDEX_DB: &str = "registry_unitindex";
 const META_DB: &str = "meta";
 const META_DB_FILE_LIMIT: i32 = 5;
 const DEFAULT_LOG_DIR: &str = "logs";
@@ -89,11 +89,11 @@ pub fn get_app_dir() -> PathBuf {
 pub fn validate_args(args: &Args) -> ConfigResult<()> {
     #[cfg(feature = "devnet-prealloc")]
     {
-        if args.num_prealloc_utxos.is_some() && !(args.devnet || args.simnet) {
-            return Err(ConfigError::PreallocUtxosOnNonDevnet);
+        if args.num_prealloc_registry_units.is_some() && !(args.devnet || args.simnet) {
+            return Err(ConfigError::PreallocRegistryUnitsOnNonDevnet);
         }
 
-        if args.prealloc_address.is_some() ^ args.num_prealloc_utxos.is_some() {
+        if args.prealloc_address.is_some() ^ args.num_prealloc_registry_units.is_some() {
             return Err(ConfigError::MissingPreallocNumOrAddress);
         }
     }
@@ -278,10 +278,10 @@ fn configure_rocksdb(args: &Args) -> (RocksDbPreset, Option<usize>, Option<PathB
 pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget: i32) -> (Arc<Core>, Arc<RpcCoreService>) {
     let network = args.network();
     let mut fd_remaining = fd_total_budget;
-    let utxo_files_limit = if args.utxoindex {
-        let utxo_files_limit = fd_remaining / 10;
-        fd_remaining -= utxo_files_limit;
-        utxo_files_limit
+    let registry_unit_files_limit = if args.registry_unitindex {
+        let registry_unit_files_limit = fd_remaining / 10;
+        fd_remaining -= registry_unit_files_limit;
+        registry_unit_files_limit
     } else {
         0
     };
@@ -341,7 +341,7 @@ pub fn create_core_with_runtime(runtime: &Runtime, args: &Args, fd_total_budget:
     }
 
     let consensus_db_dir = db_dir.join(CONSENSUS_DB);
-    let utxoindex_db_dir = db_dir.join(UTXOINDEX_DB);
+    let registry_unitindex_db_dir = db_dir.join(REGISTRY_UNITINDEX_DB);
     let meta_db_dir = db_dir.join(META_DB);
 
     let mut is_db_reset_needed = args.reset_db;
@@ -357,9 +357,9 @@ do you confirm? (answer y/n or pass --yes to the Sahyadrid command line to confi
 
     fs::create_dir_all(consensus_db_dir.as_path()).unwrap();
     fs::create_dir_all(meta_db_dir.as_path()).unwrap();
-    if args.utxoindex {
-        info!("Utxoindex Data directory {}", utxoindex_db_dir.display());
-        fs::create_dir_all(utxoindex_db_dir.as_path()).unwrap();
+    if args.registry_unitindex {
+        info!("RegistryUnitindex Data directory {}", registry_unitindex_db_dir.display());
+        fs::create_dir_all(registry_unitindex_db_dir.as_path()).unwrap();
     }
 
     if !args.archival
@@ -519,8 +519,8 @@ Do you confirm? (y/n)";
         fs::create_dir_all(consensus_db_dir.as_path()).unwrap();
         fs::create_dir_all(meta_db_dir.as_path()).unwrap();
 
-        if args.utxoindex {
-            fs::create_dir_all(utxoindex_db_dir.as_path()).unwrap();
+        if args.registry_unitindex {
+            fs::create_dir_all(registry_unitindex_db_dir.as_path()).unwrap();
         }
 
         // Reopen the DB
@@ -557,7 +557,7 @@ Do you confirm? (y/n)";
 
     let tick_service = Arc::new(TickService::new());
     let (notification_send, notification_recv) = unbounded();
-    let max_tracked_addresses = if args.utxoindex && args.max_tracked_addresses > 0 { Some(args.max_tracked_addresses) } else { None };
+    let max_tracked_addresses = if args.registry_unitindex && args.max_tracked_addresses > 0 { Some(args.max_tracked_addresses) } else { None };
     let subscription_context = SubscriptionContext::with_options(max_tracked_addresses);
     let notification_root = Arc::new(ConsensusNotificationRoot::with_context(notification_send, subscription_context.clone()));
     let processing_counters = Arc::new(ProcessingCounters::default());
@@ -606,9 +606,9 @@ Do you confirm? (y/n)";
     let system_info = SystemInfo::default();
 
     let notify_service = Arc::new(NotifyService::new(notification_root.clone(), notification_recv, subscription_context.clone()));
-    // SAHYADRI: UTXO index disabled — account model is the native commitment path.
+    // SAHYADRI: REGISTRY_UNIT index disabled — account model is the native commitment path.
     // The flag is preserved for CLI compatibility but is a no-op.
-    let _ = utxo_files_limit;
+    let _ = registry_unit_files_limit;
 
     let (address_manager, port_mapping_extender_svc) = AddressManager::new(config.clone(), meta_db, tick_service.clone());
 

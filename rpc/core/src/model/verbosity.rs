@@ -44,7 +44,7 @@ pub struct RpcHeaderVerbosity {
     pub include_parents_by_level: Option<bool>,
     pub include_hash_merkle_root: Option<bool>,
     pub include_accepted_id_merkle_root: Option<bool>,
-    pub include_utxo_commitment: Option<bool>,
+    pub include_registry_unit_commitment: Option<bool>,
     /// Timestamp is in milliseconds
     pub include_timestamp: Option<bool>,
     pub include_bits: Option<bool>,
@@ -64,7 +64,7 @@ impl Serializer for RpcHeaderVerbosity {
         store!(Option<bool>, &self.include_parents_by_level, writer)?;
         store!(Option<bool>, &self.include_hash_merkle_root, writer)?;
         store!(Option<bool>, &self.include_accepted_id_merkle_root, writer)?;
-        store!(Option<bool>, &self.include_utxo_commitment, writer)?;
+        store!(Option<bool>, &self.include_registry_unit_commitment, writer)?;
         store!(Option<bool>, &self.include_timestamp, writer)?;
         store!(Option<bool>, &self.include_bits, writer)?;
         store!(Option<bool>, &self.include_nonce, writer)?;
@@ -86,7 +86,7 @@ impl Deserializer for RpcHeaderVerbosity {
         let include_parents_by_level = load!(Option<bool>, reader)?;
         let include_hash_merkle_root = load!(Option<bool>, reader)?;
         let include_accepted_id_merkle_root = load!(Option<bool>, reader)?;
-        let include_utxo_commitment = load!(Option<bool>, reader)?;
+        let include_registry_unit_commitment = load!(Option<bool>, reader)?;
         let include_timestamp = load!(Option<bool>, reader)?;
         let include_bits = load!(Option<bool>, reader)?;
         let include_nonce = load!(Option<bool>, reader)?;
@@ -101,7 +101,7 @@ impl Deserializer for RpcHeaderVerbosity {
             include_parents_by_level,
             include_hash_merkle_root,
             include_accepted_id_merkle_root,
-            include_utxo_commitment,
+            include_registry_unit_commitment,
             include_timestamp,
             include_bits,
             include_nonce,
@@ -115,18 +115,18 @@ impl Deserializer for RpcHeaderVerbosity {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcUtxoEntryVerboseDataVerbosity {
+pub struct RpcRegistryUnitVerboseDataVerbosity {
     pub include_script_public_key_type: Option<bool>,
     pub include_script_public_key_address: Option<bool>,
 }
 
-impl RpcUtxoEntryVerboseDataVerbosity {
+impl RpcRegistryUnitVerboseDataVerbosity {
     pub fn new(include_script_public_key_type: Option<bool>, include_script_public_key_address: Option<bool>) -> Self {
         Self { include_script_public_key_type, include_script_public_key_address }
     }
 }
 
-impl Serializer for RpcUtxoEntryVerboseDataVerbosity {
+impl Serializer for RpcRegistryUnitVerboseDataVerbosity {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
         store!(Option<bool>, &self.include_script_public_key_type, writer)?;
@@ -136,7 +136,7 @@ impl Serializer for RpcUtxoEntryVerboseDataVerbosity {
     }
 }
 
-impl Deserializer for RpcUtxoEntryVerboseDataVerbosity {
+impl Deserializer for RpcRegistryUnitVerboseDataVerbosity {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
         let include_script_public_key_type = load!(Option<bool>, reader)?;
@@ -146,43 +146,43 @@ impl Deserializer for RpcUtxoEntryVerboseDataVerbosity {
     }
 }
 
-// RpcUtxoEntryVerbosity
+// RpcRegistryUnitVerbosity
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcUtxoEntryVerbosity {
+pub struct RpcRegistryUnitVerbosity {
     pub include_amount: Option<bool>,
     pub include_script_public_key: Option<bool>,
     pub include_block_daa_score: Option<bool>,
     pub include_is_coinbase: Option<bool>,
-    pub verbose_data_verbosity: Option<RpcUtxoEntryVerboseDataVerbosity>,
+    pub verbose_data_verbosity: Option<RpcRegistryUnitVerboseDataVerbosity>,
 }
 
-impl RpcUtxoEntryVerbosity {
+impl RpcRegistryUnitVerbosity {
     pub fn new(
         include_amount: Option<bool>,
         include_script_public_key: Option<bool>,
         include_block_daa_score: Option<bool>,
         include_is_coinbase: Option<bool>,
-        verbose_data_verbosity: Option<RpcUtxoEntryVerboseDataVerbosity>,
+        verbose_data_verbosity: Option<RpcRegistryUnitVerboseDataVerbosity>,
     ) -> Self {
         Self { include_amount, include_script_public_key, include_block_daa_score, include_is_coinbase, verbose_data_verbosity }
     }
 }
 
-impl Serializer for RpcUtxoEntryVerbosity {
+impl Serializer for RpcRegistryUnitVerbosity {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
         store!(Option<bool>, &self.include_amount, writer)?;
         store!(Option<bool>, &self.include_script_public_key, writer)?;
         store!(Option<bool>, &self.include_block_daa_score, writer)?;
         store!(Option<bool>, &self.include_is_coinbase, writer)?;
-        serialize!(Option<RpcUtxoEntryVerboseDataVerbosity>, &self.verbose_data_verbosity, writer)?;
+        serialize!(Option<RpcRegistryUnitVerboseDataVerbosity>, &self.verbose_data_verbosity, writer)?;
 
         Ok(())
     }
 }
 
-impl Deserializer for RpcUtxoEntryVerbosity {
+impl Deserializer for RpcRegistryUnitVerbosity {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
 
@@ -190,7 +190,7 @@ impl Deserializer for RpcUtxoEntryVerbosity {
         let include_script_public_key = load!(Option<bool>, reader)?;
         let include_block_daa_score = load!(Option<bool>, reader)?;
         let include_is_coinbase = load!(Option<bool>, reader)?;
-        let verbose_data_verbosity = deserialize!(Option<RpcUtxoEntryVerboseDataVerbosity>, reader)?;
+        let verbose_data_verbosity = deserialize!(Option<RpcRegistryUnitVerboseDataVerbosity>, reader)?;
 
         Ok(Self { include_amount, include_script_public_key, include_block_daa_score, include_is_coinbase, verbose_data_verbosity })
     }
@@ -256,19 +256,19 @@ impl Deserializer for RpcTransactionInputVerbosity {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcTransactionInputVerboseDataVerbosity {
-    pub utxo_entry_verbosity: Option<RpcUtxoEntryVerbosity>,
+    pub registry_unit_entry_verbosity: Option<RpcRegistryUnitVerbosity>,
 }
 
 impl RpcTransactionInputVerboseDataVerbosity {
-    pub fn new(utxo_entry_verbosity: Option<RpcUtxoEntryVerbosity>) -> Self {
-        Self { utxo_entry_verbosity }
+    pub fn new(registry_unit_entry_verbosity: Option<RpcRegistryUnitVerbosity>) -> Self {
+        Self { registry_unit_entry_verbosity }
     }
 }
 
 impl Serializer for RpcTransactionInputVerboseDataVerbosity {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u8, &1, writer)?;
-        serialize!(Option<RpcUtxoEntryVerbosity>, &self.utxo_entry_verbosity, writer)?;
+        serialize!(Option<RpcRegistryUnitVerbosity>, &self.registry_unit_entry_verbosity, writer)?;
 
         Ok(())
     }
@@ -277,9 +277,9 @@ impl Serializer for RpcTransactionInputVerboseDataVerbosity {
 impl Deserializer for RpcTransactionInputVerboseDataVerbosity {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u8, reader)?;
-        let utxo_entry_verbosity = deserialize!(Option<RpcUtxoEntryVerbosity>, reader)?;
+        let registry_unit_entry_verbosity = deserialize!(Option<RpcRegistryUnitVerbosity>, reader)?;
 
-        Ok(Self { utxo_entry_verbosity })
+        Ok(Self { registry_unit_entry_verbosity })
     }
 }
 
@@ -404,7 +404,7 @@ impl RpcTransactionVerbosity {
     pub fn requires_populated_transaction(&self) -> bool {
         self.input_verbosity
             .as_ref()
-            .is_some_and(|active| active.verbose_data_verbosity.as_ref().is_some_and(|active| active.utxo_entry_verbosity.is_some()))
+            .is_some_and(|active| active.verbose_data_verbosity.as_ref().is_some_and(|active| active.registry_unit_entry_verbosity.is_some()))
     }
 
     pub fn requires_block_hash(&self) -> bool {

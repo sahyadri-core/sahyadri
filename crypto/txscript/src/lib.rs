@@ -23,7 +23,7 @@ use opcodes::codes::OpReturn;
 use opcodes::{OpCond, codes, to_small_int};
 use sahyadri_consensus_core::hashing::sighash::{SigHashReusedValues, SigHashReusedValuesUnsync, calc_signature_hash};
 use sahyadri_consensus_core::hashing::sighash_type::SigHashType;
-use sahyadri_consensus_core::tx::{ScriptPublicKey, TransactionInput, UtxoEntry, VerifiableTransaction};
+use sahyadri_consensus_core::tx::{ScriptPublicKey, TransactionInput, RegistryUnit, VerifiableTransaction};
 use sahyadri_txscript_errors::TxScriptError;
 use script_class::ScriptClass;
 
@@ -69,7 +69,7 @@ pub struct SigCacheKey {
 }
 
 enum ScriptSource<'a, T: VerifiableTransaction> {
-    TxInput { tx: &'a T, input: &'a TransactionInput, idx: usize, utxo_entry: &'a UtxoEntry, is_p2sh: bool },
+    TxInput { tx: &'a T, input: &'a TransactionInput, idx: usize, registry_unit_entry: &'a RegistryUnit, is_p2sh: bool },
     StandAloneScripts(Vec<&'a [u8]>),
 }
 
@@ -133,7 +133,7 @@ pub fn get_sig_op_count<T: VerifiableTransaction>(tx: &T, input_idx: usize) -> R
         tx,
         &tx.inputs()[input_idx],
         input_idx,
-        tx.utxo(input_idx).ok_or_else(|| TxScriptError::InvalidInputIndex(input_idx as i32, tx.inputs().len()))?,
+        tx.registry_unit(input_idx).ok_or_else(|| TxScriptError::InvalidInputIndex(input_idx as i32, tx.inputs().len()))?,
         &reused_values,
         &sig_cache,
     );
@@ -212,7 +212,7 @@ fn get_sig_op_count_by_opcodes<T: VerifiableTransaction, Reused: SigHashReusedVa
 
 /// Returns whether the passed public key script is unspendable, or guaranteed to fail at execution.
 ///
-/// This allows inputs to be pruned instantly when entering the UTXO set.
+/// This allows inputs to be pruned instantly when entering the REGISTRY_UNIT set.
 pub fn is_unspendable<T: VerifiableTransaction, Reused: SigHashReusedValues>(script: &[u8]) -> bool {
     parse_script::<T, Reused>(script).enumerate().any(|(index, op)| op.is_err() || (index == 0 && op.unwrap().value() == OpReturn))
 }
@@ -242,7 +242,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
     /// * `tx` - The transaction being validated
     /// * `input` - The input being validated
     /// * `input_idx` - Index of the input in the transaction
-    /// * `utxo_entry` - UTXO entry being spent
+    /// * `registry_unit_entry` - REGISTRY_UNIT entry being spent
     /// * `reused_values` - Reused values for signature hashing
     /// * `sig_cache` - Cache for signature verification
     /// * `kip10_enabled` - Whether KIP-10 transaction introspection opcodes are enabled
@@ -256,11 +256,11 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
         tx: &'a T,
         input: &'a TransactionInput,
         input_idx: usize,
-        utxo_entry: &'a UtxoEntry,
+        registry_unit_entry: &'a RegistryUnit,
         reused_values: &'a Reused,
         sig_cache: &'a Cache<SigCacheKey, bool>,
     ) -> Self {
-        let script_public_key = utxo_entry.script_public_key.script();
+        let script_public_key = registry_unit_entry.script_public_key.script();
         // The script_public_key in P2SH is just validating the hash on the OpMultiSig script
         // the user provides
         let is_p2sh = ScriptClass::is_pay_to_script_hash(script_public_key);
@@ -268,7 +268,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
         Self {
             dstack: Default::default(),
             astack: Default::default(),
-            script_source: ScriptSource::TxInput { tx, input, idx: input_idx, utxo_entry, is_p2sh },
+            script_source: ScriptSource::TxInput { tx, input, idx: input_idx, registry_unit_entry, is_p2sh },
             reused_values,
             sig_cache,
             cond_stack: Default::default(),
@@ -356,12 +356,12 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
 
     pub fn execute(&mut self) -> Result<(), TxScriptError> {
         let (scripts, is_p2sh) = match &self.script_source {
-            ScriptSource::TxInput { input, utxo_entry, is_p2sh, .. } => {
-                if utxo_entry.script_public_key.version() > MAX_SCRIPT_PUBLIC_KEY_VERSION {
+            ScriptSource::TxInput { input, registry_unit_entry, is_p2sh, .. } => {
+                if registry_unit_entry.script_public_key.version() > MAX_SCRIPT_PUBLIC_KEY_VERSION {
                     trace!("The version of the scriptPublicKey is higher than the known version - the Execute function returns true.");
                     return Ok(());
                 }
-                (vec![input.signature_script.as_slice(), utxo_entry.script_public_key.script()], *is_p2sh)
+                (vec![input.signature_script.as_slice(), registry_unit_entry.script_public_key.script()], *is_p2sh)
             }
             ScriptSource::StandAloneScripts(scripts) => (scripts.clone(), false),
         };
@@ -387,7 +387,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
         // each is successful
         scripts.iter().enumerate().filter(|(_, s)| !s.is_empty()).try_for_each(|(idx, s)| {
             let verify_only_push =
-                idx == 0 && matches!(self.script_source, ScriptSource::TxInput { tx: _, input: _, idx: _, utxo_entry: _, is_p2sh: _ });
+                idx == 0 && matches!(self.script_source, ScriptSource::TxInput { tx: _, input: _, idx: _, registry_unit_entry: _, is_p2sh: _ });
             // Save script in p2sh
             if is_p2sh && idx == 1 {
                 saved_stack = Some(self.dstack.clone());
@@ -612,7 +612,7 @@ mod tests {
     use sahyadri_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
     use sahyadri_consensus_core::hashing::sighash_type::SIG_HASH_ALL;
     use sahyadri_consensus_core::tx::{
-        MutableTransaction, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionId, TransactionOutpoint, TransactionOutput,
+        MutableTransaction, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionId, RegistryRef, TransactionOutput,
     };
     use smallvec::SmallVec;
 
@@ -634,11 +634,11 @@ mod tests {
             unimplemented!()
         }
 
-        fn populated_input(&self, _index: usize) -> (&TransactionInput, &UtxoEntry) {
+        fn populated_input(&self, _index: usize) -> (&TransactionInput, &RegistryUnit) {
             unimplemented!()
         }
 
-        fn utxo(&self, _index: usize) -> Option<&UtxoEntry> {
+        fn registry_unit(&self, _index: usize) -> Option<&RegistryUnit> {
             unimplemented!()
         }
     }
@@ -650,7 +650,7 @@ mod tests {
         for test in test_cases {
             // Ensure encapsulation of variables (no leaking between tests)
             let input = TransactionInput {
-                previous_outpoint: TransactionOutpoint {
+                previous_outpoint: RegistryRef {
                     transaction_id: TransactionId::from_bytes([
                         0xc9, 0x97, 0xa5, 0xe5, 0x6e, 0x10, 0x41, 0x02, 0xfa, 0x20, 0x9c, 0x6a, 0x85, 0x2d, 0xd9, 0x06, 0x60, 0xa2,
                         0x0b, 0x2d, 0x9c, 0x35, 0x24, 0x23, 0xed, 0xce, 0x25, 0x85, 0x7f, 0xcd, 0x37, 0x04,
@@ -664,11 +664,11 @@ mod tests {
             let output = TransactionOutput { value: 1000000000, script_public_key: ScriptPublicKey::new(0, test.script.into()) };
 
             let tx = Transaction::new(1, vec![input.clone()], vec![output.clone()], 0, Default::default(), 0, vec![]);
-            let utxo_entry = UtxoEntry::new(output.value, output.script_public_key.clone(), 0, tx.is_coinbase());
+            let registry_unit_entry = RegistryUnit::new(output.value, output.script_public_key.clone(), 0, tx.is_coinbase());
 
-            let populated_tx = PopulatedTransaction::new(&tx, vec![utxo_entry.clone()]);
+            let populated_tx = PopulatedTransaction::new(&tx, vec![registry_unit_entry.clone()]);
 
-            let mut vm = TxScriptEngine::from_transaction_input(&populated_tx, &input, 0, &utxo_entry, &reused_values, &sig_cache);
+            let mut vm = TxScriptEngine::from_transaction_input(&populated_tx, &input, 0, &registry_unit_entry, &reused_values, &sig_cache);
             assert_eq!(vm.execute(), test.expected_result);
         }
     }
@@ -1199,13 +1199,13 @@ mod tests {
     //             let script = script_builder.drain();
     //
     //             let script_pub_key = pay_to_script_hash_script(&script);
-    //             let utxo_entry = UtxoEntry::new(1000, script_pub_key.clone(), 0, false);
+    //             let registry_unit_entry = RegistryUnit::new(1000, script_pub_key.clone(), 0, false);
     //
     //             // Create transaction
     //             let tx = Transaction::new(
     //                 1,
     //                 vec![TransactionInput {
-    //                     previous_outpoint: TransactionOutpoint { transaction_id: TransactionId::default(), index: 0 },
+    //                     previous_outpoint: RegistryRef { transaction_id: TransactionId::default(), index: 0 },
     //                     signature_script: vec![],
     //                     sequence: 0,
     //                     sig_op_count: test.sig_op_limit,
@@ -1218,7 +1218,7 @@ mod tests {
     //             );
     //
     //             let mut tx = MutableTransaction::new(tx);
-    //             tx.entries = vec![Some(utxo_entry.clone())];
+    //             tx.entries = vec![Some(registry_unit_entry.clone())];
     //
     //             // Build signature script
     //             let signature_script = (test.sig_builder)(&tx, &reused_values).build(&script)?;
@@ -1226,7 +1226,7 @@ mod tests {
     //
     //             // Execute script
     //             let tx = tx.as_verifiable();
-    //             let mut vm = TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, &utxo_entry, &reused_values, &sig_cache);
+    //             let mut vm = TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, &registry_unit_entry, &reused_values, &sig_cache);
     //
     //             let result = vm.execute().map(|_| vm.used_sig_ops());
     //
@@ -1267,7 +1267,7 @@ mod bitcoind_tests {
     use sahyadri_consensus_core::constants::MAX_TX_IN_SEQUENCE_NUM;
     use sahyadri_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
     use sahyadri_consensus_core::tx::{
-        PopulatedTransaction, ScriptPublicKey, Transaction, TransactionId, TransactionOutpoint, TransactionOutput,
+        PopulatedTransaction, ScriptPublicKey, Transaction, TransactionId, RegistryRef, TransactionOutput,
     };
 
     #[derive(PartialEq, Eq, Debug, Clone)]
@@ -1295,7 +1295,7 @@ mod bitcoind_tests {
         let coinbase = Transaction::new(
             1,
             vec![TransactionInput::new(
-                TransactionOutpoint::new(TransactionId::default(), 0xffffffffu32),
+                RegistryRef::new(TransactionId::default(), 0xffffffffu32),
                 vec![0, 0],
                 MAX_TX_IN_SEQUENCE_NUM,
                 MAX_PUB_KEYS_PER_MUTLTISIG as u8,
@@ -1310,7 +1310,7 @@ mod bitcoind_tests {
         Transaction::new(
             1,
             vec![TransactionInput::new(
-                TransactionOutpoint::new(coinbase.id(), 0u32),
+                RegistryRef::new(coinbase.id(), 0u32),
                 sig_script,
                 MAX_TX_IN_SEQUENCE_NUM,
                 MAX_PUB_KEYS_PER_MUTLTISIG as u8,
@@ -1351,7 +1351,7 @@ mod bitcoind_tests {
 
             // Create transaction
             let tx = create_spending_transaction(script_sig, script_pub_key.clone());
-            let entry = UtxoEntry::new(0, script_pub_key.clone(), 0, true);
+            let entry = RegistryUnit::new(0, script_pub_key.clone(), 0, true);
             let populated_tx = PopulatedTransaction::new(&tx, vec![entry]);
 
             // Run transaction

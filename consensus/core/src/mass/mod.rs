@@ -2,7 +2,7 @@ use crate::{
     config::params::Params,
     constants::TRANSIENT_BYTE_TO_MASS_FACTOR,
     subnets::SUBNETWORK_ID_SIZE,
-    tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutput, UtxoEntry, VerifiableTransaction},
+    tx::{ScriptPublicKey, Transaction, TransactionInput, TransactionOutput, RegistryUnit, VerifiableTransaction},
 };
 use sahyadri_hashes::HASH_SIZE;
 
@@ -58,12 +58,12 @@ pub fn transaction_output_estimated_serialized_size(output: &TransactionOutput) 
     size
 }
 
-/// Returns the UTXO storage "plurality" for this script public key.
+/// Returns the REGISTRY_UNIT storage "plurality" for this script public key.
 /// i.e., how many 100-byte "storage units" it occupies.
 /// The choice of 100 bytes per unit ensures that all standard SPKs have a plurality of 1.
-pub fn utxo_plurality(spk: &ScriptPublicKey) -> u64 {
-    /// A constant representing the number of bytes used by the fixed parts of a UTXO.
-    const UTXO_CONST_STORAGE: usize =
+pub fn registry_unit_plurality(spk: &ScriptPublicKey) -> u64 {
+    /// A constant representing the number of bytes used by the fixed parts of a REGISTRY_UNIT.
+    const REGISTRY_UNIT_CONST_STORAGE: usize =
         32  // outpoint::tx_id
         + 4 // outpoint::index
         + 8 // entry amount
@@ -75,72 +75,72 @@ pub fn utxo_plurality(spk: &ScriptPublicKey) -> u64 {
 
     // The base (63 bytes) plus the max standard public key length (33 bytes) fits into one 100-byte unit.
     // Hence, all standard SPKs end up with a plurality of 1.
-    const UTXO_UNIT_SIZE: usize = 100;
+    const REGISTRY_UNIT_UNIT_SIZE: usize = 100;
 
-    (UTXO_CONST_STORAGE + spk.script().len()).div_ceil(UTXO_UNIT_SIZE) as u64
+    (REGISTRY_UNIT_CONST_STORAGE + spk.script().len()).div_ceil(REGISTRY_UNIT_UNIT_SIZE) as u64
 }
 
-pub trait UtxoPlurality {
-    /// Returns the UTXO storage plurality for the script public key associated with this object.
+pub trait RegistryUnitPlurality {
+    /// Returns the REGISTRY_UNIT storage plurality for the script public key associated with this object.
     fn plurality(&self) -> u64;
 }
 
-impl UtxoPlurality for ScriptPublicKey {
+impl RegistryUnitPlurality for ScriptPublicKey {
     fn plurality(&self) -> u64 {
-        utxo_plurality(self)
+        registry_unit_plurality(self)
     }
 }
 
-impl UtxoPlurality for UtxoEntry {
+impl RegistryUnitPlurality for RegistryUnit {
     fn plurality(&self) -> u64 {
-        utxo_plurality(&self.script_public_key)
+        registry_unit_plurality(&self.script_public_key)
     }
 }
 
-impl UtxoPlurality for TransactionOutput {
+impl RegistryUnitPlurality for TransactionOutput {
     fn plurality(&self) -> u64 {
-        utxo_plurality(&self.script_public_key)
+        registry_unit_plurality(&self.script_public_key)
     }
 }
 
-/// An abstract UTXO storage cell.
+/// An abstract REGISTRY_UNIT storage cell.
 ///
 /// # Plurality
 ///
-/// Each `UtxoCell` now has a `plurality` field reflecting how many 100-byte "storage units"
-/// this UTXO effectively occupies. This generalizes KIP-0009 to support UTXOs with
-/// script public keys larger than the standard 33-byte limit. For a UTXO of byte-size
+/// Each `RegistryUnitCell` now has a `plurality` field reflecting how many 100-byte "storage units"
+/// this REGISTRY_UNIT effectively occupies. This generalizes KIP-0009 to support REGISTRY_UNITs with
+/// script public keys larger than the standard 33-byte limit. For a REGISTRY_UNIT of byte-size
 /// `entry.size`, we define:
 ///
 /// ```ignore
-/// p := ceil(entry.size / UTXO_UNIT)
+/// p := ceil(entry.size / REGISTRY_UNIT_UNIT)
 /// ```
 ///
-/// Conceptually, we treat a large UTXO as `p` sub-entries each holding `entry.amount / p`,
+/// Conceptually, we treat a large REGISTRY_UNIT as `p` sub-entries each holding `entry.amount / p`,
 /// preserving the total locked amount but increasing the "count" proportionally to script size.
 ///
 /// Refer to the KIP-0009 specification for more details.
 #[derive(Clone, Copy)]
-pub struct UtxoCell {
-    /// The plurality (number of "storage units") for this UTXO
+pub struct RegistryUnitCell {
+    /// The plurality (number of "storage units") for this REGISTRY_UNIT
     pub plurality: u64,
-    /// The amount of CSM (in kanas) locked in this UTXO
+    /// The amount of CSM (in kanas) locked in this REGISTRY_UNIT
     pub amount: u64,
 }
 
-impl UtxoCell {
+impl RegistryUnitCell {
     pub fn new(plurality: u64, amount: u64) -> Self {
         Self { plurality, amount }
     }
 }
 
-impl From<&UtxoEntry> for UtxoCell {
-    fn from(entry: &UtxoEntry) -> Self {
+impl From<&RegistryUnit> for RegistryUnitCell {
+    fn from(entry: &RegistryUnit) -> Self {
         Self::new(entry.plurality(), entry.amount)
     }
 }
 
-impl From<&TransactionOutput> for UtxoCell {
+impl From<&TransactionOutput> for RegistryUnitCell {
     fn from(output: &TransactionOutput) -> Self {
         Self::new(output.plurality(), output.value)
     }
@@ -244,7 +244,7 @@ impl MassCalculator {
 
     /// Calculates the non-contextual masses for this transaction (i.e., masses which can be calculated from
     /// the transaction alone). These include compute and transient storage masses of this transaction. This
-    /// does not include the persistent storage mass calculation below which requires full UTXO context
+    /// does not include the persistent storage mass calculation below which requires full REGISTRY_UNIT context
     pub fn calc_non_contextual_masses(&self, tx: &Transaction) -> NonContextualMasses {
         if tx.is_coinbase() {
             return NonContextualMasses::new(0, 0);
@@ -287,9 +287,9 @@ impl MassCalculator {
 
 /// Calculates the storage mass (KIP-0009) for a given set of inputs and outputs.
 ///
-/// This function has been generalized for UTXO entries that may exceed
-/// the max standard 33-byte script public key size. Each `UtxoCell::plurality` indicates
-/// how many 100-byte "storage units" that UTXO occupies.
+/// This function has been generalized for REGISTRY_UNIT entries that may exceed
+/// the max standard 33-byte script public key size. Each `RegistryUnitCell::plurality` indicates
+/// how many 100-byte "storage units" that REGISTRY_UNIT occupies.
 ///
 /// # Formula Overview
 ///
@@ -303,7 +303,7 @@ impl MassCalculator {
 ///
 /// - `C` is the storage mass parameter (`storm_param`).
 /// - `|O|` and `|I|` are the total pluralities of outputs and inputs, respectively.
-/// - `H(O)` is the harmonic mean of the outputs' amounts, generalized to account for per-UTXO
+/// - `H(O)` is the harmonic mean of the outputs' amounts, generalized to account for per-REGISTRY_UNIT
 ///   `plurality`.
 ///
 ///   In standard KIP-0009, one has:
@@ -312,7 +312,7 @@ impl MassCalculator {
 ///   |O| / H(O) = Σ (1 / o)
 ///   ```
 ///
-///   Here, each UTXO that occupies `p` storage units is treated as `p` sub-entries,
+///   Here, each REGISTRY_UNIT that occupies `p` storage units is treated as `p` sub-entries,
 ///   each holding `amount / p`. This effectively converts `1 / o` into `p^2 / amount`.
 ///   Consequently, the code accumulates:
 ///
@@ -337,8 +337,8 @@ impl MassCalculator {
 /// indicates that the mass is incomputable and can be considered too high.
 pub fn calc_storage_mass(
     is_coinbase: bool,
-    inputs: impl ExactSizeIterator<Item = UtxoCell> + Clone,
-    mut outputs: impl Iterator<Item = UtxoCell>,
+    inputs: impl ExactSizeIterator<Item = RegistryUnitCell> + Clone,
+    mut outputs: impl Iterator<Item = RegistryUnitCell>,
     storm_param: u64,
 ) -> Option<u64> {
     if is_coinbase {
@@ -356,7 +356,7 @@ pub fn calc_storage_mass(
     */
     let (outs_plurality, harmonic_outs) = outputs.try_fold(
         (0u64, 0u64), // (accumulated plurality, accumulated harmonic)
-        |(acc_plurality, acc_harm), UtxoCell { plurality, amount }| {
+        |(acc_plurality, acc_harm), RegistryUnitCell { plurality, amount }| {
             Some((
                 acc_plurality + plurality, // represents in-memory bytes, cannot overflow
                 acc_harm.checked_add(storm_param.checked_mul(plurality)?.checked_mul(plurality)? / amount)?,
@@ -389,7 +389,7 @@ pub fn calc_storage_mass(
     if relaxed_formula_path {
         // Each input i contributes C · p(i)^2 / amount(i)
         let harmonic_ins = inputs
-            .map(|UtxoCell { plurality, amount }| storm_param * plurality * plurality / amount) // we assume no overflow (see verify_utxo_plurality_limits)
+            .map(|RegistryUnitCell { plurality, amount }| storm_param * plurality * plurality / amount) // we assume no overflow (see verify_registry_unit_plurality_limits)
             .fold(0u64, |total, current| total.saturating_add(current));
 
         // max(0, harmonic_outs - harmonic_ins)
@@ -399,7 +399,7 @@ pub fn calc_storage_mass(
     // Otherwise, we calculate the arithmetic portion for inputs:
     // (ins_plurality, sum_ins) =>  (Σ plurality, Σ amounts)
     let (ins_plurality, sum_ins) =
-        inputs.fold((0u64, 0u64), |(acc_plur, acc_amt), UtxoCell { plurality, amount }| (acc_plur + plurality, acc_amt + amount));
+        inputs.fold((0u64, 0u64), |(acc_plur, acc_amt), RegistryUnitCell { plurality, amount }| (acc_plur + plurality, acc_amt + amount));
 
     // mean_ins = (Σ amounts) / (Σ plurality)
     let mean_ins = sum_ins / ins_plurality;
@@ -422,30 +422,30 @@ mod tests {
     };
     use std::str::FromStr;
 
-    const UTXO_CONST_STORAGE: u64 = 63;
-    const UTXO_UNIT_SIZE: u64 = 100;
+    const REGISTRY_UNIT_CONST_STORAGE: u64 = 63;
+    const REGISTRY_UNIT_UNIT_SIZE: u64 = 100;
 
     #[test]
-    fn verify_utxo_plurality_limits() {
+    fn verify_registry_unit_plurality_limits() {
         /*
-           Verify that for all networks, existing UTXO entries can never overflow the product C·P^2 used
+           Verify that for all networks, existing REGISTRY_UNIT entries can never overflow the product C·P^2 used
            for harmonic_ins within calc_storage_mass
         */
         for net in NetworkType::iter() {
             let params: Params = net.into();
             let max_spk_len =
                 (params.max_script_public_key_len as u64).min(params.max_block_mass.div_ceil(params.mass_per_script_pub_key_byte));
-            let max_plurality = (UTXO_CONST_STORAGE + max_spk_len).div_ceil(UTXO_UNIT_SIZE); // see utxo_plurality
+            let max_plurality = (REGISTRY_UNIT_CONST_STORAGE + max_spk_len).div_ceil(REGISTRY_UNIT_UNIT_SIZE); // see registry_unit_plurality
             let product = params.storage_mass_parameter.checked_mul(max_plurality).and_then(|x| x.checked_mul(max_plurality));
             // verify C·P^2 can never overflow
             assert!(product.is_some());
         }
 
         // verify P >= 1 also when the script is empty
-        assert!(utxo_plurality(&ScriptPublicKey::new(0, ScriptVec::from_slice(&[]))) == 1);
-        // Assert the UTXO_CONST_STORAGE=63, UTXO_UNIT_SIZE=100 constants
-        assert!(utxo_plurality(&ScriptPublicKey::from_vec(0, vec![1; (UTXO_UNIT_SIZE - UTXO_CONST_STORAGE) as usize])) == 1);
-        assert!(utxo_plurality(&ScriptPublicKey::from_vec(0, vec![1; (UTXO_UNIT_SIZE - UTXO_CONST_STORAGE + 1) as usize])) == 2);
+        assert!(registry_unit_plurality(&ScriptPublicKey::new(0, ScriptVec::from_slice(&[]))) == 1);
+        // Assert the REGISTRY_UNIT_CONST_STORAGE=63, REGISTRY_UNIT_UNIT_SIZE=100 constants
+        assert!(registry_unit_plurality(&ScriptPublicKey::from_vec(0, vec![1; (REGISTRY_UNIT_UNIT_SIZE - REGISTRY_UNIT_CONST_STORAGE) as usize])) == 1);
+        assert!(registry_unit_plurality(&ScriptPublicKey::from_vec(0, vec![1; (REGISTRY_UNIT_UNIT_SIZE - REGISTRY_UNIT_CONST_STORAGE + 1) as usize])) == 2);
     }
 
     #[derive(Debug)]
@@ -465,7 +465,7 @@ mod tests {
 
         /// (Optional) index of the input/output in tx2 whose script we want to override
         plurality_index: Option<usize>,
-        /// Desired plurality for that UTXO's script
+        /// Desired plurality for that REGISTRY_UNIT's script
         desired_plurality: Option<u64>,
         /// Whether to override an output and not an input
         override_output: bool,
@@ -625,7 +625,7 @@ mod tests {
     /// ScriptPublicKey generator that yields a script with length adjusted
     /// to match `desired_plurality`.
     fn generate_script_for_plurality(desired_plurality: u64) -> ScriptPublicKey {
-        let required_script_len = ((desired_plurality - 1) * UTXO_UNIT_SIZE) as usize;
+        let required_script_len = ((desired_plurality - 1) * REGISTRY_UNIT_UNIT_SIZE) as usize;
         ScriptPublicKey::from_vec(0, vec![1; required_script_len])
     }
 
@@ -697,7 +697,7 @@ mod tests {
             0,
             (0..ins.len())
                 .map(|i| TransactionInput {
-                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: i as u32 },
+                    previous_outpoint: RegistryRef { transaction_id: prev_tx_id, index: i as u32 },
                     signature_script: vec![],
                     sequence: 0,
                     sig_op_count: 0,
@@ -718,7 +718,7 @@ mod tests {
         let entries = ins
             .iter()
             .copied()
-            .map(|in_amount| UtxoEntry {
+            .map(|in_amount| RegistryUnit {
                 amount: in_amount,
                 script_public_key: ScriptPublicKey::new(0, script_pub_key.clone()),
                 block_daa_score: 0,

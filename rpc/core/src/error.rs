@@ -3,9 +3,7 @@
 //!
 
 use sahyadri_consensus_core::{
-    errors::header::CompressedParentsError, subnets::SubnetworkConversionError, tx::TransactionId,
-    utxo::utxo_inquirer::UtxoInquirerError,
-};
+    errors::header::CompressedParentsError, subnets::SubnetworkConversionError, tx::TransactionId};
 use sahyadri_utils::networking::IpAddress;
 use std::{net::AddrParseError, num::TryFromIntError};
 use thiserror::Error;
@@ -63,8 +61,8 @@ pub enum RpcError {
     #[error("Transaction {0} not found")]
     TransactionNotFound(TransactionId),
 
-    #[error("Method unavailable. Run the node with the --utxoindex argument.")]
-    NoUtxoIndex,
+    #[error("Method unavailable. Run the node with the --registry_unitindex argument.")]
+    NoRegistryUnitIndex,
 
     #[error("Method unavailable. No connection manager is currently available.")]
     NoConnectionManager,
@@ -137,9 +135,6 @@ pub enum RpcError {
 
     #[error(transparent)]
     ConsensusClient(#[from] sahyadri_consensus_client::error::Error),
-
-    #[error("utxo return address could not be found -> {0}")]
-    UtxoReturnAddressNotFound(UtxoInquirerError),
 
     #[error("consensus converter required {0} - but was not found")]
     ConsensusConverterNotFound(String),

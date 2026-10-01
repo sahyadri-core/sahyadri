@@ -2,7 +2,7 @@ use sahyadri_notify::{scope::Scope, subscription::Command};
 
 use crate::protowire::{
     NotifyBlockAddedRequestMessage, NotifyFinalityConflictRequestMessage, NotifyNewBlockTemplateRequestMessage,
-    NotifyPruningPointUtxoSetOverrideRequestMessage, NotifySinkBlueScoreChangedRequestMessage, NotifyUtxosChangedRequestMessage,
+    NotifyPruningPointRegistryUnitSetOverrideRequestMessage, NotifySinkBlueScoreChangedRequestMessage, NotifyRegistryChangedRequestMessage,
     NotifyVirtualChainChangedRequestMessage, NotifyVirtualDaaScoreChangedRequestMessage, SahyadridRequest, SahyadridResponse,
     sahyadrid_request, sahyadrid_response,
 };
@@ -45,7 +45,7 @@ impl sahyadrid_request::Payload {
                     command: command.into(),
                 })
             }
-            Scope::UtxosChanged(scope) => sahyadrid_request::Payload::NotifyUtxosChangedRequest(NotifyUtxosChangedRequestMessage {
+            Scope::RegistryChanged(scope) => sahyadrid_request::Payload::NotifyRegistryChangedRequest(NotifyRegistryChangedRequestMessage {
                 addresses: scope.addresses.iter().map(|x| x.into()).collect::<Vec<String>>(),
                 command: command.into(),
             }),
@@ -59,8 +59,8 @@ impl sahyadrid_request::Payload {
                     command: command.into(),
                 })
             }
-            Scope::PruningPointUtxoSetOverride(_) => {
-                sahyadrid_request::Payload::NotifyPruningPointUtxoSetOverrideRequest(NotifyPruningPointUtxoSetOverrideRequestMessage {
+            Scope::PruningPointRegistryUnitSetOverride(_) => {
+                sahyadrid_request::Payload::NotifyPruningPointRegistryUnitSetOverrideRequest(NotifyPruningPointRegistryUnitSetOverrideRequestMessage {
                     command: command.into(),
                 })
             }
@@ -74,13 +74,13 @@ impl sahyadrid_request::Payload {
             Payload::NotifyBlockAddedRequest(_)
                 | Payload::NotifyVirtualChainChangedRequest(_)
                 | Payload::NotifyFinalityConflictRequest(_)
-                | Payload::NotifyUtxosChangedRequest(_)
+                | Payload::NotifyRegistryChangedRequest(_)
                 | Payload::NotifySinkBlueScoreChangedRequest(_)
                 | Payload::NotifyVirtualDaaScoreChangedRequest(_)
-                | Payload::NotifyPruningPointUtxoSetOverrideRequest(_)
+                | Payload::NotifyPruningPointRegistryUnitSetOverrideRequest(_)
                 | Payload::NotifyNewBlockTemplateRequest(_)
-                | Payload::StopNotifyingUtxosChangedRequest(_)
-                | Payload::StopNotifyingPruningPointUtxoSetOverrideRequest(_)
+                | Payload::StopNotifyingRegistryChangedRequest(_)
+                | Payload::StopNotifyingPruningPointRegistryUnitSetOverrideRequest(_)
         )
     }
 }
@@ -103,10 +103,10 @@ impl sahyadrid_response::Payload {
             Payload::VirtualChainChangedNotification(_) => true,
             Payload::FinalityConflictNotification(_) => true,
             Payload::FinalityConflictResolvedNotification(_) => true,
-            Payload::UtxosChangedNotification(_) => true,
+            Payload::RegistryChangedNotification(_) => true,
             Payload::SinkBlueScoreChangedNotification(_) => true,
             Payload::VirtualDaaScoreChangedNotification(_) => true,
-            Payload::PruningPointUtxoSetOverrideNotification(_) => true,
+            Payload::PruningPointRegistryUnitSetOverrideNotification(_) => true,
             Payload::NewBlockTemplateNotification(_) => true,
             _ => false,
         }

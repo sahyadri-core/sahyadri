@@ -17,9 +17,9 @@ pub use crate::rpc::Rpc;
 pub use crate::rpc::{DynRpcApi, RpcCtl};
 pub use crate::serializer::*;
 pub use crate::storage::*;
-pub use crate::utxo::balance::Balance;
-pub use crate::utxo::scan::{Scan, ScanExtent};
-pub use crate::utxo::{Maturity, NetworkParams, OutgoingTransaction, UtxoContext, UtxoEntryReference, UtxoProcessor};
+pub use crate::registry_unit::balance::Balance;
+pub use crate::registry_unit::scan::{Scan, ScanExtent};
+pub use crate::registry_unit::{Maturity, NetworkParams, OutgoingTransaction, RegistryUnitContext, RegistryUnitRef, RegistryUnitProcessor};
 pub use crate::wallet::*;
 pub use crate::{storage, utils};
 

@@ -166,7 +166,7 @@ impl ConsensusStorage {
             PolicyBuilder::new().bytes_budget(sahyadri_consensus_budget).min_items(level_lower_bound).tracked_bytes();
         let headers_builder = PolicyBuilder::new().bytes_budget(headers_budget).tracked_bytes();
         let header_data_builder = PolicyBuilder::new().max_items(perf_params.header_data_cache_size).untracked();
-        let utxo_set_builder = PolicyBuilder::new().max_items(perf_params.utxo_set_cache_size).untracked();
+        let registry_unit_set_builder = PolicyBuilder::new().max_items(perf_params.registry_unit_set_cache_size).untracked();
         let transactions_builder = PolicyBuilder::new().bytes_budget(transactions_budget).tracked_bytes();
         let acceptance_data_builder = PolicyBuilder::new().bytes_budget(acceptance_data_budget).tracked_bytes();
         let past_pruning_points_builder = PolicyBuilder::new().max_items(1024).untracked();
@@ -213,12 +213,12 @@ impl ConsensusStorage {
         let block_transactions_store = Arc::new(DbBlockTransactionsStore::new(db.clone(), transactions_builder.build()));
         let acceptance_data_store = Arc::new(DbAcceptanceDataStore::new(db.clone(), acceptance_data_builder.build()));
 
-        // Initialize the Account Store (Sahyadri Bank) using the utxo_set_cache_size for cache allocation
-        let account_store = Arc::new(DbAccountStore::new(db.clone(), perf_params.utxo_set_cache_size as u64)); // <--- 3. INIT BANK
+        // Initialize the Account Store (Sahyadri Bank) using the registry_unit_set_cache_size for cache allocation
+        let account_store = Arc::new(DbAccountStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64)); // <--- 3. INIT BANK
 
-        let smt_nodes_store = Arc::new(DbSmtNodeStore::new(db.clone(), perf_params.utxo_set_cache_size as u64));
-        let account_roots_store = Arc::new(DbAccountRootsStore::new(db.clone(), perf_params.utxo_set_cache_size as u64));
-        let account_states_store = Arc::new(DbAccountStatesStore::new(db.clone(), perf_params.utxo_set_cache_size as u64));
+        let smt_nodes_store = Arc::new(DbSmtNodeStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64));
+        let account_roots_store = Arc::new(DbAccountRootsStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64));
+        let account_states_store = Arc::new(DbAccountStatesStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64));
 
         // Tips
         let headers_selected_tip_store = Arc::new(RwLock::new(DbHeadersSelectedTipStore::new(db.clone())));
@@ -231,7 +231,7 @@ impl ConsensusStorage {
         // Virtual stores
         let lkg_virtual_state = LkgVirtualState::default();
         let virtual_stores =
-            Arc::new(RwLock::new(VirtualStores::new(db.clone(), lkg_virtual_state.clone(), utxo_set_builder.build())));
+            Arc::new(RwLock::new(VirtualStores::new(db.clone(), lkg_virtual_state.clone(), registry_unit_set_builder.build())));
 
         // Ensure that reachability stores are initialized
         reachability::init(reachability_store.write().deref_mut()).unwrap();
@@ -264,7 +264,7 @@ impl ConsensusStorage {
             smt_nodes_store,
             account_roots_store,
             account_states_store,
-            did_store: Arc::new(DbDidStore::new(db.clone(), perf_params.utxo_set_cache_size as u64)),
+            did_store: Arc::new(DbDidStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64)),
         })
     }
 }

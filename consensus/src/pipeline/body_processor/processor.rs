@@ -214,7 +214,7 @@ impl BlockBodyProcessor {
         self.counters.body_counts.fetch_add(1, Ordering::Relaxed);
         self.counters.txs_counts.fetch_add(block.transactions.len() as u64, Ordering::Relaxed);
         self.counters.mass_counts.fetch_add(mass.max(), Ordering::Relaxed);
-        Ok(BlockStatus::StatusUTXOPendingVerification)
+        Ok(BlockStatus::StatusStatePendingVerification)
     }
 
     fn validate_body(self: &Arc<BlockBodyProcessor>, block: &Block, is_trusted: bool) -> BlockProcessResult<Mass> {
@@ -234,7 +234,7 @@ impl BlockBodyProcessor {
         let mut body_tips_write_guard = self.body_tips_store.write();
         body_tips_write_guard.add_tip_batch(&mut batch, hash, parents).unwrap();
         let statuses_write_guard =
-            self.statuses_store.set_batch(&mut batch, hash, BlockStatus::StatusUTXOPendingVerification).unwrap();
+            self.statuses_store.set_batch(&mut batch, hash, BlockStatus::StatusStatePendingVerification).unwrap();
 
         self.db.write(batch).unwrap();
 

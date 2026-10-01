@@ -3,8 +3,7 @@ use sahyadri_consensus_core::{
     block::Block,
     header::Header,
     subnets::SubnetworkId,
-    tx::{ScriptPublicKey, ScriptVec, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
-    utxo::utxo_collection::UtxoCollection,
+    tx::{ScriptPublicKey, ScriptVec, Transaction, TransactionInput, RegistryRef, TransactionOutput, RegistryUnit},
 };
 use sahyadri_hashes::{HASH_SIZE, Hash};
 
@@ -16,42 +15,27 @@ pub fn block_from_precomputed_hash(hash: Hash, parents: Vec<Hash>) -> Block {
     Block::from_precomputed_hash(hash, parents)
 }
 
-pub fn generate_random_utxos_from_script_public_key_pool(
-    rng: &mut SmallRng,
-    amount: usize,
-    script_public_key_pool: &[ScriptPublicKey],
-) -> UtxoCollection {
-    let mut i = 0;
-    let mut collection = UtxoCollection::with_capacity(amount);
-    while i < amount {
-        collection
-            .insert(generate_random_outpoint(rng), generate_random_utxo_from_script_public_key_pool(rng, script_public_key_pool));
-        i += 1;
-    }
-    collection
-}
-
 pub fn generate_random_hash(rng: &mut SmallRng) -> Hash {
     let random_bytes = rng.r#gen::<[u8; HASH_SIZE]>();
     Hash::from_bytes(random_bytes)
 }
 
-pub fn generate_random_outpoint(rng: &mut SmallRng) -> TransactionOutpoint {
-    TransactionOutpoint::new(generate_random_hash(rng), rng.r#gen::<u32>())
+pub fn generate_random_outpoint(rng: &mut SmallRng) -> RegistryRef {
+    RegistryRef::new(generate_random_hash(rng), rng.r#gen::<u32>())
 }
 
-pub fn generate_random_utxo_from_script_public_key_pool(rng: &mut SmallRng, script_public_key_pool: &[ScriptPublicKey]) -> UtxoEntry {
-    UtxoEntry::new(
-        rng.gen_range(1..100_000), //we choose small amounts as to not overflow with large utxosets.
+pub fn generate_random_registry_unit_from_script_public_key_pool(rng: &mut SmallRng, script_public_key_pool: &[ScriptPublicKey]) -> RegistryUnit {
+    RegistryUnit::new(
+        rng.gen_range(1..100_000), //we choose small amounts as to not overflow with large registry_unitsets.
         script_public_key_pool.choose(rng).expect("expected_script_public key").clone(),
         rng.r#gen(),
         rng.gen_bool(0.5),
     )
 }
 
-pub fn generate_random_utxo(rng: &mut SmallRng) -> UtxoEntry {
-    UtxoEntry::new(
-        rng.gen_range(1..100_000), //we choose small amounts as to not overflow with large utxosets.
+pub fn generate_random_registry_unit(rng: &mut SmallRng) -> RegistryUnit {
+    RegistryUnit::new(
+        rng.gen_range(1..100_000), //we choose small amounts as to not overflow with large registry_unitsets.
         generate_random_p2pk_script_public_key(rng),
         rng.r#gen(),
         rng.gen_bool(0.5),
@@ -144,7 +128,7 @@ pub fn generate_random_transaction_inputs(rng: &mut SmallRng, amount: usize) -> 
 ///Note: generate_random_transactions is filled with random data, it does not represent consensus-valid  transaction output!
 pub fn generate_random_transaction_output(rng: &mut SmallRng) -> TransactionOutput {
     TransactionOutput::new(
-        rng.gen_range(1..100_000), //we choose small amounts as to not overflow with large utxosets.
+        rng.gen_range(1..100_000), //we choose small amounts as to not overflow with large registry_unitsets.
         generate_random_p2pk_script_public_key(rng),
     )
 }
@@ -155,8 +139,8 @@ pub fn generate_random_transaction_outputs(rng: &mut SmallRng, amount: usize) ->
 }
 
 ///Note: generate_random_transactions is filled with random data, it does not represent consensus-valid  transaction output!
-pub fn generate_random_transaction_outpoint(rng: &mut SmallRng) -> TransactionOutpoint {
-    TransactionOutpoint::new(generate_random_hash(rng), rng.r#gen())
+pub fn generate_random_transaction_outpoint(rng: &mut SmallRng) -> RegistryRef {
+    RegistryRef::new(generate_random_hash(rng), rng.r#gen())
 }
 
 //TODO: create `assert_eq_<sahyadri-sturct>!()` helper macros in `consensus::test_helpers`

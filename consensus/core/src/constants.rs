@@ -36,6 +36,6 @@ pub const SEQUENCE_LOCK_TIME_MASK: u64 = 0x00000000ffffffff;
 // as a relative lock time.
 pub const SEQUENCE_LOCK_TIME_DISABLED: u64 = 1 << 63;
 
-/// UNACCEPTED_DAA_SCORE is used to for UtxoEntries that were created by
+/// UNACCEPTED_DAA_SCORE is used to for RegistryUnitEntries that were created by
 /// transactions in the mempool, or otherwise not-yet-accepted transactions.
 pub const UNACCEPTED_DAA_SCORE: u64 = u64::MAX;

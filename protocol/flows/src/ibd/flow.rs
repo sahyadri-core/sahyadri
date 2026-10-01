@@ -28,7 +28,7 @@ use sahyadri_p2p_lib::{
     dequeue_with_timeout, make_message, make_request,
     pb::{
         RequestAntipastMessage, RequestBlockBodiesMessage, RequestHeadersMessage, RequestIbdBlocksMessage,
-        RequestPruningPointAndItsAnticoneMessage, RequestPruningPointProofMessage, RequestPruningPointUtxoSetMessage,
+        RequestPruningPointAndItsAnticoneMessage, RequestPruningPointProofMessage, RequestPruningPointRegistryUnitSetMessage,
         sahyadrid_message::Payload,
     },
 };
@@ -39,7 +39,7 @@ use std::{
 };
 use tokio::time::sleep;
 
-use super::{HeadersChunk, IBD_BATCH_SIZE, PruningPointUtxosetChunkStream, progress::ProgressReporter};
+use super::{HeadersChunk, IBD_BATCH_SIZE, PruningPointRegistryUnitsetChunkStream, progress::ProgressReporter};
 type BlockBody = Vec<Transaction>;
 
 /// Flow for managing IBD - Initial Block Download
@@ -66,7 +66,7 @@ impl Flow for IbdFlow {
 }
 
 pub enum IbdType {
-    Sync { highest_known_syncer_chain_hash: Hash, is_utxo_stable: bool, is_pp_anticone_synced: bool },
+    Sync { highest_known_syncer_chain_hash: Hash, is_registry_unit_stable: bool, is_pp_anticone_synced: bool },
     DownloadHeadersProof,
     PruningCatchUp { highest_known_syncer_chain_hash: Hash },
 }
@@ -121,7 +121,7 @@ impl IbdFlow {
             )
             .await?;
         match ibd_type {
-            IbdType::Sync { highest_known_syncer_chain_hash, is_utxo_stable, is_pp_anticone_synced } => {
+            IbdType::Sync { highest_known_syncer_chain_hash, is_registry_unit_stable, is_pp_anticone_synced } => {
                 let pruning_point = session.async_pruning_point().await;
 
                 info!("syncing ahead from current pruning point");
@@ -135,18 +135,18 @@ impl IbdFlow {
                 if !is_pp_anticone_synced {
                     self.sync_missing_trusted_bodies(&session).await?;
                 }
-                if !is_utxo_stable
-                // Utxo might not be available even if the pruning point block data is.
-                // Utxo must be synced before all so the node could function
+                if !is_registry_unit_stable
+                // RegistryUnit might not be available even if the pruning point block data is.
+                // RegistryUnit must be synced before all so the node could function
                 {
                     info!(
-                        "utxoset corresponding to the current pruning point is incomplete, attempting to download it from {}",
+                        "registry_unitset corresponding to the current pruning point is incomplete, attempting to download it from {}",
                         self.router
                     );
 
-                    self.sync_new_utxo_set(&session, pruning_point).await?;
+                    self.sync_new_registry_unit_set(&session, pruning_point).await?;
                 }
-                // Once utxo is valid, simply sync missing headers
+                // Once registry_unit is valid, simply sync missing headers
                 self.sync_headers(
                     &session,
                     negotiation_output.syncer_virtual_selected_parent,
@@ -168,10 +168,10 @@ impl IbdFlow {
 
                         // This will reobtain the freshly committed staging consensus
                         session = self.ctx.consensus().session().await;
-                        // Next, sync a utxoset corresponding to the new pruning point from the syncer.
+                        // Next, sync a registry_unitset corresponding to the new pruning point from the syncer.
                         // Note that the new pruning point's anticone need not be downloaded separately as in other IBD types
                         // as it was just downloaded as part of the headers proof.
-                        self.sync_new_utxo_set(&session, negotiation_output.syncer_pruning_point).await?;
+                        self.sync_new_registry_unit_set(&session, negotiation_output.syncer_pruning_point).await?;
                     }
                     Err(e) => {
                         warn!("IBD with headers proof from {} was unsuccessful ({})", self.router, e);
@@ -186,7 +186,7 @@ impl IbdFlow {
                     Ok(()) => {
                         info!("header stage of pruning catchup from peer {} completed", self.router);
                         self.sync_missing_trusted_bodies(&session).await?;
-                        self.sync_new_utxo_set(&session, negotiation_output.syncer_pruning_point).await?;
+                        self.sync_new_registry_unit_set(&session, negotiation_output.syncer_pruning_point).await?;
                         // Note that pruning of old data will only occur once virtual has caught up sufficiently far
                     }
 
@@ -258,15 +258,15 @@ impl IbdFlow {
                     ));
                 };
 
-                let is_utxo_stable = consensus.async_is_pruning_utxoset_stable().await;
+                let is_registry_unit_stable = consensus.async_is_pruning_registry_stable().await;
                 let is_pp_anticone_synced = consensus.async_is_pruning_point_anticone_fully_synced().await;
 
-                return match (syncer_skew, is_utxo_stable && is_pp_anticone_synced) {
+                return match (syncer_skew, is_registry_unit_stable && is_pp_anticone_synced) {
                     (SyncerSkew::Aligned, _) => {
-                        Ok(IbdType::Sync { highest_known_syncer_chain_hash, is_utxo_stable, is_pp_anticone_synced })
+                        Ok(IbdType::Sync { highest_known_syncer_chain_hash, is_registry_unit_stable, is_pp_anticone_synced })
                     }
                     (SyncerSkew::Lagging, true) => {
-                        Ok(IbdType::Sync { highest_known_syncer_chain_hash, is_utxo_stable, is_pp_anticone_synced })
+                        Ok(IbdType::Sync { highest_known_syncer_chain_hash, is_registry_unit_stable, is_pp_anticone_synced })
                     }
                     (SyncerSkew::Lagging, false) => Err(ProtocolError::Other(
                         "Local node is in a transitional state requiring external data to stabilize, but the syncer lags behind and is unable to provide said data",
@@ -275,7 +275,7 @@ impl IbdFlow {
                         if consensus.async_get_block_status(syncer_pruning_point).await.is_some_and(|b| b.has_block_body()) {
                             // While a leading syncer skew often indicates the need for catchup, in this case
                             // the node is just missing a segment in the future of its current pruning point, that is available to the syncer
-                            Ok(IbdType::Sync { highest_known_syncer_chain_hash, is_utxo_stable, is_pp_anticone_synced })
+                            Ok(IbdType::Sync { highest_known_syncer_chain_hash, is_registry_unit_stable, is_pp_anticone_synced })
                         } else {
                             Ok(IbdType::PruningCatchUp { highest_known_syncer_chain_hash })
                         }
@@ -595,16 +595,16 @@ impl IbdFlow {
         Ok(())
     }
 
-    async fn sync_new_utxo_set(&mut self, consensus: &ConsensusProxy, pruning_point: Hash) -> Result<(), ProtocolError> {
-        // A better solution could be to create a copy of the old utxo state for some sort of fallback rather than delete it.
-        consensus.async_clear_pruning_utxo_set().await; // this deletes the old pruning utxoset and also sets the pruning utxo as invalidated
-        self.sync_pruning_point_utxoset(consensus, pruning_point).await?;
-        // Only if the function has reached here, will the utxo be considered "final"
-        consensus.async_set_pruning_utxoset_stable().await;
-        // Once a new utxoset is stored, the utxoindex needs to be resynced as well. This happens through the reset handler mechanism.
+    async fn sync_new_registry_unit_set(&mut self, consensus: &ConsensusProxy, pruning_point: Hash) -> Result<(), ProtocolError> {
+        // A better solution could be to create a copy of the old registry_unit state for some sort of fallback rather than delete it.
+        consensus.async_clear_pruning_registry_set().await; // this deletes the old pruning registry_unitset and also sets the pruning registry_unit as invalidated
+        self.sync_pruning_point_registry_unitset(consensus, pruning_point).await?;
+        // Only if the function has reached here, will the registry_unit be considered "final"
+        consensus.async_set_pruning_registry_stable().await;
+        // Once a new registry_unitset is stored, the registry_unitindex needs to be resynced as well. This happens through the reset handler mechanism.
         let consensus_manager = self.ctx.consensus_manager.clone();
         spawn_blocking(move || consensus_manager.invoke_consensus_reset_handlers()).await.unwrap();
-        self.ctx.on_pruning_point_utxoset_override();
+        self.ctx.on_pruning_point_registry_unitset_override();
         Ok(())
     }
 
@@ -672,26 +672,26 @@ staging selected tip ({}) is too small or negative. Aborting IBD...",
         }
     }
 
-    async fn sync_pruning_point_utxoset(&mut self, consensus: &ConsensusProxy, pruning_point: Hash) -> Result<(), ProtocolError> {
-        info!("downloading the pruning point utxoset, this can take a little while.");
+    async fn sync_pruning_point_registry_unitset(&mut self, consensus: &ConsensusProxy, pruning_point: Hash) -> Result<(), ProtocolError> {
+        info!("downloading the pruning point registry_unitset, this can take a little while.");
         self.router
             .enqueue(make_message!(
-                Payload::RequestPruningPointUtxoSet,
-                RequestPruningPointUtxoSetMessage { pruning_point_hash: Some(pruning_point.into()) }
+                Payload::RequestPruningPointRegistryUnitSet,
+                RequestPruningPointRegistryUnitSetMessage { pruning_point_hash: Some(pruning_point.into()) }
             ))
             .await?;
-        let mut chunk_stream = PruningPointUtxosetChunkStream::new(&self.router, &mut self.incoming_route);
+        let mut chunk_stream = PruningPointRegistryUnitsetChunkStream::new(&self.router, &mut self.incoming_route);
         let mut multiset = MuHash::new();
         while let Some(chunk) = chunk_stream.next().await? {
             multiset = consensus
                 .clone()
                 .spawn_blocking(move |c| {
-                    c.append_imported_pruning_point_utxos(&chunk, &mut multiset);
+                    c.append_imported_pruning_point_registry_units(&chunk, &mut multiset);
                     multiset
                 })
                 .await;
         }
-        consensus.clone().spawn_blocking(move |c| c.import_pruning_point_utxo_set(pruning_point, multiset)).await?;
+        consensus.clone().spawn_blocking(move |c| c.import_pruning_point_registry_unit_set(pruning_point, multiset)).await?;
         Ok(())
     }
     async fn sync_missing_trusted_bodies(&mut self, consensus: &ConsensusProxy) -> Result<(), ProtocolError> {

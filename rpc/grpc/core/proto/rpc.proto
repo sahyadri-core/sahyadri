@@ -27,7 +27,7 @@ message RpcBlockHeader {
   repeated RpcBlockLevelParents parents = 12;
   string hashMerkleRoot = 3;
   string acceptedIdMerkleRoot = 4;
-  string utxoCommitment = 5;
+  string registryUnitCommitment = 5;
   int64 timestamp = 6;
   uint32 bits = 7;
   uint64 nonce = 8;
@@ -90,18 +90,18 @@ message RpcTransactionInput {
 }
 
 message RpcTransactionInputVerboseData {
-  RpcUtxoEntry utxoEntry = 1; // this field is new, if this is null, the utxo cannot be found, or is coinbase.
+  RpcRegistryUnit registryUnitEntry = 1; // this field is new, if this is null, the registry unit cannot be found, or is coinbase.
 }
 
-message RpcUtxoEntry {
+message RpcRegistryUnit {
   uint64 amount = 1;
   RpcScriptPublicKey scriptPublicKey = 2;
   uint64 blockDaaScore = 3;
   bool isCoinbase = 4;
-  RpcUtxoEntryVerboseData verboseData = 5;
+  RpcRegistryUnitVerboseData verboseData = 5;
 }
 
-message RpcUtxoEntryVerboseData {
+message RpcRegistryUnitVerboseData {
   string scriptPublicKeyType = 5;
   string scriptPublicKeyAddress = 6;
 }
@@ -502,70 +502,70 @@ message GetHeadersResponseMessage {
   RPCError error = 1000;
 }
 
-// NotifyUtxosChangedRequestMessage registers this connection for utxoChanged notifications
+// NotifyRegistryChangedRequestMessage registers this connection for registryChanged notifications
 // for the given addresses.
 //
-// This call is only available when this sahyadrid was started with `--utxoindex`
+// This call is only available when this sahyadrid was started with `--registryindex`
 //
-// See: UtxosChangedNotificationMessage
-message NotifyUtxosChangedRequestMessage {
-  // UTXOs addresses to start/stop getting notified about
+// See: RegistryChangedNotificationMessage
+message NotifyRegistryChangedRequestMessage {
+  // REGISTRY_UNITs addresses to start/stop getting notified about
   // Leave empty to start/stop all updates
   repeated string addresses = 1;
   RpcNotifyCommand command = 101;
 }
 
-message NotifyUtxosChangedResponseMessage {
+message NotifyRegistryChangedResponseMessage {
   RPCError error = 1000;
 }
 
-// UtxosChangedNotificationMessage is sent whenever the UTXO index had been updated.
+// RegistryChangedNotificationMessage is sent whenever the REGISTRY_UNIT index had been updated.
 //
-// See: NotifyUtxosChangedRequestMessage
-message UtxosChangedNotificationMessage {
-  repeated RpcUtxosByAddressesEntry added = 1;
-  repeated RpcUtxosByAddressesEntry removed = 2;
+// See: NotifyRegistryChangedRequestMessage
+message RegistryChangedNotificationMessage {
+  repeated RpcRegistryByAddressesEntry added = 1;
+  repeated RpcRegistryByAddressesEntry removed = 2;
 }
 
-message RpcUtxosByAddressesEntry {
+message RpcRegistryByAddressesEntry {
   string address = 1;
   RpcOutpoint outpoint = 2;
-  RpcUtxoEntry utxoEntry = 3;
+  RpcRegistryUnit registryUnitEntry = 3;
 }
 
-// StopNotifyingUtxosChangedRequestMessage unregisters this connection for utxoChanged notifications
+// StopNotifyingRegistryChangedRequestMessage unregisters this connection for registryChanged notifications
 // for the given addresses.
 //
-// This call is only available when this sahyadrid was started with `--utxoindex`
+// This call is only available when this sahyadrid was started with `--registryindex`
 //
-// See: UtxosChangedNotificationMessage
+// See: RegistryChangedNotificationMessage
 //
 // This message only exists for backward compatibility reason with sahyadrid and is deprecated.
-// Use instead UtxosChangedNotificationMessage with command = NOTIFY_STOP.
-message StopNotifyingUtxosChangedRequestMessage {
+// Use instead RegistryChangedNotificationMessage with command = NOTIFY_STOP.
+message StopNotifyingRegistryChangedRequestMessage {
   repeated string addresses = 1;
 }
 
-message StopNotifyingUtxosChangedResponseMessage {
+message StopNotifyingRegistryChangedResponseMessage {
   RPCError error = 1000;
 }
 
-// GetUtxosByAddressesRequestMessage requests all current UTXOs for the given sahyadrid addresses
+// GetRegistryByAddressesRequestMessage requests all current REGISTRY_UNITs for the given sahyadrid addresses
 //
-// This call is only available when this sahyadrid was started with `--utxoindex`
-message GetUtxosByAddressesRequestMessage {
+// This call is only available when this sahyadrid was started with `--registryindex`
+message GetRegistryByAddressesRequestMessage {
   repeated string addresses = 1;
 }
 
-message GetUtxosByAddressesResponseMessage {
-  repeated RpcUtxosByAddressesEntry entries = 1;
+message GetRegistryByAddressesResponseMessage {
+  repeated RpcRegistryByAddressesEntry entries = 1;
 
   RPCError error = 1000;
 }
 
 // GetBalanceByAddressRequest returns the total balance in unspent transactions towards a given address
 //
-// This call is only available when this sahyadrid was started with `--utxoindex`
+// This call is only available when this sahyadrid was started with `--registryindex`
 message GetBalanceByAddressRequestMessage {
   string address = 1;
 }
@@ -654,38 +654,38 @@ message VirtualDaaScoreChangedNotificationMessage {
   uint64 virtualDaaScore = 1;
 }
 
-// NotifyPruningPointUtxoSetOverrideRequestMessage registers this connection for
-// pruning point UTXO set override notifications.
+// NotifyPruningPointRegistryUnitSetOverrideRequestMessage registers this connection for
+// pruning point REGISTRY_UNIT set override notifications.
 //
-// This call is only available when this sahyadrid was started with `--utxoindex`
+// This call is only available when this sahyadrid was started with `--registryindex`
 //
-// See: NotifyPruningPointUtxoSetOverrideResponseMessage
-message NotifyPruningPointUtxoSetOverrideRequestMessage {
+// See: NotifyPruningPointRegistryUnitSetOverrideResponseMessage
+message NotifyPruningPointRegistryUnitSetOverrideRequestMessage {
   RpcNotifyCommand command = 101;
 }
 
-message NotifyPruningPointUtxoSetOverrideResponseMessage {
+message NotifyPruningPointRegistryUnitSetOverrideResponseMessage {
   RPCError error = 1000;
 }
 
-// PruningPointUtxoSetOverrideNotificationMessage is sent whenever the UTXO index
+// PruningPointRegistryUnitSetOverrideNotificationMessage is sent whenever the REGISTRY_UNIT index
 // resets due to pruning point change via IBD.
 //
-// See NotifyPruningPointUtxoSetOverrideRequestMessage
-message PruningPointUtxoSetOverrideNotificationMessage {}
+// See NotifyPruningPointRegistryUnitSetOverrideRequestMessage
+message PruningPointRegistryUnitSetOverrideNotificationMessage {}
 
-// StopNotifyingPruningPointUtxoSetOverrideRequestMessage unregisters this connection for
-// pruning point UTXO set override notifications.
+// StopNotifyingPruningPointRegistryUnitSetOverrideRequestMessage unregisters this connection for
+// pruning point REGISTRY_UNIT set override notifications.
 //
-// This call is only available when this sahyadrid was started with `--utxoindex`
+// This call is only available when this sahyadrid was started with `--registryindex`
 //
-// See: PruningPointUtxoSetOverrideNotificationMessage
+// See: PruningPointRegistryUnitSetOverrideNotificationMessage
 //
 // This message only exists for backward compatibility reason with sahyadrid and is deprecated.
-// Use instead NotifyPruningPointUtxoSetOverrideRequestMessage with command = NOTIFY_STOP.
-message StopNotifyingPruningPointUtxoSetOverrideRequestMessage {}
+// Use instead NotifyPruningPointRegistryUnitSetOverrideRequestMessage with command = NOTIFY_STOP.
+message StopNotifyingPruningPointRegistryUnitSetOverrideRequestMessage {}
 
-message StopNotifyingPruningPointUtxoSetOverrideResponseMessage {
+message StopNotifyingPruningPointRegistryUnitSetOverrideResponseMessage {
   RPCError error = 1000;
 }
 
@@ -714,7 +714,7 @@ message GetInfoResponseMessage {
   string p2pId = 1;
   uint64 mempoolSize = 2;
   string serverVersion = 3;
-  bool isUtxoIndexed = 4;
+  bool isRegistryUnitIndexed = 4;
   bool isSynced = 5;
   bool hasNotifyCommand = 11;
   bool hasMessageId = 12;
@@ -895,7 +895,7 @@ message GetServerInfoResponseMessage {
   uint32 rpcApiRevision = 2;
   string serverVersion = 3;
   string networkId = 4;
-  bool hasUtxoIndex = 5;
+  bool hasRegistryUnitIndex = 5;
   bool isSynced = 6;
   uint64 virtualDaaScore = 7;
   RPCError error = 1000;
@@ -972,12 +972,12 @@ message GetFeeEstimateExperimentalResponseMessage {
   RPCError error = 1000;
 }
 
-message GetUtxoReturnAddressRequestMessage {
+message GetRegistryUnitReturnAddressRequestMessage {
   string txid = 1;
   uint64 accepting_block_daa_score = 2;
 }
 
-message GetUtxoReturnAddressResponseMessage {
+message GetRegistryUnitReturnAddressResponseMessage {
   string return_address = 1;
   RPCError error = 1000;
 }
@@ -997,7 +997,7 @@ message RpcOptionalHeader {
   repeated RpcBlockLevelRun parentsByLevel = 4;
   optional string hashMerkleRoot = 5;
   optional string acceptedIdMerkleRoot = 6;
-  optional string utxoCommitment = 7;
+  optional string registryUnitCommitment = 7;
   optional int64 timestamp = 8;
   optional uint32 bits = 9;
   optional uint64 nonce = 10;
@@ -1007,30 +1007,30 @@ message RpcOptionalHeader {
   optional string pruningPoint = 14;
 }
 
-message RpcOptionalTransactionOutpoint {
+message RpcOptionalRegistryRef {
   optional string transactionId = 2;
   optional uint32 index = 3;
 }
 
-message RpcOptionalUtxoEntryVerboseData {
+message RpcOptionalRegistryUnitVerboseData {
   optional string scriptPublicKeyType = 2;
   optional string scriptPublicKeyAddress = 3;
 }
 
-message RpcOptionalUtxoEntry {
+message RpcOptionalRegistryUnit {
   optional uint64 amount = 2;
   optional RpcScriptPublicKey scriptPublicKey = 3;
   optional uint64 blockDaaScore = 4;
   optional bool isCoinbase = 5;
-  optional RpcOptionalUtxoEntryVerboseData verboseData = 6;
+  optional RpcOptionalRegistryUnitVerboseData verboseData = 6;
 }
 
 message RpcOptionalTransactionInputVerboseData {
-  optional RpcOptionalUtxoEntry utxoEntry = 2;
+  optional RpcOptionalRegistryUnit registryUnitEntry = 2;
 }
 
 message RpcOptionalTransactionInput {
-  optional RpcOptionalTransactionOutpoint previousOutpoint = 2;
+  optional RpcOptionalRegistryRef previousOutpoint = 2;
   optional string signatureScript = 3;
   optional uint64 sequence = 4;
   optional uint32 sigOpCount = 5;

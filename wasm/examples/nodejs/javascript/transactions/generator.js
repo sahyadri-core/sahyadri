@@ -42,18 +42,18 @@ const { encoding, networkId, address : destinationAddress } = require("../utils"
     }
 
 
-    let { entries } = await rpc.getUtxosByAddresses([sourceAddress]);
+    let { entries } = await rpc.getRegistryUnitsByAddresses([sourceAddress]);
 
     if (!entries.length) {
-        console.error(`No UTXOs found for address ${sourceAddress}`);
+        console.error(`No REGISTRY_UNITs found for address ${sourceAddress}`);
     } else {
         console.info(entries);
 
-        // a very basic JS-driven utxo entry sort
+        // a very basic JS-driven registry_unit entry sort
         entries.sort((a, b) => a.amount > b.amount ? 1 : -1);
 
         // create a transaction generator
-        // entries: an array of UtxoEntry
+        // entries: an array of RegistryUnitEntry
         // outputs: an array of [address, amount]
         //
         // priorityFee: a priodityFee value in Kana
@@ -69,7 +69,7 @@ const { encoding, networkId, address : destinationAddress } = require("../utils"
         // If the requested amount is greater than the Sahyadri
         // transaction mass, the Generator will create multiple
         // transactions where each transaction will forward
-        // UTXOs to the change address, until the requested
+        // REGISTRY_UNITs to the change address, until the requested
         // amount is reached.  It will then create a final
         // transaction according to the supplied outputs.
         let generator = new Generator({

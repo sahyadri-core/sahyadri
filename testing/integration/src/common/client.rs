@@ -49,8 +49,8 @@ impl ListeningClient {
         self.listener(EventType::BlockAdded)
     }
 
-    pub fn utxos_changed_listener(&self) -> Option<Listener> {
-        self.listener(EventType::UtxosChanged)
+    pub fn registry_changed_listener(&self) -> Option<Listener> {
+        self.listener(EventType::RegistryChanged)
     }
 
     pub fn virtual_daa_score_changed_listener(&self) -> Option<Listener> {

@@ -233,13 +233,13 @@ mod tests {
             0,
             vec![
                 TransactionInput {
-                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id.clone(), index: 0 },
+                    previous_outpoint: RegistryRef { transaction_id: prev_tx_id.clone(), index: 0 },
                     signature_script: vec![],
                     sequence: 0,
                     sig_op_count: 0,
                 },
                 TransactionInput {
-                    previous_outpoint: TransactionOutpoint { transaction_id: prev_tx_id, index: 1 },
+                    previous_outpoint: RegistryRef { transaction_id: prev_tx_id, index: 1 },
                     signature_script: vec![],
                     sequence: 1,
                     sig_op_count: 0,
@@ -255,13 +255,13 @@ mod tests {
             vec![],
         );
         let entries = vec![
-            UtxoEntry {
+            RegistryUnit {
                 amount: 100,
                 script_public_key: ScriptPublicKey::new(0, script_pub_key.clone()),
                 block_daa_score: 0,
                 is_coinbase: false,
             },
-            UtxoEntry {
+            RegistryUnit {
                 amount: 200,
                 script_public_key: ScriptPublicKey::new(0, script_pub_key2),
                 block_daa_score: 0,

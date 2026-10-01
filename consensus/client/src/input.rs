@@ -4,8 +4,8 @@
 
 #![allow(non_snake_case)]
 
-use crate::TransactionOutpoint;
-use crate::UtxoEntryReference;
+use crate::RegistryRef;
+use crate::RegistryUnitRef;
 use crate::imports::*;
 use crate::result::Result;
 use sahyadri_utils::hex::*;
@@ -18,11 +18,11 @@ const TS_TRANSACTION: &'static str = r#"
  * @category Consensus
  */
 export interface ITransactionInput {
-    previousOutpoint: ITransactionOutpoint;
+    previousOutpoint: IRegistryRef;
     signatureScript?: HexString;
     sequence: bigint;
     sigOpCount: number;
-    utxo?: UtxoEntryReference;
+    registry_unit?: RegistryUnitRef;
 
     /** Optional verbose data provided by RPC */
     verboseData?: ITransactionInputVerboseData;
@@ -57,22 +57,22 @@ extern "C" {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionInputInner {
-    pub previous_outpoint: TransactionOutpoint,
+    pub previous_outpoint: RegistryRef,
     pub signature_script: Option<Vec<u8>>,
     pub sequence: u64,
     pub sig_op_count: u8,
-    pub utxo: Option<UtxoEntryReference>,
+    pub registry_unit: Option<RegistryUnitRef>,
 }
 
 impl TransactionInputInner {
     pub fn new(
-        previous_outpoint: TransactionOutpoint,
+        previous_outpoint: RegistryRef,
         signature_script: Option<Vec<u8>>,
         sequence: u64,
         sig_op_count: u8,
-        utxo: Option<UtxoEntryReference>,
+        registry_unit: Option<RegistryUnitRef>,
     ) -> Self {
-        Self { previous_outpoint, signature_script, sequence, sig_op_count, utxo }
+        Self { previous_outpoint, signature_script, sequence, sig_op_count, registry_unit }
     }
 }
 
@@ -86,13 +86,13 @@ pub struct TransactionInput {
 
 impl TransactionInput {
     pub fn new(
-        previous_outpoint: TransactionOutpoint,
+        previous_outpoint: RegistryRef,
         signature_script: Option<Vec<u8>>,
         sequence: u64,
         sig_op_count: u8,
-        utxo: Option<UtxoEntryReference>,
+        registry_unit: Option<RegistryUnitRef>,
     ) -> Self {
-        let inner = TransactionInputInner::new(previous_outpoint, signature_script, sequence, sig_op_count, utxo);
+        let inner = TransactionInputInner::new(previous_outpoint, signature_script, sequence, sig_op_count, registry_unit);
         Self { inner: Arc::new(Mutex::new(inner)) }
     }
 
@@ -112,8 +112,8 @@ impl TransactionInput {
         self.inner().signature_script.as_ref().map(|signature_script| signature_script.len()).unwrap_or_default()
     }
 
-    pub fn utxo(&self) -> Option<UtxoEntryReference> {
-        self.inner().utxo.clone()
+    pub fn registry_unit(&self) -> Option<RegistryUnitRef> {
+        self.inner().registry_unit.clone()
     }
 }
 
@@ -125,7 +125,7 @@ impl TransactionInput {
     }
 
     #[wasm_bindgen(getter = previousOutpoint)]
-    pub fn get_previous_outpoint(&self) -> TransactionOutpoint {
+    pub fn get_previous_outpoint(&self) -> RegistryRef {
         self.inner().previous_outpoint.clone()
     }
 
@@ -176,9 +176,9 @@ impl TransactionInput {
         self.inner().sig_op_count = sig_op_count;
     }
 
-    #[wasm_bindgen(getter = utxo)]
-    pub fn get_utxo(&self) -> Option<UtxoEntryReference> {
-        self.inner().utxo.clone()
+    #[wasm_bindgen(getter = registry_unit)]
+    pub fn get_registry_unit(&self) -> Option<RegistryUnitRef> {
+        self.inner().registry_unit.clone()
     }
 }
 
@@ -188,7 +188,7 @@ impl TransactionInput {
     }
 
     pub fn script_public_key(&self) -> Option<ScriptPublicKey> {
-        self.utxo().map(|utxo_ref| utxo_ref.utxo.script_public_key.clone())
+        self.registry_unit().map(|registry_unit_ref| registry_unit_ref.registry_unit.script_public_key.clone())
     }
 }
 
@@ -206,12 +206,12 @@ impl TryCastFromJs for TransactionInput {
     {
         Self::resolve_cast(value, || {
             if let Some(object) = Object::try_from(value.as_ref()) {
-                let previous_outpoint: TransactionOutpoint = object.get_value("previousOutpoint")?.as_ref().try_into()?;
+                let previous_outpoint: RegistryRef = object.get_value("previousOutpoint")?.as_ref().try_into()?;
                 let signature_script = object.get_vec_u8("signatureScript").ok();
                 let sequence = object.get_u64("sequence")?;
                 let sig_op_count = object.get_u8("sigOpCount")?;
-                let utxo = object.try_cast_into::<UtxoEntryReference>("utxo")?;
-                Ok(TransactionInput::new(previous_outpoint, signature_script, sequence, sig_op_count, utxo).into())
+                let registry_unit = object.try_cast_into::<RegistryUnitRef>("registry_unit")?;
+                Ok(TransactionInput::new(previous_outpoint, signature_script, sequence, sig_op_count, registry_unit).into())
             } else {
                 Err("TransactionInput must be an object".into())
             }
