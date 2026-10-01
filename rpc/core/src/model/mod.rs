@@ -34,3 +34,5 @@ pub use peer::*;
 pub use subnets::*;
 pub use tx::*;
 pub use verbosity::*;
+pub mod proof;
+pub use proof::*;

@@ -28,6 +28,7 @@ use sahyadri_notify::{
         context::SubscriptionContext,
     },
 };
+use sahyadri_rpc_core::api::connection::DynRpcConnection;
 use sahyadri_rpc_core::{
     Notification,
     api::rpc::RpcApi,
@@ -282,8 +283,21 @@ impl RpcApi for GrpcClient {
     route!(get_registry_unit_return_address_call, GetRegistryUnitReturnAddress);
     route!(get_virtual_chain_from_block_v2_call, GetVirtualChainFromBlockV2);
 
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Notification API
+    async fn get_account_proof(
+        &self,
+        _address: sahyadri_rpc_core::RpcAddress,
+        _block_hash: Option<sahyadri_rpc_core::RpcHash>,
+    ) -> RpcResult<sahyadri_rpc_core::RpcAccountProof> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
+    async fn get_account_proof_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        _request: sahyadri_rpc_core::GetAccountProofRequest,
+    ) -> RpcResult<sahyadri_rpc_core::RpcAccountProof> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
 
     /// Register a new listener and returns an id identifying it.
     fn register_new_listener(&self, connection: ChannelConnection) -> ListenerId {

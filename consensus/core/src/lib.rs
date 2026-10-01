@@ -147,3 +147,4 @@ mod tests {
         assert_eq!(hasher.finish(), 4);
     }
 }
+pub mod model;

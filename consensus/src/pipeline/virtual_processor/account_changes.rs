@@ -24,6 +24,13 @@ use crate::model::stores::account_states::AccountStatesStoreReader;
 use crate::model::stores::account_store::{AccountState, FlashEntry};
 use crate::pipeline::virtual_processor::flash_tx::{flash_pubkey_to_spk, hash20_to_p2pkh_spk};
 
+
+use crate::model::stores::smt_nodes::DbSmtNodeStoreBase;
+use sahyadri_consensus_core::model::proof::{
+    AccountProof, AccountProofFlashEntry, AccountProofPayload, AccountProofState,
+    AccountProofTerminal,
+};
+
 #[derive(Debug)]
 pub enum AccountError {
     Smt(sahyadri_smt::SmtError),
@@ -237,4 +244,66 @@ pub fn extract_block_effects(
     }
 
     (flash_txs, rewards)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ACCOUNT PROOF GENERATION (light-client support)
+// ═══════════════════════════════════════════════════════════════
+
+/// Generate a proof of account membership / absence against `root`.
+pub fn prove_account(
+    smt_store: &DbSmtNodeStoreBase,
+    account_states_store: &dyn AccountStatesStoreReader,
+    root: H256,
+    spk: &ScriptPublicKey,
+) -> Result<AccountProof, AccountError> {
+    let key = account_key_hash(spk);
+
+    // 1. SMT proof
+    let smt_proof = sahyadri_smt::prove(smt_store, root, &key)
+        .map_err(AccountError::Smt)?;
+
+    // 2. Translate into serde-friendly shape
+    let siblings = smt_proof.siblings.clone();
+    let terminal = match smt_proof.terminal {
+        sahyadri_smt::Terminal::Empty => AccountProofTerminal::Empty,
+        sahyadri_smt::Terminal::Leaf { key, value } => {
+            AccountProofTerminal::Leaf { key, value }
+        }
+    };
+
+    // 3. Resolve account state via leaf value
+    let (state, state_hash) = match &terminal {
+        AccountProofTerminal::Empty => (None, [0u8; 32]),
+        AccountProofTerminal::Leaf { value, .. } => {
+            // `value` is the content-hash of the AccountState.
+            // Fetch the AccountState from the state store keyed by that hash.
+            match account_states_store.get(Hash::from_bytes(*value)) {
+                Ok(s) => (
+                    Some(AccountProofState {
+                        balance: s.balance,
+                        recent_flashes: s
+                            .recent_flashes
+                            .iter()
+                            .map(|f| AccountProofFlashEntry {
+                                flash_id: f.flash_id,
+                                expiry_daa_score: f.expiry_daa_score,
+                            })
+                            .collect(),
+                    }),
+                    *value,
+                ),
+                Err(_) => (None, *value),
+            }
+        }
+    };
+
+    Ok(AccountProof {
+        block_hash: Default::default(),   // caller sets
+        account_root: Hash::from_bytes(root),
+        key,
+        proof: AccountProofPayload { siblings, terminal },
+        state,
+        state_hash,
+    })
 }

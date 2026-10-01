@@ -1497,6 +1497,37 @@ pub struct GetRegistryByAddressesRequest {
     pub addresses: Vec<RpcAddress>,
 }
 
+
+/// Request for an account-state proof against a specific block's header.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetAccountProofRequest {
+    pub address: RpcAddress,
+    pub block_hash: Option<RpcHash>,
+}
+
+impl GetAccountProofRequest {
+    pub fn new(address: RpcAddress, block_hash: Option<RpcHash>) -> Self {
+        Self { address, block_hash }
+    }
+}
+
+impl Serializer for GetAccountProofRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(RpcAddress, &self.address, writer)?;
+        store!(Option<RpcHash>, &self.block_hash, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetAccountProofRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let address = load!(RpcAddress, reader)?;
+        let block_hash = load!(Option<RpcHash>, reader)?;
+        Ok(Self { address, block_hash })
+    }
+}
+
 impl GetRegistryByAddressesRequest {
     pub fn new(addresses: Vec<RpcAddress>) -> Self {
         Self { addresses }

@@ -676,6 +676,22 @@ impl RpcApi for SahyadriRpcClient {
         self.submit_account_transaction_call(None, request).await
     }
 
+    async fn get_account_proof(
+        &self,
+        _address: sahyadri_rpc_core::RpcAddress,
+        _block_hash: Option<sahyadri_rpc_core::RpcHash>,
+    ) -> RpcResult<sahyadri_rpc_core::RpcAccountProof> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
+    async fn get_account_proof_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: sahyadri_rpc_core::GetAccountProofRequest,
+    ) -> RpcResult<sahyadri_rpc_core::RpcAccountProof> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
     async fn submit_flash_transaction(
         &self,
         request: sahyadri_rpc_core::SubmitFlashTransactionRequest,

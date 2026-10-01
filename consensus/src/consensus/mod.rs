@@ -102,6 +102,13 @@ use std::{
     },
     thread::{self, JoinHandle},
 };
+
+use crate::model::stores::smt_nodes::DbSmtNodeStoreBase;
+use sahyadri_consensus_core::model::proof::AccountProof;
+use sahyadri_consensus_core::tx::ScriptPublicKey;
+use sahyadri_smt::H256;
+use crate::model::stores::account_roots::AccountRootsStoreReader;
+
 use tokio::sync::oneshot;
 
 use self::{services::ConsensusServices, storage::ConsensusStorage};
@@ -602,6 +609,35 @@ impl ConsensusApi for Consensus {
     fn get_account_balance(&self, address: &sahyadri_addresses::Address) -> Option<u64> {
         let script_public_key = sahyadri_txscript::pay_to_address_script(address);
         self.storage.account_store.get(&script_public_key).ok().map(|state| state.balance)
+    }
+
+
+    fn get_account_proof(
+        &self,
+        spk: &ScriptPublicKey,
+        block_hash: Hash,
+    ) -> ConsensusResult<AccountProof> {
+        // 1. Resolve the account root for the block
+        let root_hash = self
+            .account_roots_store
+            .get(block_hash)
+            .map_err(|_| ConsensusError::General("account root not found"))?;
+        let root: H256 = root_hash;
+
+        // 2. Build SMT store base (scoped)
+        let smt_base = DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
+
+        // 3. Generate proof
+        let mut proof = crate::pipeline::virtual_processor::account_changes::prove_account(
+            &smt_base,
+            &*self.account_states_store,
+            root,
+            spk,
+        )
+        .map_err(|_| ConsensusError::General("prove_account failed"))?;
+
+        proof.block_hash = block_hash;
+        Ok(proof)
     }
 
     // ============= SAHYADRI DID IMPLEMENTATIONS =============

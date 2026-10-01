@@ -303,6 +303,16 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(|c| c.get_tips()).await
     }
 
+    pub async fn async_get_account_proof(
+        &self,
+        spk: sahyadri_consensus_core::tx::ScriptPublicKey,
+        block_hash: sahyadri_consensus_core::Hash,
+    ) -> ConsensusResult<sahyadri_consensus_core::model::proof::AccountProof> {
+        self.clone()
+            .spawn_blocking(move |c| c.get_account_proof(&spk, block_hash))
+            .await
+    }
+
     pub async fn async_get_tips_len(&self) -> usize {
         self.clone().spawn_blocking(|c| c.get_tips_len()).await
     }

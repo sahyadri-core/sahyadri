@@ -26,6 +26,9 @@ use crate::{
         TransactionType, RegistryUnit,
     },
 };
+
+use crate::model::proof::AccountProof;
+use crate::tx::ScriptPublicKey;
 use sahyadri_hashes::Hash;
 
 pub use self::stats::{BlockCount, ConsensusStats};
@@ -78,6 +81,14 @@ pub trait ConsensusApi: Send + Sync {
         _tx_selector: Box<dyn TemplateTransactionSelector>,
         _build_mode: TemplateBuildMode,
     ) -> Result<BlockTemplate, RuleError> {
+        unimplemented!()
+    }
+
+    fn get_account_proof(
+        &self,
+        _spk: &ScriptPublicKey,
+        _block_hash: Hash,
+    ) -> ConsensusResult<AccountProof> {
         unimplemented!()
     }
 
