@@ -18,6 +18,8 @@ pub trait HeaderStoreReader {
     fn get_header(&self, hash: Hash) -> Result<Arc<Header>, StoreError>;
     fn get_header_with_block_level(&self, hash: Hash) -> Result<HeaderWithBlockLevel, StoreError>;
     fn get_compact_header_data(&self, hash: Hash) -> Result<CompactHeaderData, StoreError>;
+    /// SAHYADRI GC: iterate all block hashes whose compact header exists.
+    fn iter_block_hashes(&self) -> Box<dyn Iterator<Item = Hash> + '_>;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -196,6 +198,18 @@ impl HeaderStoreReader for DbHeadersStore {
             return Ok(header_with_block_level.header.as_ref().into());
         }
         self.compact_headers_access.read(hash)
+    }
+
+    fn iter_block_hashes(&self) -> Box<dyn Iterator<Item = Hash> + '_> {
+        Box::new(self.compact_headers_access.iterator().filter_map(|res| {
+            res.ok().and_then(|(k, _v)| {
+                if k.len() == 32 {
+                    Some(Hash::from_slice(&k))
+                } else {
+                    None
+                }
+            })
+        }))
     }
 }
 

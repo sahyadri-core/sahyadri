@@ -560,6 +560,37 @@ impl PruningProcessor {
             }
         }
 
+
+        // SAHYADRI GC: mark-and-sweep after pruning point advances.
+        //
+        // Live roots = every block whose header still exists. Anything
+        // not reachable from those roots (SMT nodes, account states,
+        // roots for pruned blocks) is deleted from disk permanently.
+        //
+        // We hold the pruning lock here, so no concurrent block commit
+        // can introduce a new root mid-sweep.
+        {
+            let gc_start = std::time::Instant::now();
+            let stats = crate::model::stores::gc::mark_and_sweep(
+                &self.smt_nodes_store,
+                &self.account_states_store,
+                &self.account_roots_store,
+                &self.headers_store,
+            );
+            log::info!(
+                "SAHYADRI GC: {} live roots, {} nodes + {} states marked, \
+                 {} nodes + {} states + {} roots deleted, took {:?}",
+                stats.live_roots,
+                stats.marked_nodes,
+                stats.marked_states,
+                stats.deleted_nodes,
+                stats.deleted_states,
+                stats.deleted_roots,
+                gc_start.elapsed()
+            );
+        }
+
+
         drop(reachability_read);
         drop(prune_guard);
 

@@ -75,6 +75,39 @@ impl DbSmtNodeStore {
         self.mem_pool.read().unwrap().len()
     }
 
+
+    /// SAHYADRI GC: iterate all node hashes in the persistent store.
+    pub fn iter_hashes(&self) -> impl Iterator<Item = H256> + '_ {
+        self.access.iterator().filter_map(|res| {
+            res.ok().and_then(|(k, _v)| {
+                if k.len() == 32 {
+                    let mut bytes = [0u8; 32];
+                    bytes.copy_from_slice(&k);
+                    Some(bytes)
+                } else {
+                    None
+                }
+            })
+        })
+    }
+
+    /// SAHYADRI GC: batch-delete nodes by hash (persistent + mem_pool).
+    pub fn delete_many_sync(&self, hashes: &[H256]) -> StoreResult<()> {
+        if hashes.is_empty() {
+            return Ok(());
+        }
+        let mut batch = rocksdb::WriteBatch::default();
+        for h in hashes {
+            self.access.delete(BatchDbWriter::new(&mut batch), h256_to_hash(*h))?;
+        }
+        self.db.write(batch)?;
+        let mut pool = self.mem_pool.write().unwrap();
+        for h in hashes {
+            pool.remove(h);
+        }
+        Ok(())
+    }
+
     /// SAHYADRI: synchronously persist a node to DB.
     ///
     /// Used by the build and verify paths to write SMT nodes immediately,

@@ -1,3 +1,4 @@
+
 // SAHYADRI: DID support
 use crate::{
     consensus::{
@@ -1300,6 +1301,35 @@ impl VirtualStateProcessor {
                 self.smt_nodes_store.mem_clear();
                 log::info!("SAHYADRI: cleared SMT mem_pool ({} entries) after 10k blocks", before);
             }
+
+            // SAHYADRI GC: test-only trigger via env var.
+            // Set SAHYADRI_GC_EVERY_N_BLOCKS=100 → GC every 100 commits.
+            // Production: unset → no-op (auto GC on pruning point advance).
+            let gc_interval: u64 = std::env::var("SAHYADRI_GC_EVERY_N_BLOCKS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            if gc_interval > 0 && n % gc_interval == gc_interval - 1 {
+                // Take pruning_lock read to exclude concurrent prune().
+                // GC writes to SMT/states stores; prune holds write lock
+                // while mutating them, so we must serialize against it.
+                //
+                // Note: this trigger is test-only. Production GC runs
+                // automatically inside prune() after the pruning point
+                // advances (~30h cycle).
+                let _guard = self.pruning_lock.blocking_read();
+                log::info!("SAHYADRI GC: forced trigger at commit #{}", n);
+                let stats = crate::model::stores::gc::mark_and_sweep(
+                    &self.smt_nodes_store,
+                    &self.account_states_store,
+                    &self.account_roots_store,
+                    &self.headers_store,
+                );
+                log::info!(
+                    "SAHYADRI GC: forced run — {} live roots, {} nodes + {} states deleted",
+                    stats.live_roots, stats.deleted_nodes, stats.deleted_states
+                );
+            }
         }
 
         // Calling the drops explicitly after the batch is written in order to avoid possible errors.
@@ -1776,18 +1806,14 @@ impl VirtualStateProcessor {
             &template_rewards,
             virtual_state.daa_score,
         ) {
-            Ok((root, changes)) => {
-                // SAHYADRI: sync-persist SMT nodes AND state snapshots.
-                // Same rationale as verify path.
+            Ok((root, _changes)) => {
+                // SAHYADRI: build path = in-memory only. Nothing written to
+                // disk here — templates are speculative and most never become
+                // blocks. The verify path persists the same nodes when a
+                // block is actually submitted, so no race is reintroduced.
                 let pending: Vec<_> = smt_overlay.into_pending().collect();
-                if let Err(e) = self.smt_nodes_store.insert_sync_many(pending) {
-                    log::error!("SAHYADRI: sync SMT write failed in build: {:?}", e);
-                }
-                for (_spk, state) in &changes {
-                    let state_hash = state.content_hash();
-                    if let Err(e) = self.account_states_store.insert_sync(state_hash, state) {
-                        log::error!("SAHYADRI: sync state write failed in build: {:?}", e);
-                    }
+                for (h, n) in pending {
+                    self.smt_nodes_store.mem_put(h, n);
                 }
                 root
             }

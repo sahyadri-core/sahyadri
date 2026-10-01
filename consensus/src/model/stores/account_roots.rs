@@ -19,18 +19,46 @@ pub trait AccountRootsStore: AccountRootsStoreReader {
 
 #[derive(Clone)]
 pub struct DbAccountRootsStore {
+    db: Arc<sahyadri_database::prelude::DB>,
     access: CachedDbAccess<Hash, Vec<u8>>,
 }
 
 impl DbAccountRootsStore {
     pub fn new(db: Arc<sahyadri_database::prelude::DB>, cache_size: u64) -> Self {
         Self {
+            db: db.clone(),
             access: CachedDbAccess::new(
                 db,
                 CachePolicy::Count(cache_size as usize),
                 DatabaseStorePrefixes::AccountRoots.into(),
             ),
         }
+    }
+
+    /// SAHYADRI GC: iterate all block hashes that have a stored root.
+    pub fn iter_block_hashes(&self) -> impl Iterator<Item = Hash> + '_ {
+        self.access.iterator().filter_map(|res| {
+            res.ok().and_then(|(k, _v)| {
+                if k.len() == 32 {
+                    Some(Hash::from_slice(&k))
+                } else {
+                    None
+                }
+            })
+        })
+    }
+
+    /// SAHYADRI GC: batch-delete roots for blocks that were pruned.
+    pub fn delete_many_sync(&self, block_hashes: &[Hash]) -> StoreResult<()> {
+        if block_hashes.is_empty() {
+            return Ok(());
+        }
+        let mut batch = rocksdb::WriteBatch::default();
+        for h in block_hashes {
+            self.access.delete(BatchDbWriter::new(&mut batch), *h)?;
+        }
+        self.db.write(batch)?;
+        Ok(())
     }
 }
 

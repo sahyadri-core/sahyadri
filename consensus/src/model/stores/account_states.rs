@@ -57,6 +57,32 @@ impl DbAccountStatesStore {
         self.db.write(batch)?;
         Ok(())
     }
+    
+    /// SAHYADRI GC: iterate all state hashes.
+    pub fn iter_hashes(&self) -> impl Iterator<Item = Hash> + '_ {
+        self.access.iterator().filter_map(|res| {
+            res.ok().and_then(|(k, _v)| {
+                if k.len() == 32 {
+                    Some(Hash::from_slice(&k))
+                } else {
+                    None
+                }
+            })
+        })
+    }
+
+    /// SAHYADRI GC: batch-delete states by hash.
+    pub fn delete_many_sync(&self, hashes: &[Hash]) -> StoreResult<()> {
+        if hashes.is_empty() {
+            return Ok(());
+        }
+        let mut batch = rocksdb::WriteBatch::default();
+        for h in hashes {
+            self.access.delete(BatchDbWriter::new(&mut batch), *h)?;
+        }
+        self.db.write(batch)?;
+        Ok(())
+    }
 }
 
 impl AccountStatesStoreReader for DbAccountStatesStore {
