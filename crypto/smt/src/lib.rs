@@ -411,6 +411,11 @@ pub fn leaves_after<S: NodeStore>(
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_empty_root_is_zero() {
+        assert_eq!(EMPTY, [0u8; 32], "SMT EMPTY must be all zeros");
+    }
+
     fn k(i: u32) -> H256 {
         hash_key(&i.to_le_bytes())
     }

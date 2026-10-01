@@ -206,13 +206,13 @@ impl Header {
     }
 
     #[wasm_bindgen(getter = registry_unitCommitment)]
-    pub fn get_registry_unit_commitment_as_hex(&self) -> String {
-        self.inner().registry_unit_commitment.to_hex()
+    pub fn get_account_commitment_as_hex(&self) -> String {
+        self.inner().account_commitment.to_hex()
     }
 
     #[wasm_bindgen(setter = registry_unitCommitment)]
-    pub fn set_registry_unit_commitment_from_js_value(&mut self, js_value: JsValue) {
-        self.inner_mut().registry_unit_commitment = Hash::from_slice(&js_value.try_as_vec_u8().expect("registry_unit commitment"));
+    pub fn set_account_commitment_from_js_value(&mut self, js_value: JsValue) {
+        self.inner_mut().account_commitment = Hash::from_slice(&js_value.try_as_vec_u8().expect("registry_unit commitment"));
     }
 
     #[wasm_bindgen(getter = pruningPoint)]
@@ -300,7 +300,7 @@ impl TryCastFromJs for Header {
                         .get_value("acceptedIdMerkleRoot")?
                         .try_into_owned()
                         .map_err(|err| Error::convert("acceptedIdMerkleRoot", err))?,
-                    registry_unit_commitment: object
+                    account_commitment: object
                         .get_value("registry_unitCommitment")?
                         .try_into_owned()
                         .map_err(|err| Error::convert("registry_unitCommitment", err))?,

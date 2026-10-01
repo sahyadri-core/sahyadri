@@ -1084,7 +1084,7 @@ async fn difficulty_test() {
             parents_by_level: Vec::<Vec<Hash>>::new().try_into().unwrap(),
             hash_merkle_root: 0.into(),
             accepted_id_merkle_root: 0.into(),
-            registry_unit_commitment: 0.into(),
+            account_commitment: 0.into(),
             timestamp: 0,
             bits: 0,
             nonce: 0,
@@ -1434,7 +1434,7 @@ async fn kip10_test() {
             initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
                 genesis_multiset.add_registry_unit(outpoint, registry_unit);
             });
-            cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
+            cfg.params.genesis.account_commitment = genesis_multiset.finalize();
             let genesis_header: Header = (&cfg.params.genesis).into();
             cfg.params.genesis.hash = genesis_header.hash;
         })
@@ -1559,7 +1559,7 @@ async fn payload_for_native_tx_test() {
             initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
                 genesis_multiset.add_registry_unit(outpoint, registry_unit);
             });
-            cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
+            cfg.params.genesis.account_commitment = genesis_multiset.finalize();
             let genesis_header: Header = (&cfg.params.genesis).into();
             cfg.params.genesis.hash = genesis_header.hash;
         })
@@ -1661,7 +1661,7 @@ async fn payload_for_native_tx_test() {
 //             initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
 //                 genesis_multiset.add_registry_unit(outpoint, registry_unit);
 //             });
-//             cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
+//             cfg.params.genesis.account_commitment = genesis_multiset.finalize();
 //             let genesis_header: Header = (&cfg.params.genesis).into();
 //             cfg.params.genesis.hash = genesis_header.hash;
 //         })
@@ -1769,7 +1769,7 @@ async fn payload_for_native_tx_test() {
 //             initial_registry_unit_collection.iter().for_each(|(outpoint, registry_unit)| {
 //                 genesis_multiset.add_registry_unit(outpoint, registry_unit);
 //             });
-//             cfg.params.genesis.registry_unit_commitment = genesis_multiset.finalize();
+//             cfg.params.genesis.account_commitment = genesis_multiset.finalize();
 //             let genesis_header: Header = (&cfg.params.genesis).into();
 //             cfg.params.genesis.hash = genesis_header.hash;
 //         })

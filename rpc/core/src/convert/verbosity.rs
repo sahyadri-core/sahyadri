@@ -77,7 +77,7 @@ impl_verbosity_from! {
         include_parents_by_level:        (RpcDataVerbosityLevel::High),
         include_hash_merkle_root:        (RpcDataVerbosityLevel::High),
         include_accepted_id_merkle_root: (RpcDataVerbosityLevel::High),
-        include_registry_unit_commitment:         (RpcDataVerbosityLevel::Full),
+        include_account_commitment:         (RpcDataVerbosityLevel::Full),
         include_pruning_point:           (RpcDataVerbosityLevel::Full),
     }
 }

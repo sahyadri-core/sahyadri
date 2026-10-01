@@ -57,14 +57,14 @@ pub fn mark_and_sweep(
     // (yet) on the selected chain — they could become chain blocks via a
     // reorg, and their SMT nodes must not be swept.
     //
-    // The header's `registry_unit_commitment` field is the block's SMT root.
+    // The header's `account_commitment` field is the block's SMT root.
     let mut live_roots: Vec<H256> = Vec::new();
     let mut retained_blocks: std::collections::HashSet<Hash> = std::collections::HashSet::new();
 
     for block_hash in headers_store.iter_block_hashes() {
         if let Ok(header) = headers_store.get_header(block_hash) {
             retained_blocks.insert(block_hash);
-            let root = header.registry_unit_commitment.as_bytes();
+            let root = header.account_commitment.as_bytes();
             if root != sahyadri_smt::EMPTY {
                 live_roots.push(root);
             }
@@ -73,7 +73,7 @@ pub fn mark_and_sweep(
     let live_roots_count = live_roots.len();
 
     // ── 1b. Identify stale roots: their headers no longer exist ──
-    //      NOTE: never delete the pruning point's root — assert_registry_unit_commitment
+    //      NOTE: never delete the pruning point's root — assert_account_commitment
     //      reads it during pruning.
     // NOTE: the pruning point's header is always retained, so its block
     // hash is always in `retained_blocks` — no special-casing needed here.

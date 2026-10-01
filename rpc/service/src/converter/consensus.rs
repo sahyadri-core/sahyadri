@@ -212,8 +212,8 @@ impl ConsensusConverter {
             } else {
                 Default::default()
             },
-            registry_unit_commitment: if verbosity.include_registry_unit_commitment.unwrap_or(false) {
-                Some(header.registry_unit_commitment)
+            account_commitment: if verbosity.include_account_commitment.unwrap_or(false) {
+                Some(header.account_commitment)
             } else {
                 Default::default()
             },

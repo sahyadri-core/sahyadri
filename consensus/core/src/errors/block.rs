@@ -141,8 +141,6 @@ pub enum RuleError {
     #[error("expected indirect parents {0} but got {1}")]
     UnexpectedIndirectParents(TwoDimVecDisplay<Hash>, TwoDimVecDisplay<Hash>),
 
-    #[error("block {0} REGISTRY_UNIT commitment is invalid - block header indicates {1}, but calculated value is {2}")]
-    BadRegistryUnitCommitment(Hash, Hash, Hash),
 
     #[error("block {0} accepted ID merkle root is invalid - block header indicates {1}, but calculated value is {2}")]
     BadAcceptedIDMerkleRoot(Hash, Hash, Hash),

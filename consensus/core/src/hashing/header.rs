@@ -17,7 +17,7 @@ pub fn hash_override_nonce_time(header: &Header, nonce: u64, timestamp: u64) -> 
     hasher
         .update(header.hash_merkle_root)
         .update(header.accepted_id_merkle_root)
-        .update(header.registry_unit_commitment)
+        .update(header.account_commitment)
         .update(timestamp.to_le_bytes())
         .update(header.bits.to_le_bytes())
         .update(nonce.to_le_bytes())

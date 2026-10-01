@@ -273,7 +273,7 @@ impl PruningProcessor {
 
         if self.config.enable_sanity_checks {
             info!("Performing a sanity check that the new REGISTRY_UNIT set has the expected REGISTRY_UNIT commitment");
-            self.assert_registry_unit_commitment(new_pruning_point);
+            self.assert_account_commitment(new_pruning_point);
         }
         true
     }
@@ -281,14 +281,14 @@ impl PruningProcessor {
     /// SAHYADRI: verify that the pruning point's header commitment matches
     /// the SMT root we have stored for that block. Non-panicking so a
     /// transient miss during pruning does not crash the node.
-    fn assert_registry_unit_commitment(&self, pruning_point: Hash) {
+    fn assert_account_commitment(&self, pruning_point: Hash) {
         info!("Verifying the new pruning point account commitment (sanity test)");
         if pruning_point == self.config.genesis.hash {
             info!("Pruning point is genesis; skipping commitment check");
             return;
         }
         let header_commitment = match self.headers_store.get_header(pruning_point) {
-            Ok(h) => h.registry_unit_commitment,
+            Ok(h) => h.account_commitment,
             Err(e) => {
                 warn!("Pruning point header missing for {}: {:?}", pruning_point, e);
                 return;

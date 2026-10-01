@@ -20,7 +20,7 @@ pub struct RpcOptionalHeader {
     /// Level: High
     pub accepted_id_merkle_root: Option<Hash>,
     /// Level: Full
-    pub registry_unit_commitment: Option<Hash>,
+    pub account_commitment: Option<Hash>,
     /// Level: Low - Timestamp is in milliseconds
     pub timestamp: Option<u64>,
     /// Level: Low
@@ -44,7 +44,7 @@ impl RpcOptionalHeader {
             && self.parents_by_level.is_none()
             && self.hash_merkle_root.is_none()
             && self.accepted_id_merkle_root.is_none()
-            && self.registry_unit_commitment.is_none()
+            && self.account_commitment.is_none()
             && self.timestamp.is_none()
             && self.bits.is_none()
             && self.nonce.is_none()
@@ -69,7 +69,7 @@ impl From<Header> for RpcOptionalHeader {
             parents_by_level: Some(header.parents_by_level),
             hash_merkle_root: Some(header.hash_merkle_root),
             accepted_id_merkle_root: Some(header.accepted_id_merkle_root),
-            registry_unit_commitment: Some(header.registry_unit_commitment),
+            account_commitment: Some(header.account_commitment),
             timestamp: Some(header.timestamp),
             bits: Some(header.bits),
             nonce: Some(header.nonce),
@@ -89,7 +89,7 @@ impl From<&Header> for RpcOptionalHeader {
             parents_by_level: Some(header.parents_by_level.clone()),
             hash_merkle_root: Some(header.hash_merkle_root),
             accepted_id_merkle_root: Some(header.accepted_id_merkle_root),
-            registry_unit_commitment: Some(header.registry_unit_commitment),
+            account_commitment: Some(header.account_commitment),
             timestamp: Some(header.timestamp),
             bits: Some(header.bits),
             nonce: Some(header.nonce),
@@ -117,9 +117,9 @@ impl TryFrom<RpcOptionalHeader> for Header {
             accepted_id_merkle_root: header
                 .accepted_id_merkle_root
                 .ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "accepted_id_merkle_root".to_owned()))?,
-            registry_unit_commitment: header
-                .registry_unit_commitment
-                .ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "registry_unit_commitment".to_owned()))?,
+            account_commitment: header
+                .account_commitment
+                .ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "account_commitment".to_owned()))?,
             timestamp: header.timestamp.ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "timestamp".to_owned()))?,
             bits: header.bits.ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "bits".to_owned()))?,
             nonce: header.nonce.ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "nonce".to_owned()))?,
@@ -150,9 +150,9 @@ impl TryFrom<&RpcOptionalHeader> for Header {
             accepted_id_merkle_root: header
                 .accepted_id_merkle_root
                 .ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "accepted_id_merkle_root".to_owned()))?,
-            registry_unit_commitment: header
-                .registry_unit_commitment
-                .ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "registry_unit_commitment".to_owned()))?,
+            account_commitment: header
+                .account_commitment
+                .ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "account_commitment".to_owned()))?,
             timestamp: header.timestamp.ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "timestamp".to_owned()))?,
             bits: header.bits.ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "bits".to_owned()))?,
             nonce: header.nonce.ok_or(RpcError::MissingRpcFieldError("RpcHeader".to_owned(), "nonce".to_owned()))?,
@@ -175,7 +175,7 @@ impl Serializer for RpcOptionalHeader {
         store!(Option<RpcCompressedParents>, &self.parents_by_level, writer)?;
         store!(Option<Hash>, &self.hash_merkle_root, writer)?;
         store!(Option<Hash>, &self.accepted_id_merkle_root, writer)?;
-        store!(Option<Hash>, &self.registry_unit_commitment, writer)?;
+        store!(Option<Hash>, &self.account_commitment, writer)?;
         store!(Option<u64>, &self.timestamp, writer)?;
         store!(Option<u32>, &self.bits, writer)?;
         store!(Option<u64>, &self.nonce, writer)?;
@@ -197,7 +197,7 @@ impl Deserializer for RpcOptionalHeader {
         let parents_by_level = load!(Option<RpcCompressedParents>, reader)?;
         let hash_merkle_root = load!(Option<Hash>, reader)?;
         let accepted_id_merkle_root = load!(Option<Hash>, reader)?;
-        let registry_unit_commitment = load!(Option<Hash>, reader)?;
+        let account_commitment = load!(Option<Hash>, reader)?;
         let timestamp = load!(Option<u64>, reader)?;
         let bits = load!(Option<u32>, reader)?;
         let nonce = load!(Option<u64>, reader)?;
@@ -212,7 +212,7 @@ impl Deserializer for RpcOptionalHeader {
             parents_by_level,
             hash_merkle_root,
             accepted_id_merkle_root,
-            registry_unit_commitment,
+            account_commitment,
             timestamp,
             bits,
             nonce,

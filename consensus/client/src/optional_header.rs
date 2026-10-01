@@ -51,7 +51,7 @@ pub struct OptionalHeader {
     parents_by_level: Option<WasmCompressedParents>,
     hash_merkle_root: Option<Hash>,
     accepted_id_merkle_root: Option<Hash>,
-    registry_unit_commitment: Option<Hash>,
+    account_commitment: Option<Hash>,
     timestamp: Option<u64>,
     bits: Option<u32>,
     nonce: Option<u64>,
@@ -69,7 +69,7 @@ impl OptionalHeader {
         parents_by_level: Option<WasmCompressedParents>,
         hash_merkle_root: Option<Hash>,
         accepted_id_merkle_root: Option<Hash>,
-        registry_unit_commitment: Option<Hash>,
+        account_commitment: Option<Hash>,
         timestamp: Option<u64>,
         bits: Option<u32>,
         nonce: Option<u64>,
@@ -84,7 +84,7 @@ impl OptionalHeader {
             parents_by_level,
             hash_merkle_root,
             accepted_id_merkle_root,
-            registry_unit_commitment,
+            account_commitment,
             timestamp,
             bits,
             nonce,
@@ -129,8 +129,8 @@ impl OptionalHeader {
     }
 
     #[wasm_bindgen(getter, js_name = registry_unitCommitment)]
-    pub fn registry_unit_commitment(&self) -> Option<String> {
-        self.registry_unit_commitment.map(|h| h.to_hex())
+    pub fn account_commitment(&self) -> Option<String> {
+        self.account_commitment.map(|h| h.to_hex())
     }
 
     #[wasm_bindgen(getter)]
@@ -204,7 +204,7 @@ impl TryCastFromJs for OptionalHeader {
                         .try_get_value("acceptedIdMerkleRoot")?
                         .map(|v| v.try_into_owned().map_err(|err| Error::convert("acceptedIdMerkleRoot", err)))
                         .transpose()?,
-                    registry_unit_commitment: object
+                    account_commitment: object
                         .try_get_value("registry_unitCommitment")?
                         .map(|v| v.try_into_owned().map_err(|err| Error::convert("registry_unitCommitment", err)))
                         .transpose()?,

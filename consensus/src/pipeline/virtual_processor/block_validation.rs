@@ -174,7 +174,7 @@ impl VirtualStateProcessor {
 
     /// Verify that the current block fully respects its own REGISTRY_UNIT view. We define a block as
     /// REGISTRY_UNIT valid if all the following conditions hold:
-    ///     1. The block header includes the expected `registry_unit_commitment`.
+    ///     1. The block header includes the expected `account_commitment`.
     ///     2. The block header includes the expected `accepted_id_merkle_root`.
     ///     3. The block header includes the expected `pruning_point`.
     ///     4. The block coinbase transaction rewards the mergeset blocks correctly.
@@ -187,7 +187,7 @@ impl VirtualStateProcessor {
         // SAHYADRI: read parent root from the parent's HEADER, not from
         // account_roots_store. The store is written asynchronously during
         // commit, so for recent parents (which is the normal case) it may
-        // not yet contain the entry. The header's registry_unit_commitment field is
+        // not yet contain the entry. The header's account_commitment field is
         // always populated by the producer and available before verify.
         let parent_hash = ctx.selected_parent();
         let parent_header = self
@@ -247,12 +247,12 @@ impl VirtualStateProcessor {
 
         let expected_commitment = sahyadri_hashes::Hash::from_bytes(my_root);
 
-        if expected_commitment != header.registry_unit_commitment {
+        if expected_commitment != header.account_commitment {
             log::warn!(
                 "SAHYADRI: ACCOUNT COMMITMENT MISMATCH — block {} header={} calc={}",
-                header.hash, header.registry_unit_commitment, expected_commitment
+                header.hash, header.account_commitment, expected_commitment
             );
-            return Err(BadAccountCommitment(header.hash, header.registry_unit_commitment, expected_commitment));
+            return Err(BadAccountCommitment(header.hash, header.account_commitment, expected_commitment));
         }
 
         trace!("correct commitment: {}, {}", header.hash, expected_commitment);

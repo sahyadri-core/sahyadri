@@ -1793,7 +1793,7 @@ impl VirtualStateProcessor {
                 sahyadri_smt::EMPTY
             }
         };
-        let registry_unit_commitment = sahyadri_hashes::Hash::from_bytes(account_commitment_h256);
+        let account_commitment = sahyadri_hashes::Hash::from_bytes(account_commitment_h256);
         // Past median time is the exclusive lower bound for valid block time, so we increase by 1 to get the valid min
         let min_block_time = virtual_state.past_median_time + 1;
         let header = Header::new_finalized(
@@ -1801,7 +1801,7 @@ impl VirtualStateProcessor {
             parents_by_level,
             hash_merkle_root,
             accepted_id_merkle_root,
-            registry_unit_commitment,
+            account_commitment,
             u64::max(min_block_time, unix_now()),
             virtual_state.bits,
             0,
@@ -1867,10 +1867,10 @@ impl VirtualStateProcessor {
 
     /// SAHYADRI: resolve the account (SMT) root of a parent block.
     ///
-    /// - For the genesis block, its header's `registry_unit_commitment` is a legacy
+    /// - For the genesis block, its header's `account_commitment` is a legacy
     ///   REGISTRY_UNIT multiset hash (hardcoded in config/genesis.rs), NOT an SMT
     ///   root. The correct SMT root at genesis is `EMPTY`.
-    /// - For every other block, the header's `registry_unit_commitment` field is
+    /// - For every other block, the header's `account_commitment` field is
     ///   the SMT root produced by this node's own commitment function,
     ///   so it can be read directly.
     pub(super) fn parent_account_root(
@@ -1881,7 +1881,7 @@ impl VirtualStateProcessor {
         if parent_hash == self.genesis.hash {
             sahyadri_smt::EMPTY
         } else {
-            parent_header.registry_unit_commitment.as_bytes()
+            parent_header.account_commitment.as_bytes()
         }
     }
 
@@ -1894,9 +1894,9 @@ impl VirtualStateProcessor {
         info!("Importing the REGISTRY_UNIT set of the pruning point {}", new_pruning_point);
         let new_pruning_point_header = self.headers_store.get_header(new_pruning_point).unwrap();
         let imported_registry_unit_multiset_hash = imported_registry_unit_multiset.finalize();
-        if imported_registry_unit_multiset_hash != new_pruning_point_header.registry_unit_commitment {
+        if imported_registry_unit_multiset_hash != new_pruning_point_header.account_commitment {
             return Err(PruningImportError::ImportedMultisetHashMismatch(
-                new_pruning_point_header.registry_unit_commitment,
+                new_pruning_point_header.account_commitment,
                 imported_registry_unit_multiset_hash,
             ));
         }
