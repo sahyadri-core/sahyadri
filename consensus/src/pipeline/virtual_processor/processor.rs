@@ -44,7 +44,7 @@ use crate::{
     params::Params,
     pipeline::{
         ProcessingCounters, deps_manager::VirtualStateProcessingMessage, pruning_processor::processor::PruningProcessingMessage,
-        virtual_processor::utxo_validation::UtxoProcessingContext,
+        virtual_processor::block_validation::BlockProcessingContext,
     },
     processes::{
         coinbase::CoinbaseManager,
@@ -473,9 +473,9 @@ impl VirtualStateProcessor {
     /// SAHYADRI: UTXO diff no longer tracked, but chain validation must
     /// still run. This function walks the selected chain from `from` to
     /// `to` and, for each block that isn't already validated, calls
-    /// `calculate_utxo_state` + `verify_expected_utxo_state` (account
+    /// `calculate_block_state` + `verify_block_state` (account
     /// commitment, coinbase, pruning point) and, on success,
-    /// `commit_utxo_state`. Failing blocks are marked disqualified.
+    /// `commit_block_state`. Failing blocks are marked disqualified.
     fn calculate_utxo_state_relatively(
         &self,
         _stores: &VirtualStores,
@@ -545,10 +545,10 @@ impl VirtualStateProcessor {
 
             let selected_parent_utxo_view =
                 sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
-            let mut ctx = UtxoProcessingContext::new(mergeset_data.into());
+            let mut ctx = BlockProcessingContext::new(mergeset_data.into());
 
-            self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
-            let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
+            self.calculate_block_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
+            let res = self.verify_block_state(&mut ctx, &selected_parent_utxo_view, &header);
 
             if let Err(rule_error) = res {
                 info!("Block {} is disqualified from virtual chain: {}", current, rule_error);
@@ -557,7 +557,7 @@ impl VirtualStateProcessor {
             } else {
                 debug!("VIRTUAL PROCESSOR, UTXO validated for {current}");
                 diff_point = current;
-                self.commit_utxo_state(
+                self.commit_block_state(
                     current,
                     ctx.mergeset_acceptance_data,
                     ctx.pruning_sample_from_pov.unwrap_or_else(|| {
@@ -577,7 +577,7 @@ impl VirtualStateProcessor {
         diff_point
     }
 
-    fn commit_utxo_state(
+    fn commit_block_state(
         &self,
         current: Hash,
         acceptance_data: AcceptanceData,
@@ -1870,7 +1870,7 @@ impl VirtualStateProcessor {
     /// Initializes UTXO state of genesis and points virtual at genesis.
     /// Note that pruning point-related stores are initialized by `init`
     pub fn process_genesis(self: &Arc<Self>) {
-        self.commit_utxo_state(self.genesis.hash, AcceptanceData::default(), Default::default());
+        self.commit_block_state(self.genesis.hash, AcceptanceData::default(), Default::default());
 
         // Init the virtual selected chain store
         let mut batch = WriteBatch::default();

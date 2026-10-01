@@ -348,6 +348,65 @@ pub fn verify_exclusion(root: &H256, key: &H256, proof: &Proof) -> bool {
     }
 }
 
+/// Set bit `i` of `key` to 1.
+fn set_bit(key: &mut H256, i: usize) {
+    key[i / 8] |= 1 << (7 - (i % 8));
+}
+
+/// Largest key a subtree rooted at `depth` with prefix `path` can contain.
+fn subtree_max(path: &H256, depth: usize) -> H256 {
+    let mut m = *path;
+    for i in depth..TREE_DEPTH {
+        set_bit(&mut m, i);
+    }
+    m
+}
+
+/// Up to `limit` leaves with key > `after`, in ascending key order.
+/// Used to serve pruning-point state to a syncing node in resumable chunks.
+pub fn leaves_after<S: NodeStore>(
+    store: &S,
+    root: H256,
+    after: Option<&H256>,
+    limit: usize,
+) -> Result<Vec<(H256, H256)>, SmtError> {
+    let mut out = Vec::new();
+    if root == EMPTY || limit == 0 {
+        return Ok(out);
+    }
+    let mut stack: Vec<(H256, usize, H256)> = vec![(root, 0, [0u8; 32])];
+    while let Some((h, depth, path)) = stack.pop() {
+        if h == EMPTY {
+            continue;
+        }
+        if let Some(a) = after {
+            if subtree_max(&path, depth) <= *a {
+                continue;
+            }
+        }
+        match store.get(&h).ok_or(SmtError::MissingNode(h))? {
+            Node::Leaf { key, value } => {
+                if after.map_or(true, |a| key > *a) {
+                    out.push((key, value));
+                    if out.len() >= limit {
+                        break;
+                    }
+                }
+            }
+            Node::Branch { left, right } => {
+                if depth >= TREE_DEPTH {
+                    return Err(SmtError::DepthExceeded);
+                }
+                let mut rpath = path;
+                set_bit(&mut rpath, depth);
+                stack.push((right, depth + 1, rpath));
+                stack.push((left, depth + 1, path));
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -409,6 +468,31 @@ mod tests {
         let mut s = MemStore::default();
         let root = build(&mut s, &[1, 2, 3]);
         assert_eq!(update(&mut s, root, &k(50), None).unwrap(), root);
+    }
+
+    #[test]
+    fn leaves_after_paginates_and_rebuilds_same_root() {
+        let mut s = MemStore::default();
+        let ids: Vec<u32> = (0..50).collect();
+        let root = build(&mut s, &ids);
+
+        let mut expected: Vec<(H256, H256)> = ids.iter().map(|&i| (k(i), v(i))).collect();
+        expected.sort();
+
+        let mut got = Vec::new();
+        let mut cursor: Option<H256> = None;
+        loop {
+            let chunk = leaves_after(&s, root, cursor.as_ref(), 7).unwrap();
+            if chunk.is_empty() { break; }
+            cursor = Some(chunk.last().unwrap().0);
+            got.extend(chunk);
+        }
+        assert_eq!(got, expected);
+
+        // Receiver rebuilding from leaves must reach same root
+        let mut s2 = MemStore::default();
+        let rebuilt = update_many(&mut s2, EMPTY, got.iter().map(|(k, v)| (*k, Some(*v)))).unwrap();
+        assert_eq!(rebuilt, root);
     }
 
     #[test]

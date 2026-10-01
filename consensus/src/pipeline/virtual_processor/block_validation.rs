@@ -4,7 +4,7 @@ use crate::{
         BlockProcessResult,
         RuleError::{
             AccountCommitmentComputeFailed, BadAccountCommitment,
-            InvalidTransactionsInUtxoContext, WrongHeaderPruningPoint,
+            InvalidTransactionsInBlockContext, WrongHeaderPruningPoint,
         },
     },
     model::stores::{
@@ -75,7 +75,7 @@ pub(crate) mod raigad {
 
 /// A context for processing the UTXO state of a block with respect to its selected parent.
 /// Note this can also be the virtual block.
-pub(super) struct UtxoProcessingContext<'a> {
+pub(super) struct BlockProcessingContext<'a> {
     pub sahyadri_consensus_data: Refs<'a, SahyadriConsensusData>,
     pub mergeset_diff: UtxoDiff,
     pub accepted_tx_ids: Vec<TransactionId>,
@@ -84,7 +84,7 @@ pub(super) struct UtxoProcessingContext<'a> {
     pub pruning_sample_from_pov: Option<Hash>,
 }
 
-impl<'a> UtxoProcessingContext<'a> {
+impl<'a> BlockProcessingContext<'a> {
     pub fn new(sahyadri_consensus_data: Refs<'a, SahyadriConsensusData>) -> Self {
         let mergeset_size = sahyadri_consensus_data.mergeset_size();
         Self {
@@ -104,9 +104,9 @@ impl<'a> UtxoProcessingContext<'a> {
 
 impl VirtualStateProcessor {
     /// Calculates UTXO state and transaction acceptance data relative to the selected parent state
-    pub(super) fn calculate_utxo_state<V: UtxoView + Sync>(
+    pub(super) fn calculate_block_state<V: UtxoView + Sync>(
         &self,
-        ctx: &mut UtxoProcessingContext,
+        ctx: &mut BlockProcessingContext,
         selected_parent_utxo_view: &V,
         pov_daa_score: u64,
     ) {
@@ -206,9 +206,9 @@ impl VirtualStateProcessor {
     ///     3. The block header includes the expected `pruning_point`.
     ///     4. The block coinbase transaction rewards the mergeset blocks correctly.
     ///     5. All non-coinbase block transactions are valid against its own UTXO view.
-    pub(super) fn verify_expected_utxo_state<V: UtxoView + Sync>(
+    pub(super) fn verify_block_state<V: UtxoView + Sync>(
         &self,
-        ctx: &mut UtxoProcessingContext,
+        ctx: &mut BlockProcessingContext,
         selected_parent_utxo_view: &V,
         header: &Header,
     ) -> BlockProcessResult<()> {
@@ -274,6 +274,7 @@ impl VirtualStateProcessor {
         }
 
         let expected_commitment = sahyadri_hashes::Hash::from_bytes(my_root);
+
         if expected_commitment != header.utxo_commitment {
             log::warn!(
                 "SAHYADRI: ACCOUNT COMMITMENT MISMATCH — block {} header={} calc={}",
@@ -313,7 +314,7 @@ impl VirtualStateProcessor {
             self.validate_transactions_in_parallel(&txs, &current_utxo_view, header.daa_score, TxValidationFlags::Full);
         if validated_transactions.len() < txs.len() - 1 {
             // Some non-coinbase transactions are invalid
-            return Err(InvalidTransactionsInUtxoContext(txs.len() - 1 - validated_transactions.len(), txs.len() - 1));
+            return Err(InvalidTransactionsInBlockContext(txs.len() - 1 - validated_transactions.len(), txs.len() - 1));
         }
 
         Ok(())

@@ -151,7 +151,7 @@ pub enum RuleError {
     BadCoinbaseTransaction,
 
     #[error("{0} non-coinbase transactions (out of {1}) are invalid in UTXO context")]
-    InvalidTransactionsInUtxoContext(usize, usize),
+    InvalidTransactionsInBlockContext(usize, usize),
 
     #[error("invalid transactions in new block template")]
     InvalidTransactionsInNewBlock(HashMap<TransactionId, TxRuleError>),
