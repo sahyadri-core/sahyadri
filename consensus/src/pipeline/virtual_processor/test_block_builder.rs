@@ -43,10 +43,9 @@ impl TestBlockBuilder {
         let virtual_state = virtual_read.state.get().unwrap();
         let finality_point = ORIGIN; // No real finality point since we are not actually building virtual here
         let sink = virtual_state.sahyadri_consensus_data.selected_parent;
-        let mut accumulated_diff = sahyadri_consensus_core::utxo::utxo_diff::UtxoDiff::default();
         // Search for the sink block from the PoV of this virtual
         let (pov_sink, virtual_parent_candidates) =
-            self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, sink, parents, finality_point, pruning_point);
+            self.sink_search_algorithm(sink, parents, finality_point, pruning_point);
         let (pov_virtual_parents, pov_virtual_sahyadri_consensus_data) =
             self.pick_virtual_parents(pov_sink, virtual_parent_candidates, pruning_point);
         // Call mein se pub(crate) hatao
@@ -56,8 +55,7 @@ impl TestBlockBuilder {
             pov_virtual_sahyadri_consensus_data,
         )?;
 
-        let dummy_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
-        self.validate_block_template_transactions(&txs, &pov_virtual_state, &dummy_utxo_view)?;
+        self.validate_block_template_transactions(&txs, &pov_virtual_state)?;
         drop(virtual_read);
         self.build_block_template_from_virtual_state(pov_virtual_state, miner_data, txs, vec![])
     }

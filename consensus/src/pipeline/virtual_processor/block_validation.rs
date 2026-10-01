@@ -16,7 +16,6 @@ use crate::{
     processes::{
         pruning::PruningPointReply,
         transaction_validator::{
-            errors::{TxResult, TxRuleError},
             tx_validation_in_account_context::TxValidationFlags,
         },
     },
@@ -24,23 +23,16 @@ use crate::{
 use sahyadri_consensus_core::{
     BlockHashMap, BlockHashSet, HashMapCustomHasher,
     acceptance_data::{AcceptedTxEntry, MergesetBlockAcceptanceData},
-    api::args::TransactionValidationArgs,
     coinbase::*,
     header::Header,
-    muhash::MuHashExtensions,
-    tx::{MutableTransaction, PopulatedTransaction, Transaction, TransactionId, ValidatedTransaction, VerifiableTransaction},
-    utxo::{
-        utxo_diff::UtxoDiff,
-        utxo_view::{UtxoView, UtxoViewComposition},
-    },
+    tx::{Transaction, TransactionId, ValidatedTransaction, VerifiableTransaction},
 };
-use sahyadri_core::{info, trace};
+use sahyadri_core::{trace};
 use sahyadri_hashes::Hash;
 use sahyadri_muhash::MuHash;
+use smallvec::SmallVec;
 use sahyadri_utils::refs::Refs;
 
-use rayon::prelude::*;
-use smallvec::{SmallVec, smallvec};
 use std::{collections::HashSet, iter::once, ops::Deref};
 
 pub(crate) mod raigad {
@@ -77,7 +69,6 @@ pub(crate) mod raigad {
 /// Note this can also be the virtual block.
 pub(super) struct BlockProcessingContext<'a> {
     pub sahyadri_consensus_data: Refs<'a, SahyadriConsensusData>,
-    pub mergeset_diff: UtxoDiff,
     pub accepted_tx_ids: Vec<TransactionId>,
     pub mergeset_acceptance_data: Vec<MergesetBlockAcceptanceData>,
     pub mergeset_rewards: BlockHashMap<BlockRewardData>,
@@ -89,7 +80,6 @@ impl<'a> BlockProcessingContext<'a> {
         let mergeset_size = sahyadri_consensus_data.mergeset_size();
         Self {
             sahyadri_consensus_data,
-            mergeset_diff: UtxoDiff::default(),
             accepted_tx_ids: Vec::with_capacity(1), // We expect at least the selected parent coinbase tx
             mergeset_rewards: BlockHashMap::with_capacity(mergeset_size),
             mergeset_acceptance_data: Vec::with_capacity(mergeset_size),
@@ -104,16 +94,14 @@ impl<'a> BlockProcessingContext<'a> {
 
 impl VirtualStateProcessor {
     /// Calculates UTXO state and transaction acceptance data relative to the selected parent state
-    pub(super) fn calculate_block_state<V: UtxoView + Sync>(
+    pub(super) fn calculate_block_state(
         &self,
         ctx: &mut BlockProcessingContext,
-        selected_parent_utxo_view: &V,
         pov_daa_score: u64,
     ) {
         let selected_parent_transactions = self.block_transactions_store.get(ctx.selected_parent()).unwrap();
         let validated_coinbase = ValidatedTransaction::new_coinbase(&selected_parent_transactions[0]);
 
-        ctx.mergeset_diff.add_transaction(&validated_coinbase, pov_daa_score).unwrap();
         let validated_coinbase_id = validated_coinbase.id();
         ctx.accepted_tx_ids.push(validated_coinbase_id);
 
@@ -133,8 +121,6 @@ impl VirtualStateProcessor {
             )
             .enumerate()
         {
-            // Create a composed UTXO view from the selected parent UTXO view + the mergeset UTXO diff
-            let composed_view = selected_parent_utxo_view.compose(&ctx.mergeset_diff);
 
             // The first block in the mergeset is always the selected parent
             let is_selected_parent = i == 0;
@@ -143,7 +129,7 @@ impl VirtualStateProcessor {
             // as part of selected parent UTXO state verification with the exact same UTXO context.
             let validation_flags = if is_selected_parent { TxValidationFlags::SkipScriptChecks } else { TxValidationFlags::Full };
             let (validated_transactions, inner_multiset) =
-                self.validate_transactions_with_muhash_in_parallel(&txs, &composed_view, pov_daa_score, validation_flags);
+                self.validate_transactions_with_muhash_in_parallel(&txs, pov_daa_score, validation_flags);
 
             // NOTE: We intentionally do NOT combine `inner_multiset` here.
             // Duplicate txs across parallel DAG blocks would be double-counted
@@ -157,19 +143,6 @@ impl VirtualStateProcessor {
 
                 // DAG semantics: same tx may appear in multiple parallel blocks.
                 if !seen_txids.insert(txid) {
-                    continue;
-                }
-
-                if let Err(e) = ctx.mergeset_diff.add_transaction(validated_tx, pov_daa_score) {
-                    // After dedup this should be unreachable. If it fires, the UTXO
-                    // diff and multiset hash would diverge — log loudly, don't hide.
-                    log::error!(
-                        "SAHYADRI BUG: UTXO apply failed after dedup — block {} tx {}: {:?}",
-                        merged_block,
-                        txid,
-                        e
-                    );
-                    debug_assert!(false, "DoubleAddCall after dedup — bug");
                     continue;
                 }
 
@@ -206,10 +179,9 @@ impl VirtualStateProcessor {
     ///     3. The block header includes the expected `pruning_point`.
     ///     4. The block coinbase transaction rewards the mergeset blocks correctly.
     ///     5. All non-coinbase block transactions are valid against its own UTXO view.
-    pub(super) fn verify_block_state<V: UtxoView + Sync>(
+    pub(super) fn verify_block_state(
         &self,
         ctx: &mut BlockProcessingContext,
-        selected_parent_utxo_view: &V,
         header: &Header,
     ) -> BlockProcessResult<()> {
         // SAHYADRI: read parent root from the parent's HEADER, not from
@@ -309,9 +281,8 @@ impl VirtualStateProcessor {
         ctx.pruning_sample_from_pov = Some(reply.pruning_sample);
 
         // Verify all transactions are valid in context
-        let current_utxo_view = selected_parent_utxo_view.compose(&ctx.mergeset_diff);
         let validated_transactions =
-            self.validate_transactions_in_parallel(&txs, &current_utxo_view, header.daa_score, TxValidationFlags::Full);
+            self.validate_transactions_in_parallel(&txs, header.daa_score, TxValidationFlags::Full);
         if validated_transactions.len() < txs.len() - 1 {
             // Some non-coinbase transactions are invalid
             return Err(InvalidTransactionsInBlockContext(txs.len() - 1 - validated_transactions.len(), txs.len() - 1));
@@ -346,149 +317,37 @@ impl VirtualStateProcessor {
         Ok(())
     }
 
-    pub(crate) fn validate_transactions_in_parallel<'a, V: UtxoView + Sync>(
+    pub(crate) fn validate_transactions_in_parallel<'a>(
         &self,
         txs: &'a [Transaction],
-        _utxo_view: &V,
         _pov_daa_score: u64,
         _flags: TxValidationFlags,
-    ) -> Vec<(ValidatedTransaction<'a>, u32)> {
-        // Sahyadri Account Model Bypass:
-        // For now, we consider all transactions valid without UTXO context.
-        // Future decentralized identity (DID) validation logic will be added here.
+    ) -> Vec<(ValidatedTransaction<'a>, usize)> {
+        // SAHYADRI: account-model transactions pass through directly.
         txs.iter()
             .enumerate()
-            .skip(1) // Skip the coinbase transaction
+            .skip(1)
             .map(|(i, tx)| {
-            // We use new_coinbase as a bypass for account model migration
-            (ValidatedTransaction::new_account_bypass(tx), i as u32)
-       })
+                (ValidatedTransaction::new_account_bypass(tx), i)
+            })
             .collect()
     }
 
-    /// Same as validate_transactions_in_parallel except during the iteration this will also
-    /// calculate the muhash in parallel for valid transactions
-    pub(crate) fn validate_transactions_with_muhash_in_parallel<'a, V: UtxoView + Sync>(
+    /// SAHYADRI ACCOUNT MODEL: UTXO-based muhash tracking removed.
+    /// Returns account-bypass validated transactions and a fresh
+    /// (unused) MuHash. The muhash is a legacy artifact of the UTXO
+    /// commitment scheme and is no longer read by any caller.
+    pub(crate) fn validate_transactions_with_muhash_in_parallel<'a>(
         &self,
         txs: &'a Vec<Transaction>,
-        utxo_view: &V,
-        pov_daa_score: u64,
-        flags: TxValidationFlags,
+        _pov_daa_score: u64,
+        _flags: TxValidationFlags,
     ) -> (SmallVec<[(ValidatedTransaction<'a>, u32); 2]>, MuHash) {
-        self.thread_pool.install(|| {
-            txs
-                .par_iter() // We can do this in parallel without complications since block body validation already ensured
-                            // that all txs within each block are independent
-                .enumerate()
-                .skip(1) // Skip the coinbase tx.
-                .filter_map(|(i, tx)| self.validate_transaction_in_utxo_context(tx, &utxo_view, pov_daa_score, flags).ok().map(|vtx| {
-                    let mh = MuHash::from_transaction(&vtx, pov_daa_score);
-                    (smallvec![(vtx, i as u32)], mh)
-                }
-                ))
-                .reduce(
-                    || (smallvec![], MuHash::new()),
-                    |mut a, mut b| {
-                        a.0.append(&mut b.0);
-                        a.1.combine(&b.1);
-                        a
-                    },
-                )
-        })
-    }
-
-    /// Attempts to populate the transaction with UTXO entries and performs all utxo-related tx validations
-    pub(super) fn validate_transaction_in_utxo_context<'a>(
-        &self,
-        transaction: &'a Transaction,
-        utxo_view: &impl UtxoView,
-        pov_daa_score: u64,
-        flags: TxValidationFlags,
-    ) -> TxResult<ValidatedTransaction<'a>> {
-        let mut entries = Vec::with_capacity(transaction.inputs.len());
-        for input in transaction.inputs.iter() {
-            if let Some(entry) = utxo_view.get(&input.previous_outpoint) {
-                entries.push(entry);
-            } else {
-                // Missing at least one input. For perf considerations, we report once a single miss is detected and avoid collecting all possible misses.
-                return Err(TxRuleError::MissingTxOutpoints);
-            }
+        let mut out: SmallVec<[(ValidatedTransaction<'a>, u32); 2]> = SmallVec::new();
+        for (i, tx) in txs.iter().enumerate().skip(1) {
+            out.push((ValidatedTransaction::new_account_bypass(tx), i as u32));
         }
-        let populated_tx = PopulatedTransaction::new(transaction, entries);
-        let res = self.transaction_validator.validate_populated_transaction_and_get_fee(&populated_tx, pov_daa_score, flags, None);
-        match res {
-            Ok(calculated_fee) => Ok(ValidatedTransaction::new(populated_tx, calculated_fee)),
-            Err(tx_rule_error) => {
-                // TODO (relaxed): aggregate by error types and log through the monitor (in order to not flood the logs)
-                info!("Rejecting transaction {} due to transaction rule error: {}", transaction.id(), tx_rule_error);
-                Err(tx_rule_error)
-            }
-        }
-    }
-
-    /// Populates the mempool transaction with maximally found UTXO entry data
-    pub(crate) fn populate_mempool_transaction_in_utxo_context(
-        &self,
-        mutable_tx: &mut MutableTransaction,
-        utxo_view: &impl UtxoView,
-    ) -> TxResult<()> {
-        let mut has_missing_outpoints = false;
-        for i in 0..mutable_tx.tx.inputs.len() {
-            if mutable_tx.entries[i].is_some() {
-                // We prefer a previously populated entry if such exists
-                continue;
-            }
-            if let Some(entry) = utxo_view.get(&mutable_tx.tx.inputs[i].previous_outpoint) {
-                mutable_tx.entries[i] = Some(entry);
-            } else {
-                // We attempt to fill as much as possible UTXO entries, hence we do not break in this case but rather continue looping
-                has_missing_outpoints = true;
-            }
-        }
-        if has_missing_outpoints {
-            return Err(TxRuleError::MissingTxOutpoints);
-        }
-        Ok(())
-    }
-
-    /// Populates the mempool transaction with maximally found UTXO entry data and proceeds to validation if all found
-    pub(super) fn validate_mempool_transaction_in_utxo_context(
-        &self,
-        mutable_tx: &mut MutableTransaction,
-        utxo_view: &impl UtxoView,
-        pov_daa_score: u64,
-        args: &TransactionValidationArgs,
-    ) -> TxResult<()> {
-        // SAHYADRI ACCOUNT MODEL: Skip UTXO validation for account transactions
-        if mutable_tx.tx.inputs.is_empty() && !mutable_tx.tx.payload.is_empty() {
-            mutable_tx.calculated_fee = Some(0);
-            return Ok(());
-        }
-
-        self.populate_mempool_transaction_in_utxo_context(mutable_tx, utxo_view)?;
-
-        // Calc the contextual storage mass
-        let contextual_mass = self
-            .transaction_validator
-            .mass_calculator
-            .calc_contextual_masses(&mutable_tx.as_verifiable())
-            .ok_or(TxRuleError::MassIncomputable)?;
-
-        // Set the inner mass field
-        mutable_tx.tx.set_mass(contextual_mass.storage_mass);
-
-        // At this point we know all UTXO entries are populated, so we can safely pass the tx as verifiable
-        let mass_and_feerate_threshold = args
-            .feerate_threshold
-            .map(|threshold| (contextual_mass.max(mutable_tx.calculated_non_contextual_masses.unwrap()), threshold));
-        let calculated_fee = self.transaction_validator.validate_populated_transaction_and_get_fee(
-            &mutable_tx.as_verifiable(),
-            pov_daa_score,
-            TxValidationFlags::SkipMassCheck, // we can skip the mass check since we just set it
-            mass_and_feerate_threshold,
-        )?;
-        mutable_tx.calculated_fee = Some(calculated_fee);
-        Ok(())
+        (out, MuHash::new())
     }
 
     /// Calculates the accepted_id_merkle_root based on the current DAA score and the accepted tx ids

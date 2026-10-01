@@ -150,7 +150,6 @@ impl ConsensusServices {
             params.coinbase_maturity(),
             params.sahyadri_consensus_k(),
             tx_script_cache_counters,
-            mass_calculator.clone(),
             storage.account_store.clone(),
         );
 

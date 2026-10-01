@@ -81,11 +81,10 @@ use sahyadri_consensus_core::{
     mining_rules::MiningRules,
     pruning::PruningPointsList,
     tx::{MutableTransaction, Transaction},
-    utxo::{utxo_diff::UtxoDiff, utxo_view::UtxoView},
 };
 use sahyadri_consensus_notify::{
     notification::{
-        NewBlockTemplateNotification, Notification, SinkBlueScoreChangedNotification, UtxosChangedNotification,
+        NewBlockTemplateNotification, Notification, SinkBlueScoreChangedNotification,
         VirtualChainChangedNotification, VirtualDaaScoreChangedNotification,
     },
     root::ConsensusNotificationRoot,
@@ -367,14 +366,10 @@ impl VirtualStateProcessor {
             .filter(|&h| self.reachability_service.is_dag_ancestor_of(finality_point, h))
             .collect_vec();
         drop(prune_guard);
-        // SAHYADRI: UTXO diff is no longer tracked. We keep a dummy
-        // `UtxoDiff` so downstream signatures remain unchanged. Its
-        // content is never read.
-        let mut accumulated_diff = sahyadri_consensus_core::utxo::utxo_diff::UtxoDiff::default();
         let prev_sink = prev_state.sahyadri_consensus_data.selected_parent;
 
         let (new_sink, virtual_parent_candidates) =
-            self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, prev_sink, tips, finality_point, pruning_point);
+            self.sink_search_algorithm(prev_sink, tips, finality_point, pruning_point);
         let (virtual_parents, virtual_sahyadri_consensus_data) =
             self.pick_virtual_parents(new_sink, virtual_parent_candidates, pruning_point);
         if virtual_sahyadri_consensus_data.selected_parent != new_sink {
@@ -395,7 +390,6 @@ impl VirtualStateProcessor {
                 virtual_read,
                 virtual_parents,
                 virtual_sahyadri_consensus_data,
-                &mut accumulated_diff,
                 &chain_path,
             )
         {
@@ -429,14 +423,11 @@ impl VirtualStateProcessor {
         }
 
         // Emit notifications
-        let accumulated_diff = Arc::new(accumulated_diff);
         let virtual_parents = Arc::new(new_virtual_state.parents.clone());
         self.notification_root
             .notify(Notification::NewBlockTemplate(NewBlockTemplateNotification {}))
             .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
-        self.notification_root
-            .notify(Notification::UtxosChanged(UtxosChangedNotification::new(accumulated_diff, virtual_parents)))
-            .unwrap_or_else(|e| log::error!("SAHYADRI: notification channel send failed: {:?}", e));
+        let _ = virtual_parents;  // reserved for future UtxosChanged-equivalent
         self.notification_root
             .notify(Notification::SinkBlueScoreChanged(SinkBlueScoreChangedNotification::new(
                 compact_sink_sahyadri_consensus_data.blue_score,
@@ -478,8 +469,6 @@ impl VirtualStateProcessor {
     /// `commit_block_state`. Failing blocks are marked disqualified.
     fn calculate_utxo_state_relatively(
         &self,
-        _stores: &VirtualStores,
-        _diff: &mut UtxoDiff,
         from: Hash,
         to: Hash,
     ) -> Hash {
@@ -543,12 +532,10 @@ impl VirtualStateProcessor {
             let mergeset_data = self.sahyadri_consensus_store.get_data(current).unwrap();
             let pov_daa_score = header.daa_score;
 
-            let selected_parent_utxo_view =
-                sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
             let mut ctx = BlockProcessingContext::new(mergeset_data.into());
 
-            self.calculate_block_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
-            let res = self.verify_block_state(&mut ctx, &selected_parent_utxo_view, &header);
+            self.calculate_block_state(&mut ctx, pov_daa_score);
+            let res = self.verify_block_state(&mut ctx, &header);
 
             if let Err(rule_error) = res {
                 info!("Block {} is disqualified from virtual chain: {}", current, rule_error);
@@ -598,12 +585,11 @@ impl VirtualStateProcessor {
         virtual_read: RwLockUpgradableReadGuard<'_, VirtualStores>,
         virtual_parents: Vec<Hash>,
         virtual_sahyadri_consensus_data: SahyadriConsensusData,
-        accumulated_diff: &mut UtxoDiff,
         chain_path: &ChainPath,
     ) -> Result<Arc<VirtualState>, RuleError> {
         let new_virtual_state =
             self.calculate_virtual_state(&virtual_read, virtual_parents, virtual_sahyadri_consensus_data)?;
-        self.commit_virtual_state(virtual_read, new_virtual_state.clone(), accumulated_diff, chain_path);
+        self.commit_virtual_state(virtual_read, new_virtual_state.clone(), chain_path);
         Ok(new_virtual_state)
     }
 
@@ -657,7 +643,6 @@ impl VirtualStateProcessor {
         &self,
         virtual_read: RwLockUpgradableReadGuard<'_, VirtualStores>,
         new_virtual_state: Arc<VirtualState>,
-        _accumulated_diff: &UtxoDiff,
         chain_path: &ChainPath,
     ) {
         let mut batch = WriteBatch::default();
@@ -1376,8 +1361,6 @@ impl VirtualStateProcessor {
     /// parent candidates ordered in descending blue work order.
     pub(super) fn sink_search_algorithm(
         &self,
-        stores: &VirtualStores,
-        diff: &mut UtxoDiff,
         prev_sink: Hash,
         tips: Vec<Hash>,
         finality_point: Hash,
@@ -1406,7 +1389,7 @@ impl VirtualStateProcessor {
                 }
             };
             if self.reachability_service.is_chain_ancestor_of(finality_point, candidate) {
-                diff_point = self.calculate_utxo_state_relatively(stores, diff, diff_point, candidate);
+                diff_point = self.calculate_utxo_state_relatively(diff_point, candidate);
                 if diff_point == candidate {
                     // This indicates that candidate has valid UTXO state and that `diff` represents its diff from virtual
 
@@ -1586,10 +1569,9 @@ impl VirtualStateProcessor {
     fn validate_mempool_transaction_impl(
         &self,
         mutable_tx: &mut MutableTransaction,
-        virtual_utxo_view: &impl UtxoView,
         virtual_daa_score: u64,
         virtual_past_median_time: u64,
-        args: &TransactionValidationArgs,
+        _args: &TransactionValidationArgs,
     ) -> TxResult<()> {
         self.transaction_validator.validate_tx_in_isolation(&mutable_tx.tx)?;
         self.transaction_validator.validate_tx_in_header_context_with_args(
@@ -1597,7 +1579,6 @@ impl VirtualStateProcessor {
             virtual_daa_score,
             virtual_past_median_time,
         )?;
-        self.validate_mempool_transaction_in_utxo_context(mutable_tx, virtual_utxo_view, virtual_daa_score, args)?;
         Ok(())
     }
 
@@ -1606,10 +1587,8 @@ impl VirtualStateProcessor {
         let virtual_state = virtual_read.state.get().unwrap();
         let virtual_daa_score = virtual_state.daa_score;
         let virtual_past_median_time = virtual_state.past_median_time;
-        let dummy_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default(); // SAHYADRI ACCOUNT BYPASS
-
         self.thread_pool.install(|| {
-            self.validate_mempool_transaction_impl(mutable_tx, &dummy_utxo_view, virtual_daa_score, virtual_past_median_time, args)
+            self.validate_mempool_transaction_impl(mutable_tx, virtual_daa_score, virtual_past_median_time, args)
         })
     }
 
@@ -1624,13 +1603,11 @@ impl VirtualStateProcessor {
         let virtual_past_median_time = virtual_state.past_median_time;
 
         self.thread_pool.install(|| {
-            let dummy_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default(); // SAHYADRI ACCOUNT BYPASS
             mutable_txs
                 .par_iter_mut()
                 .map(|mtx| {
                     self.validate_mempool_transaction_impl(
                         mtx,
-                        &dummy_utxo_view,
                         virtual_daa_score,
                         virtual_past_median_time,
                         args.get(&mtx.id()),
@@ -1663,8 +1640,7 @@ impl VirtualStateProcessor {
         let virtual_state = virtual_read.state.get().unwrap();
 
         let invalid_transactions = HashMap::new();
-        let virtual_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
-        let results = self.validate_block_template_transactions(&txs, &virtual_state, &virtual_utxo_view);
+        let results = self.validate_block_template_transactions(&txs, &virtual_state);
         for (_tx, _res) in txs.iter().zip(results) {}
 
         let mut has_rejections = !invalid_transactions.is_empty();
@@ -1700,7 +1676,6 @@ impl VirtualStateProcessor {
         &self,
         _txs: &[Transaction],
         _virtual_state: &VirtualState,
-        _utxo_view: &impl UtxoView,
     ) -> Result<(), RuleError> {
         // SAHYADRI ACCOUNT MODEL: All transactions are considered valid at this stage.
         Ok(())
@@ -1887,7 +1862,6 @@ impl VirtualStateProcessor {
                 self.sahyadri_consensus_manager.sahyadri_consensus(&[self.genesis.hash]),
             )),
             &Default::default(),
-            &Default::default(),
         );
     }
 
@@ -1939,11 +1913,9 @@ impl VirtualStateProcessor {
         let virtual_read = self.virtual_stores.upgradable_read();
 
         // Validate transactions of the pruning point itself
-        let dummy_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
         let new_pruning_point_transactions = vec![]; // SAHYADRI ACCOUNT BYPASS: Dummy variable
         let validated_transactions = self.validate_transactions_in_parallel(
             &new_pruning_point_transactions,
-            &dummy_view,
             new_pruning_point_header.daa_score,
             TxValidationFlags::Full,
         );
@@ -1969,7 +1941,6 @@ impl VirtualStateProcessor {
             virtual_read,
             virtual_parents,
             virtual_sahyadri_consensus_data,
-            &mut UtxoDiff::default(),
             &ChainPath::default(),
         )?;
 

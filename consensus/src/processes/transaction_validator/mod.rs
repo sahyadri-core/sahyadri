@@ -11,7 +11,7 @@ use sahyadri_txscript::{
     caches::{Cache, TxScriptCacheCounters},
 };
 
-use sahyadri_consensus_core::{KType, mass::MassCalculator};
+use sahyadri_consensus_core::{KType};
 
 #[derive(Clone)]
 pub struct TransactionValidator {
@@ -24,8 +24,7 @@ pub struct TransactionValidator {
     _sahyadri_consensus_k: KType,
     sig_cache: Cache<SigCacheKey, bool>,
 
-    pub(crate) mass_calculator: MassCalculator,
-    pub account_store: Arc<DbAccountStore>, // <--- GAVE THE BANK KEY TO BOUNCER
+    pub account_store: Arc<DbAccountStore>,
 }
 
 impl TransactionValidator {
@@ -38,7 +37,6 @@ impl TransactionValidator {
         coinbase_maturity: u64,
         sahyadri_consensus_k: KType,
         counters: Arc<TxScriptCacheCounters>,
-        mass_calculator: MassCalculator,
         account_store: Arc<DbAccountStore>, // <--- REQUIRED IT IN THE CONSTRUCTOR
     ) -> Self {
         Self {
@@ -50,7 +48,6 @@ impl TransactionValidator {
             _coinbase_maturity: coinbase_maturity,
             _sahyadri_consensus_k: sahyadri_consensus_k,
             sig_cache: Cache::with_counters(10_000, counters),
-            mass_calculator,
             account_store, // <--- SAVED IT
         }
     }
@@ -75,7 +72,6 @@ impl TransactionValidator {
             _coinbase_maturity: coinbase_maturity,
             _sahyadri_consensus_k: sahyadri_consensus_k,
             sig_cache: Cache::with_counters(10_000, counters),
-            mass_calculator: MassCalculator::new(0, 0, 0, 0),
             account_store, // <--- SAVED IT
         }
     }
