@@ -28,7 +28,6 @@ use crate::{
             selected_chain::SelectedChainStore,
             statuses::StatusesStoreReader,
             tips::{TipsStore, TipsStoreReader},
-            utxo_set::{UtxoSetStore, UtxoSetStoreReader},
             virtual_state::VirtualState,
         },
     },
@@ -69,7 +68,6 @@ use sahyadri_consensus_core::{
     mass::{ContextualMasses, NonContextualMasses},
     merkle::calc_hash_merkle_root,
     mining_rules::MiningRules,
-    muhash::MuHashExtensions,
     network::NetworkType,
     pruning::{PruningPointProof, PruningPointTrustedData, PruningPointsList, PruningProofMetadata},
     trusted::{ExternalSahyadriConsensusData, TrustedBlock},
@@ -86,7 +84,6 @@ use crossbeam_channel::{
 use itertools::Itertools;
 use sahyadri_consensusmanager::{SessionLock, SessionReadGuard};
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rocksdb::WriteBatch;
 use sahyadri_core::info;
 use sahyadri_database::prelude::StoreResultExt;
@@ -1068,26 +1065,14 @@ impl ConsensusApi for Consensus {
 
     fn get_pruning_point_utxos(
         &self,
-        expected_pruning_point: Hash,
-        from_outpoint: Option<TransactionOutpoint>,
-        chunk_size: usize,
-        skip_first: bool,
+        _expected_pruning_point: Hash,
+        _from_outpoint: Option<TransactionOutpoint>,
+        _chunk_size: usize,
+        _skip_first: bool,
     ) -> ConsensusResult<Vec<(TransactionOutpoint, UtxoEntry)>> {
-        if self.pruning_point_store.read().pruning_point().unwrap() != expected_pruning_point {
-            return Err(ConsensusError::UnexpectedPruningPoint);
-        }
-        let pruning_meta_read = self.pruning_meta_stores.read();
-        let iter = pruning_meta_read.utxo_set.seek_iterator(from_outpoint, chunk_size, skip_first);
-        let utxos = iter.map(|item| item.unwrap()).collect();
-        drop(pruning_meta_read);
-
-        // We recheck the expected pruning point in case it was switched just before the utxo set read.
-        // NOTE: we rely on order of operations by pruning processor. See extended comment therein.
-        if self.pruning_point_store.read().pruning_point().unwrap() != expected_pruning_point {
-            return Err(ConsensusError::UnexpectedPruningPoint);
-        }
-
-        Ok(utxos)
+        // SAHYADRI: UTXO set removed. Pruning-point sync will rely on
+        // SMT state proofs; stub until that path is wired.
+        Ok(Vec::new())
     }
 
     fn modify_coinbase_payload(&self, payload: Vec<u8>, miner_data: &MinerData) -> CoinbaseResult<Vec<u8>> {
@@ -1114,23 +1099,21 @@ impl ConsensusApi for Consensus {
         self.services.pruning_proof_manager.import_pruning_points(&pruning_points)
     }
 
-    fn append_imported_pruning_point_utxos(&self, utxoset_chunk: &[(TransactionOutpoint, UtxoEntry)], current_multiset: &mut MuHash) {
-        let mut pruning_meta_write = self.pruning_meta_stores.write();
-        pruning_meta_write.utxo_set.write_many(utxoset_chunk).unwrap();
-
-        // Parallelize processing using the context of an existing thread pool.
-        let inner_multiset = self.virtual_processor.install(|| {
-            utxoset_chunk.par_iter().map(|(outpoint, entry)| MuHash::from_utxo(outpoint, entry)).reduce(MuHash::new, |mut a, b| {
-                a.combine(&b);
-                a
-            })
-        });
-
-        current_multiset.combine(&inner_multiset);
+    fn append_imported_pruning_point_utxos(
+        &self,
+        _utxoset_chunk: &[(TransactionOutpoint, UtxoEntry)],
+        _current_multiset: &mut MuHash,
+    ) {
+        // SAHYADRI: UTXO import removed.
     }
 
-    fn import_pruning_point_utxo_set(&self, new_pruning_point: Hash, imported_utxo_multiset: MuHash) -> PruningImportResult<()> {
-        self.virtual_processor.import_pruning_point_utxo_set(new_pruning_point, imported_utxo_multiset)
+    fn import_pruning_point_utxo_set(
+        &self,
+        _new_pruning_point: Hash,
+        _imported_utxo_multiset: MuHash,
+    ) -> PruningImportResult<()> {
+        // SAHYADRI: UTXO import removed.
+        Ok(())
     }
 
     fn validate_pruning_points(&self, syncer_virtual_selected_parent: Hash) -> ConsensusResult<()> {
@@ -1428,7 +1411,6 @@ impl ConsensusApi for Consensus {
         // We lower it down regardless as it is conceptually true to do so.
         pruning_meta_write.set_pruning_utxoset_stable_flag(&mut batch, false).unwrap();
         self.db.write(batch).unwrap();
-        pruning_meta_write.utxo_set.clear().unwrap();
     }
 
     /// The usual flow consists of the pruning point naturally updating during pruning, and hence maintains consistency by default

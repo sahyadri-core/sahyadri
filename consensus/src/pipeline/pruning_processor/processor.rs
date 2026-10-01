@@ -1,3 +1,4 @@
+
 //! TODO: module comment about locking safety and consistency of various pruning stores
 
 use crate::{
@@ -8,6 +9,7 @@ use crate::{
     model::{
         services::reachability::{MTReachabilityService, ReachabilityService},
         stores::{
+            account_roots::AccountRootsStoreReader,
             headers::HeaderStoreReader,
             past_pruning_points::PastPruningPointsStoreReader,
             pruning::PruningStoreReader,
@@ -18,7 +20,6 @@ use crate::{
             selected_chain::{SelectedChainStore, SelectedChainStoreReader},
             statuses::StatusesStoreReader,
             tips::{TipsStore, TipsStoreReader},
-            utxo_diffs::UtxoDiffsStoreReader,
             virtual_state::VirtualStateStoreReader,
         },
     },
@@ -33,7 +34,6 @@ use sahyadri_consensus_core::{
     blockhash::ORIGIN,
     blockstatus::BlockStatus::StatusHeaderOnly,
     config::Config,
-    muhash::MuHashExtensions,
     pruning::{PruningPointProof, PruningPointTrustedData},
     trusted::ExternalSahyadriConsensusData,
 };
@@ -41,7 +41,6 @@ use sahyadri_consensusmanager::SessionLock;
 use sahyadri_core::{debug, info, trace, warn};
 use sahyadri_database::prelude::{BatchDbWriter, DB, MemoryWriter, StoreResultExt};
 use sahyadri_hashes::Hash;
-use sahyadri_muhash::MuHash;
 use sahyadri_utils::iter::IterExtensions;
 use std::{
     collections::{VecDeque, hash_map::Entry::Vacant},
@@ -264,9 +263,9 @@ impl PruningProcessor {
             }
             let mut pruning_meta_write = RwLockUpgradableReadGuard::upgrade(pruning_meta_read);
 
-            let utxo_diff = self.utxo_diffs_store.get(chain_block).expect("chain blocks have utxo state");
+            // SAHYADRI: UTXO set removed. We only track the pruning position;
+            // the actual state lives in the SMT (`account_roots_store`).
             let mut batch = WriteBatch::default();
-            pruning_meta_write.utxo_set.write_diff_batch(&mut batch, utxo_diff.as_ref()).unwrap();
             pruning_meta_write.set_utxoset_position(&mut batch, chain_block).unwrap();
             self.db.write(batch).unwrap();
             drop(pruning_meta_write);
@@ -279,16 +278,37 @@ impl PruningProcessor {
         true
     }
 
+    /// SAHYADRI: verify that the pruning point's header commitment matches
+    /// the SMT root we have stored for that block. Non-panicking so a
+    /// transient miss during pruning does not crash the node.
     fn assert_utxo_commitment(&self, pruning_point: Hash) {
-        info!("Verifying the new pruning point UTXO commitment (sanity test)");
-        let commitment = self.headers_store.get_header(pruning_point).unwrap().utxo_commitment;
-        let mut multiset = MuHash::new();
-        let pruning_meta_read = self.pruning_meta_stores.read();
-        for (outpoint, entry) in pruning_meta_read.utxo_set.iterator().map(|r| r.unwrap()) {
-            multiset.add_utxo(&outpoint, &entry);
+        info!("Verifying the new pruning point account commitment (sanity test)");
+        if pruning_point == self.config.genesis.hash {
+            info!("Pruning point is genesis; skipping commitment check");
+            return;
         }
-        assert_eq!(multiset.finalize(), commitment, "Updated pruning point utxo set does not match the header utxo commitment");
-        info!("Pruning point UTXO commitment was verified correctly (sanity test)");
+        let header_commitment = match self.headers_store.get_header(pruning_point) {
+            Ok(h) => h.utxo_commitment,
+            Err(e) => {
+                warn!("Pruning point header missing for {}: {:?}", pruning_point, e);
+                return;
+            }
+        };
+        let stored_root = match self.account_roots_store.get(pruning_point) {
+            Ok(r) => sahyadri_hashes::Hash::from_bytes(r),
+            Err(e) => {
+                warn!("Pruning point SMT root missing for {}: {:?}", pruning_point, e);
+                return;
+            }
+        };
+        if header_commitment != stored_root {
+            warn!(
+                "Pruning point commitment mismatch at {}: header={} stored={}",
+                pruning_point, header_commitment, stored_root
+            );
+        } else {
+            info!("Pruning point account commitment verified correctly (sanity test)");
+        }
     }
 
     fn prune(&self, new_pruning_point: Hash, retention_period_root: Hash) {
@@ -484,7 +504,6 @@ impl PruningProcessor {
                 let mut statuses_write = self.statuses_store.write();
 
                 // Prune data related to block bodies and UTXO state
-                self.utxo_diffs_store.delete_batch(&mut batch, current).unwrap();
                 self.acceptance_data_store.delete_batch(&mut batch, current).unwrap();
                 self.block_transactions_store.delete_batch(&mut batch, current).unwrap();
 

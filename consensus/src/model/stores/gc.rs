@@ -72,7 +72,11 @@ pub fn mark_and_sweep(
     }
     let live_roots_count = live_roots.len();
 
-    // ── 1b. Roots whose headers no longer exist → delete ──
+    // ── 1b. Identify stale roots: their headers no longer exist ──
+    //      NOTE: never delete the pruning point's root — assert_utxo_commitment
+    //      reads it during pruning.
+    // NOTE: the pruning point's header is always retained, so its block
+    // hash is always in `retained_blocks` — no special-casing needed here.
     let mut roots_to_delete: Vec<Hash> = Vec::new();
     for block_hash in roots_store.iter_block_hashes() {
         if !retained_blocks.contains(&block_hash) {

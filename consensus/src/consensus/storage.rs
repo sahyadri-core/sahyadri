@@ -24,7 +24,6 @@ use crate::{
         selected_chain::DbSelectedChainStore,
         statuses::DbStatusesStore,
         tips::DbTipsStore,
-        utxo_diffs::DbUtxoDiffsStore,
         virtual_state::{LkgVirtualState, VirtualStores},
     },
     processes::{reachability::inquirer as reachability, relations, sahyadri_consensus::ordering::SortableBlock},
@@ -62,8 +61,7 @@ pub struct ConsensusStorage {
     pub depth_store: Arc<DbDepthStore>,
     pub pruning_samples_store: Arc<DbPruningSamplesStore>,
 
-    // Utxo-related stores
-    pub utxo_diffs_store: Arc<DbUtxoDiffsStore>,
+    // Stores
     pub acceptance_data_store: Arc<DbAcceptanceDataStore>,
 
     // Account Store (Sahyadri Bank)
@@ -108,7 +106,6 @@ impl ConsensusStorage {
         let sahyadri_consensus_budget = scaled(80_000_000);
         let headers_budget = scaled(80_000_000);
         let transactions_budget = scaled(40_000_000);
-        let utxo_diffs_budget = scaled(40_000_000);
         let block_window_budget = scaled(200_000_000);
         let acceptance_data_budget = scaled(40_000_000);
 
@@ -168,7 +165,6 @@ impl ConsensusStorage {
         let sahyadri_consensus_builder =
             PolicyBuilder::new().bytes_budget(sahyadri_consensus_budget).min_items(level_lower_bound).tracked_bytes();
         let headers_builder = PolicyBuilder::new().bytes_budget(headers_budget).tracked_bytes();
-        let utxo_diffs_builder = PolicyBuilder::new().bytes_budget(utxo_diffs_budget).tracked_bytes();
         let header_data_builder = PolicyBuilder::new().max_items(perf_params.header_data_cache_size).untracked();
         let utxo_set_builder = PolicyBuilder::new().max_items(perf_params.utxo_set_cache_size).untracked();
         let transactions_builder = PolicyBuilder::new().bytes_budget(transactions_budget).tracked_bytes();
@@ -210,12 +206,11 @@ impl ConsensusStorage {
         // Pruning
         let pruning_point_store = Arc::new(RwLock::new(DbPruningStore::new(db.clone())));
         let past_pruning_points_store = Arc::new(DbPastPruningPointsStore::new(db.clone(), past_pruning_points_builder.build()));
-        let pruning_meta_stores = Arc::new(RwLock::new(PruningMetaStores::new(db.clone(), utxo_set_builder.build())));
+        let pruning_meta_stores = Arc::new(RwLock::new(PruningMetaStores::new(db.clone())));
         let pruning_samples_store = Arc::new(DbPruningSamplesStore::new(db.clone(), header_data_builder.build()));
 
         // Txs
         let block_transactions_store = Arc::new(DbBlockTransactionsStore::new(db.clone(), transactions_builder.build()));
-        let utxo_diffs_store = Arc::new(DbUtxoDiffsStore::new(db.clone(), utxo_diffs_builder.build()));
         let acceptance_data_store = Arc::new(DbAcceptanceDataStore::new(db.clone(), acceptance_data_builder.build()));
 
         // Initialize the Account Store (Sahyadri Bank) using the utxo_set_cache_size for cache allocation
@@ -262,7 +257,6 @@ impl ConsensusStorage {
             daa_excluded_store,
             depth_store,
             pruning_samples_store,
-            utxo_diffs_store,
             account_store, // <--- 4. PLUG IN BANK
             block_window_cache_for_difficulty,
             block_window_cache_for_past_median_time,

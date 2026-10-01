@@ -22,8 +22,6 @@ pub mod selected_chain;
 pub mod smt_nodes;
 pub mod statuses;
 pub mod tips;
-pub mod utxo_diffs;
-pub mod utxo_set;
 pub mod virtual_state;
 
 pub use sahyadri_database;

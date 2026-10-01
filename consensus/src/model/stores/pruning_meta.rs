@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use rocksdb::WriteBatch;
-use sahyadri_database::prelude::CachePolicy;
 use sahyadri_database::prelude::DB;
 use sahyadri_database::prelude::StoreResult;
 use sahyadri_database::prelude::StoreResultExt;
@@ -9,20 +8,16 @@ use sahyadri_database::prelude::{BatchDbWriter, CachedDbItem};
 use sahyadri_database::registry::DatabaseStorePrefixes;
 use sahyadri_hashes::Hash;
 
-use super::utxo_set::DbUtxoSetStore;
-
 /// Used in order to group stores related to the pruning point utxoset under a single lock
 pub struct PruningMetaStores {
-    pub utxo_set: DbUtxoSetStore,
     utxoset_position_access: CachedDbItem<Hash>,
     utxoset_stable_flag_access: CachedDbItem<bool>,
     body_missing_anticone_blocks: CachedDbItem<Vec<Hash>>,
 }
 
 impl PruningMetaStores {
-    pub fn new(db: Arc<DB>, utxoset_cache_policy: CachePolicy) -> Self {
+    pub fn new(db: Arc<DB>) -> Self {
         Self {
-            utxo_set: DbUtxoSetStore::new(db.clone(), utxoset_cache_policy, DatabaseStorePrefixes::PruningUtxoset.into()),
             utxoset_position_access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::PruningUtxosetPosition.into()),
             utxoset_stable_flag_access: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::PruningUtxosetSyncFlag.into()),
             body_missing_anticone_blocks: CachedDbItem::new(db.clone(), DatabaseStorePrefixes::BodyMissingAnticone.into()),

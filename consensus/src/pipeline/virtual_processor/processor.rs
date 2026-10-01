@@ -38,7 +38,6 @@ use crate::{
             selected_chain::{DbSelectedChainStore, SelectedChainStore},
             statuses::{DbStatusesStore, StatusesStore, StatusesStoreBatchExtensions, StatusesStoreReader},
             tips::{DbTipsStore, TipsStoreReader},
-            utxo_diffs::{DbUtxoDiffsStore, UtxoDiffsStoreReader},
             virtual_state::{LkgVirtualState, VirtualState, VirtualStateStoreReader, VirtualStores},
         },
     },
@@ -93,7 +92,7 @@ use sahyadri_consensus_notify::{
 };
 use sahyadri_consensusmanager::SessionLock;
 use sahyadri_core::{debug, info, time::unix_now, trace, warn};
-use sahyadri_database::prelude::{StoreError, StoreResultExt, StoreResultUnitExt};
+use sahyadri_database::prelude::{StoreResultExt, StoreResultUnitExt};
 use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHYADRI_MODE, SIG_SIZE};
 
 // TODO: Replace with treasury Dilithium pubkey hex (1952 bytes = 3904 hex chars)
@@ -171,8 +170,8 @@ pub struct VirtualStateProcessor {
     pub(super) selected_chain_store: Arc<RwLock<DbSelectedChainStore>>,
     pub(super) pruning_samples_store: Arc<DbPruningSamplesStore>,
 
-    // Utxo-related stores
-    pub(super) utxo_diffs_store: Arc<DbUtxoDiffsStore>,
+    //Account-related stores
+    
     pub(super) acceptance_data_store: Arc<DbAcceptanceDataStore>,
     pub(super) account_store: Arc<DbAccountStore>,
     pub(super) did_store: Arc<DbDidStore>,
@@ -257,7 +256,6 @@ impl VirtualStateProcessor {
             depth_store: storage.depth_store.clone(),
             selected_chain_store: storage.selected_chain_store.clone(),
             pruning_samples_store: storage.pruning_samples_store.clone(),
-            utxo_diffs_store: storage.utxo_diffs_store.clone(),
             acceptance_data_store: storage.acceptance_data_store.clone(),
             account_store: storage.account_store.clone(),
             did_store: storage.did_store.clone(),
@@ -369,8 +367,11 @@ impl VirtualStateProcessor {
             .filter(|&h| self.reachability_service.is_dag_ancestor_of(finality_point, h))
             .collect_vec();
         drop(prune_guard);
-        let prev_sink = prev_state.sahyadri_consensus_data.selected_parent;
+        // SAHYADRI: UTXO diff is no longer tracked. We keep a dummy
+        // `UtxoDiff` so downstream signatures remain unchanged. Its
+        // content is never read.
         let mut accumulated_diff = sahyadri_consensus_core::utxo::utxo_diff::UtxoDiff::default();
+        let prev_sink = prev_state.sahyadri_consensus_data.selected_parent;
 
         let (new_sink, virtual_parent_candidates) =
             self.sink_search_algorithm(&virtual_read, &mut accumulated_diff, prev_sink, tips, finality_point, pruning_point);
@@ -469,29 +470,31 @@ impl VirtualStateProcessor {
         }
     }
 
-    /// Calculates the UTXO state of `to` starting from the state of `from`.
-    /// The provided `diff` is assumed to initially hold the UTXO diff of `from` from virtual.
-    /// The function returns the top-most UTXO-valid block on `chain(to)` which is ideally
-    /// `to` itself (with the exception of returning `from` if `to` is already known to be UTXO disqualified).
-    /// When returning it is guaranteed that `diff` holds the diff of the returned block from virtual
-    fn calculate_utxo_state_relatively(&self, _stores: &VirtualStores, diff: &mut UtxoDiff, from: Hash, to: Hash) -> Hash {
-        // Avoid reorging if disqualified status is already known
+    /// SAHYADRI: UTXO diff no longer tracked, but chain validation must
+    /// still run. This function walks the selected chain from `from` to
+    /// `to` and, for each block that isn't already validated, calls
+    /// `calculate_utxo_state` + `verify_expected_utxo_state` (account
+    /// commitment, coinbase, pruning point) and, on success,
+    /// `commit_utxo_state`. Failing blocks are marked disqualified.
+    fn calculate_utxo_state_relatively(
+        &self,
+        _stores: &VirtualStores,
+        _diff: &mut UtxoDiff,
+        from: Hash,
+        to: Hash,
+    ) -> Hash {
+        // Already known disqualified -> return `from` unchanged.
         if self.statuses_store.read().get(to).unwrap() == StatusDisqualifiedFromChain {
             return from;
         }
 
+        // Find the split point (most recent common ancestor of `from` and `to`).
         let mut split_point: Option<Hash> = None;
-
-        // Walk down to the reorg split point
         for current in self.reachability_service.default_backward_chain_iterator(from) {
             if self.reachability_service.is_chain_ancestor_of(current, to) {
                 split_point = Some(current);
                 break;
             }
-
-            let mergeset_diff = self.utxo_diffs_store.get(current).unwrap();
-            // Apply the diff in reverse
-            diff.with_diff_in_place(&mergeset_diff.as_reversed()).unwrap();
         }
 
         let split_point = match split_point {
@@ -503,74 +506,69 @@ impl VirtualStateProcessor {
         };
         debug!("VIRTUAL PROCESSOR, found split point: {split_point}");
 
-        // A variable holding the most recent UTXO-valid block on `chain(to)` (note that it's maintained such
-        // that 'diff' is always its UTXO diff from virtual)
         let mut diff_point = split_point;
-
-        // Walk back up to the new virtual selected parent candidate
         let mut chain_block_counter = 0;
         let mut chain_disqualified_counter = 0;
-        for (selected_parent, current) in self.reachability_service.forward_chain_iterator(split_point, to, true).tuple_windows() {
+
+        for (selected_parent, current) in
+            self.reachability_service.forward_chain_iterator(split_point, to, true).tuple_windows()
+        {
+            // Selected parent was disqualified -> propagate up.
             if selected_parent != diff_point {
-                // This indicates that the selected parent is disqualified, propagate up and continue
                 let statuses_guard = self.statuses_store.upgradable_read();
                 if statuses_guard.get(current).unwrap() != StatusDisqualifiedFromChain {
-                    RwLockUpgradableReadGuard::upgrade(statuses_guard).set(current, StatusDisqualifiedFromChain).unwrap();
+                    RwLockUpgradableReadGuard::upgrade(statuses_guard)
+                        .set(current, StatusDisqualifiedFromChain)
+                        .unwrap();
                     chain_disqualified_counter += 1;
                 }
                 continue;
             }
 
-            match self.utxo_diffs_store.get(current) {
-                Ok(mergeset_diff) => {
-                    diff.with_diff_in_place(mergeset_diff.deref()).unwrap();
-                    diff_point = current;
-                }
-                Err(StoreError::KeyNotFound(_)) => {
-                    if self.statuses_store.read().get(current).unwrap() == StatusDisqualifiedFromChain {
-                        // Current block is already known to be disqualified
-                        continue;
-                    }
+            let status = self.statuses_store.read().get(current).unwrap();
 
-                    let header = self.headers_store.get_header(current).unwrap();
-                    let mergeset_data = self.sahyadri_consensus_store.get_data(current).unwrap();
-                    let pov_daa_score = header.daa_score;
+            // Already validated -> advance without re-checking.
+            if status == StatusUTXOValid {
+                diff_point = current;
+                continue;
+            }
 
-                    let selected_parent_utxo_view = sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
-                    let mut ctx = UtxoProcessingContext::new(mergeset_data.into());
+            // Already known disqualified -> skip.
+            if status == StatusDisqualifiedFromChain {
+                continue;
+            }
 
-                    self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
-                    let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
+            // Fresh block -> validate account commitment, coinbase, pruning point.
+            let header = self.headers_store.get_header(current).unwrap();
+            let mergeset_data = self.sahyadri_consensus_store.get_data(current).unwrap();
+            let pov_daa_score = header.daa_score;
 
-                    if let Err(rule_error) = res {
-                        info!("Block {} is disqualified from virtual chain: {}", current, rule_error);
-                        self.statuses_store.write().set(current, StatusDisqualifiedFromChain).unwrap();
-                        chain_disqualified_counter += 1;
-                    } else {
-                        debug!("VIRTUAL PROCESSOR, UTXO validated for {current}");
+            let selected_parent_utxo_view =
+                sahyadri_consensus_core::utxo::utxo_collection::UtxoCollection::default();
+            let mut ctx = UtxoProcessingContext::new(mergeset_data.into());
 
-                        // Accumulate the diff
-                        diff.with_diff_in_place(&ctx.mergeset_diff).unwrap();
-                        // Update the diff point
-                        diff_point = current;
-                        // Commit UTXO data for current chain block
-                        self.commit_utxo_state(
-                            current,
-                            ctx.mergeset_diff,
-                            ctx.mergeset_acceptance_data,
-                            ctx.pruning_sample_from_pov.unwrap_or_else(|| {
-                                log::error!("SAHYADRI: pruning_sample_from_pov is None");
-                                Default::default()
-                            }),
-                        );
-                        // Count the number of UTXO-processed chain blocks
-                        chain_block_counter += 1;
-                    }
-                }
-                Err(err) => panic!("unexpected error {err}"),
+            self.calculate_utxo_state(&mut ctx, &selected_parent_utxo_view, pov_daa_score);
+            let res = self.verify_expected_utxo_state(&mut ctx, &selected_parent_utxo_view, &header);
+
+            if let Err(rule_error) = res {
+                info!("Block {} is disqualified from virtual chain: {}", current, rule_error);
+                self.statuses_store.write().set(current, StatusDisqualifiedFromChain).unwrap();
+                chain_disqualified_counter += 1;
+            } else {
+                debug!("VIRTUAL PROCESSOR, UTXO validated for {current}");
+                diff_point = current;
+                self.commit_utxo_state(
+                    current,
+                    ctx.mergeset_acceptance_data,
+                    ctx.pruning_sample_from_pov.unwrap_or_else(|| {
+                        log::error!("SAHYADRI: pruning_sample_from_pov is None");
+                        Default::default()
+                    }),
+                );
+                chain_block_counter += 1;
             }
         }
-        // Report counters
+
         self.counters.chain_block_counts.fetch_add(chain_block_counter, Ordering::Relaxed);
         if chain_disqualified_counter > 0 {
             self.counters.chain_disqualified_counts.fetch_add(chain_disqualified_counter, Ordering::Relaxed);
@@ -582,12 +580,10 @@ impl VirtualStateProcessor {
     fn commit_utxo_state(
         &self,
         current: Hash,
-        mergeset_diff: UtxoDiff,
         acceptance_data: AcceptanceData,
         pruning_sample_from_pov: Hash,
     ) {
         let mut batch = WriteBatch::default();
-        self.utxo_diffs_store.insert_batch(&mut batch, current, Arc::new(mergeset_diff)).unwrap();
         self.acceptance_data_store.insert_batch(&mut batch, current, Arc::new(acceptance_data)).unwrap();
         // Note we call idempotent since this field can be populated during IBD with headers proof
         self.pruning_samples_store.insert_batch(&mut batch, current, pruning_sample_from_pov).idempotent().unwrap();
@@ -1874,8 +1870,7 @@ impl VirtualStateProcessor {
     /// Initializes UTXO state of genesis and points virtual at genesis.
     /// Note that pruning point-related stores are initialized by `init`
     pub fn process_genesis(self: &Arc<Self>) {
-        // Write the UTXO state of genesis
-        self.commit_utxo_state(self.genesis.hash, UtxoDiff::default(), AcceptanceData::default(), Default::default());
+        self.commit_utxo_state(self.genesis.hash, AcceptanceData::default(), Default::default());
 
         // Init the virtual selected chain store
         let mut batch = WriteBatch::default();
@@ -1939,17 +1934,6 @@ impl VirtualStateProcessor {
             pruning_meta_write.set_utxoset_position(&mut batch, new_pruning_point).unwrap();
             self.db.write(batch).unwrap();
             drop(pruning_meta_write);
-        }
-
-        {
-            // Copy the pruning-point UTXO set into virtual's UTXO set
-            let pruning_meta_read = self.pruning_meta_stores.read();
-            let _virtual_write = self.virtual_stores.write();
-
-            // virtual_write.utxo_set.clear().unwrap();
-            for _chunk in &pruning_meta_read.utxo_set.iterator().map(|iter_result| iter_result.unwrap()).chunks(1000) {
-                // virtual_write.utxo_set.write_from_iterator_without_cache(chunk).unwrap();
-            }
         }
 
         let virtual_read = self.virtual_stores.upgradable_read();
