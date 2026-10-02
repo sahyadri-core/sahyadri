@@ -71,6 +71,8 @@ message SahyadridRequest {
     GetRegistryUnitReturnAddressRequestMessage getRegistryUnitReturnAddressRequest = 1112;
     GetVirtualChainFromBlockV2RequestMessage getVirtualChainFromBlockV2Request = 1114;
     GetAccountProofRequestMessage getAccountProofRequest = 1116;
+    GetSyncWaveMetadataRequestMessage getSyncWaveMetadataRequest = 1118;
+    DownloadSyncWaveChunkRequestMessage downloadSyncWaveChunkRequest = 1119;
     SubmitDidCreateRequestMessage submitDidCreateRequest = 1300;
     SubmitDidUpdateRequestMessage submitDidUpdateRequest = 1301;
     SubmitDidDeactivateRequestMessage submitDidDeactivateRequest = 1302;
@@ -145,6 +147,8 @@ message SahyadridResponse {
     GetRegistryUnitReturnAddressResponseMessage getRegistryUnitReturnAddressResponse = 1113;
     GetVirtualChainFromBlockV2ResponseMessage getVirtualChainFromBlockV2Response = 1115;
     GetAccountProofResponseMessage getAccountProofResponse = 1117;
+    GetSyncWaveMetadataResponseMessage getSyncWaveMetadataResponse = 2000;
+    DownloadSyncWaveChunkResponseMessage downloadSyncWaveChunkResponse = 2001;
     SubmitDidCreateResponseMessage submitDidCreateResponse = 1303;
     SubmitDidUpdateResponseMessage submitDidUpdateResponse = 1304;
     SubmitDidDeactivateResponseMessage submitDidDeactivateResponse = 1305;

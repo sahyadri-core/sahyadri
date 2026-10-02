@@ -85,6 +85,8 @@ impl Factory {
                 GetRegistryUnitReturnAddress,
                 GetVirtualChainFromBlockV2,
                 GetAccountProof,
+                GetSyncWaveMetadata,
+                DownloadSyncWaveChunk,
                 NotifyBlockAdded,
                 NotifyNewBlockTemplate,
                 NotifyFinalityConflict,

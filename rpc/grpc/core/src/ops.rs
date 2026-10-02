@@ -96,6 +96,8 @@ pub enum SahyadridPayloadOps {
     GetRegistryUnitReturnAddress,
     GetVirtualChainFromBlockV2,
     GetAccountProof,
+    GetSyncWaveMetadata,
+    DownloadSyncWaveChunk,
 
     // Subscription commands for starting/stopping notifications
     NotifyBlockAdded,

@@ -10,6 +10,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+bincode = "1.3"
 sahyadri-addresses.workspace = true
 sahyadri-consensus-core.workspace = true
 sahyadri-consensus-notify.workspace = true

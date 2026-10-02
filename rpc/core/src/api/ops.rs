@@ -140,6 +140,8 @@ pub enum RpcApiOps {
     /// Get REGISTRY_UNIT Return Addresses
     GetRegistryUnitReturnAddress = 150,
     GetAccountProof = 151,
+    GetSyncWaveMetadata = 164,
+    DownloadSyncWaveChunk = 165,
     /// Get Virtual Chain from Block V2
     GetVirtualChainFromBlockV2 = 152,
     SubmitAccountTransaction,
@@ -150,6 +152,7 @@ pub enum RpcApiOps {
     ResolveDid,
     ResolveDidByAddress,
 
+    // ============================================================
     // ============================================================
     // DWN Relay — RAM-only encrypted envelope forwarding
     // ============================================================

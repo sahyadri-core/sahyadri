@@ -596,6 +596,26 @@ impl Consensus {
     }
 }
 
+impl Consensus {
+    pub fn export_sync_wave(
+        &self,
+        block_hash: Hash,
+    ) -> Result<
+        sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot,
+        sahyadri_consensus_core::model::sync_wave::SyncWaveError,
+    > {
+        use crate::model::sync_wave::SyncWaveExporter;
+
+        let exporter = SyncWaveExporter::new(
+            self.storage.smt_nodes_store.clone(),
+            self.storage.account_states_store.clone(),
+            self.storage.account_roots_store.clone(),
+            self.storage.headers_store.clone(),
+        );
+        exporter.export(block_hash)
+    }
+}
+
 impl ConsensusApi for Consensus {
     fn build_block_template(
         &self,

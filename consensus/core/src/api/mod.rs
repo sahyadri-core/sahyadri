@@ -92,6 +92,16 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+
+    /// Export a SyncWave snapshot at the given block.
+    /// Bulk state transfer primitive for fresh node bootstrap.
+    fn export_sync_wave(
+        &self,
+        _block_hash: Hash,
+    ) -> Result<crate::model::sync_wave::SyncWaveSnapshot, crate::model::sync_wave::SyncWaveError> {
+        unimplemented!()
+    }
+
     fn validate_and_insert_block(&self, _block: Block) -> BlockValidationFutures {
         unimplemented!()
     }

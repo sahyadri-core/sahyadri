@@ -12,7 +12,10 @@ use async_trait::async_trait;
 use downcast::{AnySync, downcast_sync};
 use sahyadri_notify::{listener::ListenerId, scope::Scope, subscription::Command};
 use std::sync::Arc;
-
+use crate::model::sync_wave::{
+    DownloadSyncWaveChunkRequest, DownloadSyncWaveChunkResponse,
+    GetSyncWaveMetadataRequest, RpcSyncWaveMetadata,
+};
 pub const MAX_SAFE_WINDOW_SIZE: u32 = 10_000;
 
 
@@ -42,6 +45,42 @@ pub trait RpcApi: Sync + Send + AnySync {
     ) -> RpcResult<GetAccountProofResponse> {
         self.get_account_proof_call(None, GetAccountProofRequest { address, block_hash }).await
     }
+
+    // ─── SyncWave: bulk state transfer for fast bootstrap ───
+
+    async fn get_sync_wave_metadata(
+        &self,
+        block_hash: Option<RpcHash>,
+    ) -> RpcResult<RpcSyncWaveMetadata> {
+        Ok(self
+            .get_sync_wave_metadata_call(None, GetSyncWaveMetadataRequest::new(block_hash))
+            .await?
+            .metadata)
+    }
+
+    async fn get_sync_wave_metadata_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: GetSyncWaveMetadataRequest,
+    ) -> RpcResult<GetSyncWaveMetadataResponse>;
+
+    async fn download_sync_wave_chunk(
+        &self,
+        block_hash: RpcHash,
+        chunk_index: u32,
+    ) -> RpcResult<DownloadSyncWaveChunkResponse> {
+        self.download_sync_wave_chunk_call(
+            None,
+            DownloadSyncWaveChunkRequest::new(block_hash, chunk_index),
+        )
+        .await
+    }
+
+    async fn download_sync_wave_chunk_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: DownloadSyncWaveChunkRequest,
+    ) -> RpcResult<DownloadSyncWaveChunkResponse>;
 
     async fn get_account_proof_call(
         &self,

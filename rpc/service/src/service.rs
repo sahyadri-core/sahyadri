@@ -77,7 +77,10 @@ use std::{
 use dashmap::DashMap;
 use tokio::join;
 use workflow_rpc::server::WebSocketCounters as WrpcServerCounters;
-
+use sahyadri_rpc_core::model::sync_wave::{
+    DownloadSyncWaveChunkRequest, DownloadSyncWaveChunkResponse,
+    GetSyncWaveMetadataRequest, RpcSyncWaveMetadata,
+};
 /// A service implementing the Rpc API at sahyadri_rpc_core level.
 ///
 /// Collects notifications from the consensus and forwards them to
@@ -118,6 +121,15 @@ pub struct RpcCoreService {
     fee_estimate_verbose_cache: ExpiringCache<sahyadri_mining::errors::MiningManagerResult<GetFeeEstimateExperimentalResponse>>,
     mining_rule_engine: Arc<MiningRuleEngine>,
     relay_state: Arc<RelayState>,
+    /// Caches the most recently exported SyncWave snapshot to avoid
+    /// re-walking the SMT for every chunk download. Evicted when a
+    /// different block_hash is requested.
+    sync_wave_cache: Arc<std::sync::RwLock<Option<SyncWaveCacheEntry>>>,
+}
+
+struct SyncWaveCacheEntry {
+    block_hash: sahyadri_hashes::Hash,
+    snapshot: Arc<sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot>,
 }
 
 const RPC_CORE: &str = "rpc-core";
@@ -201,6 +213,32 @@ impl RelayState {
 }
 
 impl RpcCoreService {
+    async fn get_or_export_sync_wave(
+        &self,
+        block_hash: sahyadri_hashes::Hash,
+    ) -> RpcResult<Arc<sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot>> {
+        // Fast path: cached for this block
+        {
+            let guard = self.sync_wave_cache.read().unwrap();
+            if let Some(entry) = guard.as_ref() {
+                if entry.block_hash == block_hash {
+                    return Ok(entry.snapshot.clone());
+                }
+            }
+        }
+
+        // Slow path: export
+        let session = self.consensus_manager.consensus().session().await;
+        let snapshot = session
+            .async_export_sync_wave(block_hash)
+            .await
+            .map_err(|e| RpcError::General(format!("sync_wave export failed: {e:?}")))?;
+
+        let snapshot = Arc::new(snapshot);
+        let mut guard = self.sync_wave_cache.write().unwrap();
+        *guard = Some(SyncWaveCacheEntry { block_hash, snapshot: snapshot.clone() });
+        Ok(snapshot)
+    }
     pub const IDENT: &'static str = "rpc-core-service";
 
     #[allow(clippy::too_many_arguments)]
@@ -278,6 +316,7 @@ impl RpcCoreService {
             fee_estimate_verbose_cache: ExpiringCache::new(Duration::from_millis(500), Duration::from_millis(1000)),
             mining_rule_engine,
             relay_state,
+            sync_wave_cache: Arc::new(std::sync::RwLock::new(None)),
         }
     }
 
@@ -837,6 +876,74 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             Vec::new()
         };
         Ok(GetBlocksResponse { block_hashes, blocks })
+    }
+
+    async fn get_sync_wave_metadata_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: GetSyncWaveMetadataRequest,
+    ) -> RpcResult<GetSyncWaveMetadataResponse> {
+        let block_hash = match request.block_hash {
+            Some(h) => h,
+            None => {
+                let session = self.consensus_manager.consensus().session().await;
+                let tips = session.async_get_tips().await;
+                *tips.first().ok_or_else(|| RpcError::General("no virtual tips available".into()))?
+            }
+        };
+
+        let snapshot = self.get_or_export_sync_wave(block_hash).await?;
+        let m = &snapshot.metadata;
+        Ok(GetSyncWaveMetadataResponse::new(RpcSyncWaveMetadata {
+            block_hash: m.block_hash,
+            block_height: m.block_height,
+            account_root: m.account_root,
+            total_smt_nodes: m.total_smt_nodes,
+            total_accounts: m.total_accounts,
+            chunk_size: m.chunk_size,
+            total_chunks: m.total_chunks,
+        }))
+    }
+
+    async fn download_sync_wave_chunk_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: DownloadSyncWaveChunkRequest,
+    ) -> RpcResult<DownloadSyncWaveChunkResponse> {
+        let snapshot = self.get_or_export_sync_wave(request.block_hash).await?;
+
+        let chunk_size = snapshot.metadata.chunk_size as usize;
+        let total_chunks = snapshot.metadata.total_chunks;
+
+        if request.chunk_index >= total_chunks {
+            return Err(RpcError::General(format!(
+                "chunk_index {} out of range (total_chunks = {})",
+                request.chunk_index, total_chunks
+            )));
+        }
+
+        // Concatenate (smt_nodes, account_states) and slice
+        let start = request.chunk_index as usize * chunk_size;
+        let end = (start + chunk_size).min(snapshot.smt_nodes.len() + snapshot.account_states.len());
+
+        // Take from smt_nodes first, then account_states
+        let n_smt = snapshot.smt_nodes.len();
+        let smt_start = start.min(n_smt);
+        let smt_end = end.min(n_smt);
+        let st_start = start.saturating_sub(n_smt);
+        let st_end = end.saturating_sub(n_smt);
+
+        let chunk = sahyadri_consensus_core::model::sync_wave::SyncWaveChunkWire {
+            chunk_index: request.chunk_index,
+            total_chunks,
+            smt_nodes: snapshot.smt_nodes[smt_start..smt_end].to_vec(),
+            account_states: snapshot.account_states[st_start..st_end].to_vec(),
+        };
+
+        let data = bincode::serialize(&chunk)
+            .map_err(|e| RpcError::General(format!("serialize chunk: {e}")))?;
+
+        Ok(DownloadSyncWaveChunkResponse::new(data, request.chunk_index, total_chunks))
     }
 
     async fn get_info_call(&self, _connection: Option<&DynRpcConnection>, _request: GetInfoRequest) -> RpcResult<GetInfoResponse> {
@@ -2035,6 +2142,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         self.notifier.clone().stop_notify(id, scope).await?;
         Ok(())
     }
+
 }
 
 // It might be necessary to opt this out in the context of wasm32

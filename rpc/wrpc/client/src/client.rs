@@ -659,6 +659,8 @@ impl RpcApi for SahyadriRpcClient {
             GetVirtualChainFromBlock,
             GetVirtualChainFromBlockV2,
             GetAccountProof,
+            GetSyncWaveMetadata,
+            DownloadSyncWaveChunk,
             ResolveFinalityConflict,
             Shutdown,
             SubmitBlock,

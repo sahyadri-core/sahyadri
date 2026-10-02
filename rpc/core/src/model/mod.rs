@@ -36,3 +36,5 @@ pub use tx::*;
 pub use verbosity::*;
 pub mod proof;
 pub use proof::*;
+pub mod sync_wave;
+pub use sync_wave::*;

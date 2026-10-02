@@ -1014,6 +1014,81 @@ try_from!(item: &protowire::GetAccountProofResponseMessage, RpcResult<sahyadri_r
             .try_into()?,
     }
 });
+
+// ─── SyncWave conversions ───
+
+from!(item: &sahyadri_rpc_core::GetSyncWaveMetadataRequest, protowire::GetSyncWaveMetadataRequestMessage, {
+    Self { block_hash: item.block_hash.map(|h| h.to_string()) }
+});
+try_from!(item: &protowire::GetSyncWaveMetadataRequestMessage, sahyadri_rpc_core::GetSyncWaveMetadataRequest, {
+    Self { block_hash: item.block_hash.as_ref().map(|h| RpcHash::from_str(h)).transpose()? }
+});
+
+from!(item: &sahyadri_rpc_core::RpcSyncWaveMetadata, protowire::RpcSyncWaveMetadata, {
+    Self {
+        block_hash: item.block_hash.to_string(),
+        block_height: item.block_height,
+        account_root: item.account_root.to_string(),
+        total_smt_nodes: item.total_smt_nodes,
+        total_accounts: item.total_accounts,
+        chunk_size: item.chunk_size,
+        total_chunks: item.total_chunks,
+    }
+});
+try_from!(item: &protowire::RpcSyncWaveMetadata, sahyadri_rpc_core::RpcSyncWaveMetadata, {
+    Self {
+        block_hash: RpcHash::from_str(&item.block_hash)?,
+        block_height: item.block_height,
+        account_root: RpcHash::from_str(&item.account_root)?,
+        total_smt_nodes: item.total_smt_nodes,
+        total_accounts: item.total_accounts,
+        chunk_size: item.chunk_size,
+        total_chunks: item.total_chunks,
+    }
+});
+
+from!(item: RpcResult<&sahyadri_rpc_core::GetSyncWaveMetadataResponse>, protowire::GetSyncWaveMetadataResponseMessage, {
+    Self {
+        metadata: Some((&item.metadata).into()),
+        error: None,
+    }
+});
+try_from!(item: &protowire::GetSyncWaveMetadataResponseMessage, RpcResult<sahyadri_rpc_core::GetSyncWaveMetadataResponse>, {
+    Self {
+        metadata: item.metadata.as_ref()
+            .ok_or(RpcError::MissingRpcFieldError("GetSyncWaveMetadataResponse".to_string(), "metadata".to_string()))?
+            .try_into()?,
+    }
+});
+
+from!(item: &sahyadri_rpc_core::DownloadSyncWaveChunkRequest, protowire::DownloadSyncWaveChunkRequestMessage, {
+    Self {
+        block_hash: item.block_hash.to_string(),
+        chunk_index: item.chunk_index,
+    }
+});
+try_from!(item: &protowire::DownloadSyncWaveChunkRequestMessage, sahyadri_rpc_core::DownloadSyncWaveChunkRequest, {
+    Self {
+        block_hash: RpcHash::from_str(&item.block_hash)?,
+        chunk_index: item.chunk_index,
+    }
+});
+
+from!(item: RpcResult<&sahyadri_rpc_core::DownloadSyncWaveChunkResponse>, protowire::DownloadSyncWaveChunkResponseMessage, {
+    Self {
+        data: item.data.clone(),
+        chunk_index: item.chunk_index,
+        total_chunks: item.total_chunks,
+        error: None,
+    }
+});
+try_from!(item: &protowire::DownloadSyncWaveChunkResponseMessage, RpcResult<sahyadri_rpc_core::DownloadSyncWaveChunkResponse>, {
+    Self {
+        data: item.data.clone(),
+        chunk_index: item.chunk_index,
+        total_chunks: item.total_chunks,
+    }
+});
 try_from!(item: &protowire::RpcAccountProof, sahyadri_rpc_core::RpcAccountProof, {
     Self {
         block_hash: item.block_hash.clone(),

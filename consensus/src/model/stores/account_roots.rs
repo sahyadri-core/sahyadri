@@ -48,6 +48,15 @@ impl DbAccountRootsStore {
         })
     }
 
+    /// SAHYADRI: synchronously persist a single account root.
+    ///
+    /// Used by the SyncWave loader to write the checkpoint root outside
+    /// of a batch, matching the pattern of `DbSmtNodeStore::insert_sync`.
+    pub fn insert_sync(&self, block_hash: Hash, root: H256) -> StoreResult<()> {
+        use sahyadri_database::prelude::DirectDbWriter;
+        self.access.write(DirectDbWriter::new(&self.db), block_hash, root.to_vec())
+    }
+
     /// SAHYADRI GC: batch-delete roots for blocks that were pruned.
     pub fn delete_many_sync(&self, block_hashes: &[Hash]) -> StoreResult<()> {
         if block_hashes.is_empty() {

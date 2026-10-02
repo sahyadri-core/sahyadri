@@ -229,6 +229,11 @@ impl GrpcClient {
     }
 }
 
+use sahyadri_rpc_core::{
+    DownloadSyncWaveChunkRequest, DownloadSyncWaveChunkResponse,
+    GetSyncWaveMetadataRequest, GetSyncWaveMetadataResponse,
+};
+
 #[async_trait]
 impl RpcApi for GrpcClient {
     // this example illustrates the body of the function created by the route!() macro
@@ -282,6 +287,8 @@ impl RpcApi for GrpcClient {
     route!(get_registry_unit_return_address_call, GetRegistryUnitReturnAddress);
     route!(get_virtual_chain_from_block_v2_call, GetVirtualChainFromBlockV2);
     route!(get_account_proof_call, GetAccountProof);
+    route!(get_sync_wave_metadata_call, GetSyncWaveMetadata);
+    route!(download_sync_wave_chunk_call, DownloadSyncWaveChunk);
 
     /// Register a new listener and returns an id identifying it.
     fn register_new_listener(&self, connection: ChannelConnection) -> ListenerId {

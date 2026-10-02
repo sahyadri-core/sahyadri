@@ -313,6 +313,18 @@ impl ConsensusSessionOwned {
             .await
     }
 
+    pub async fn async_export_sync_wave(
+        &self,
+        block_hash: Hash,
+    ) -> Result<
+        sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot,
+        sahyadri_consensus_core::model::sync_wave::SyncWaveError,
+    > {
+        self.clone()
+            .spawn_blocking(move |c| c.export_sync_wave(block_hash))
+            .await
+    }
+
     pub async fn async_get_tips_len(&self) -> usize {
         self.clone().spawn_blocking(|c| c.get_tips_len()).await
     }
