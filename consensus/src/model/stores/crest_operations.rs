@@ -704,7 +704,7 @@ mod tests {
                 .values()
                 .find(|d| d.csm_address == address)
                 .cloned()
-                .map(Some)
+                .map(|d| Ok(Some(d)))
                 .unwrap_or(Ok(None))
         }
         
@@ -735,7 +735,7 @@ mod tests {
         }
         
         fn deactivate_batch(&self, _batch: &mut WriteBatch, did: &str) -> Result<(), sahyadri_database::prelude::StoreError> {
-            if let Some(mut doc) = self.docs.borrow_mut().get_mut(did) {
+            if let Some(doc) = self.docs.borrow_mut().get_mut(did) {
                 doc.active = false;
             }
             Ok(())

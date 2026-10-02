@@ -375,9 +375,10 @@ impl VirtualStateProcessor {
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
     use super::*;
+    use itertools::Itertools;
+    use rayon::prelude::*;
+    use smallvec::smallvec;
 
     #[test]
     fn test_rayon_reduce_retains_order() {

@@ -260,6 +260,10 @@ mod tests {
             unimplemented!()
         }
 
+        fn iter_block_hashes(&self) -> Box<dyn Iterator<Item = sahyadri_hashes::Hash> + '_> {
+            Box::new(std::iter::empty())
+        }
+
         fn get_header_with_block_level(&self, hash: sahyadri_hashes::Hash) -> Result<HeaderWithBlockLevel, StoreError> {
             Ok(self.map.read().get(&hash).unwrap().clone())
         }

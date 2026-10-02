@@ -25,7 +25,6 @@ use crate::model::stores::account_store::{AccountState, FlashEntry};
 use crate::pipeline::virtual_processor::flash_tx::{flash_pubkey_to_spk, hash20_to_p2pkh_spk};
 
 
-use crate::model::stores::smt_nodes::DbSmtNodeStoreBase;
 use sahyadri_consensus_core::model::proof::{
     AccountProof, AccountProofFlashEntry, AccountProofPayload, AccountProofState,
     AccountProofTerminal,
@@ -251,8 +250,8 @@ pub fn extract_block_effects(
 // ═══════════════════════════════════════════════════════════════
 
 /// Generate a proof of account membership / absence against `root`.
-pub fn prove_account(
-    smt_store: &DbSmtNodeStoreBase,
+pub fn prove_account<S: NodeStore>(
+    smt_store: &S,
     account_states_store: &dyn AccountStatesStoreReader,
     root: H256,
     spk: &ScriptPublicKey,
@@ -272,28 +271,38 @@ pub fn prove_account(
         }
     };
 
-    // 3. Resolve account state via leaf value
+    // 3. Resolve account state via leaf value.
+    //
+    // Two exclusion cases exist:
+    //   (a) Empty terminal — path ends in an empty subtree.
+    //   (b) Divergent leaf — path ends at a leaf whose key differs from
+    //       the queried key. In that case the queried account is absent
+    //       and we MUST NOT return the divergent account's state.
     let (state, state_hash) = match &terminal {
         AccountProofTerminal::Empty => (None, [0u8; 32]),
-        AccountProofTerminal::Leaf { value, .. } => {
-            // `value` is the content-hash of the AccountState.
-            // Fetch the AccountState from the state store keyed by that hash.
-            match account_states_store.get(Hash::from_bytes(*value)) {
-                Ok(s) => (
-                    Some(AccountProofState {
-                        balance: s.balance,
-                        recent_flashes: s
-                            .recent_flashes
-                            .iter()
-                            .map(|f| AccountProofFlashEntry {
-                                flash_id: f.flash_id,
-                                expiry_daa_score: f.expiry_daa_score,
-                            })
-                            .collect(),
-                    }),
-                    *value,
-                ),
-                Err(_) => (None, *value),
+        AccountProofTerminal::Leaf { key: leaf_key, value } => {
+            if *leaf_key != key {
+                // Divergent leaf — queried account is absent.
+                (None, [0u8; 32])
+            } else {
+                // Inclusion — fetch the AccountState keyed by its content hash.
+                match account_states_store.get(Hash::from_bytes(*value)) {
+                    Ok(s) => (
+                        Some(AccountProofState {
+                            balance: s.balance,
+                            recent_flashes: s
+                                .recent_flashes
+                                .iter()
+                                .map(|f| AccountProofFlashEntry {
+                                    flash_id: f.flash_id,
+                                    expiry_daa_score: f.expiry_daa_score,
+                                })
+                                .collect(),
+                        }),
+                        *value,
+                    ),
+                    Err(_) => (None, *value),
+                }
             }
         }
     };
@@ -306,4 +315,135 @@ pub fn prove_account(
         state,
         state_hash,
     })
+}
+
+
+#[cfg(test)]
+mod proof_generation_tests {
+    use super::*;
+    use sahyadri_smt::{MemStore, EMPTY as SMT_EMPTY};
+    use std::collections::HashMap;
+
+    /// In-memory mock of `AccountStatesStoreReader` for tests.
+    struct MockStatesStore(HashMap<Hash, AccountState>);
+
+    impl AccountStatesStoreReader for MockStatesStore {
+        fn get(&self, state_hash: Hash) -> Result<AccountState, StoreError> {
+            self.0
+                .get(&state_hash)
+                .cloned()
+                .ok_or_else(|| StoreError::DataInconsistency(format!("state not found: {state_hash}")))
+        }
+    }
+
+    fn test_spk(seed: u8) -> ScriptPublicKey {
+        ScriptPublicKey::from_vec(0, vec![seed; 20])
+    }
+
+    fn test_state(balance: u64) -> AccountState {
+        AccountState { balance, recent_flashes: vec![] }
+    }
+
+    /// Insert an account into a fresh SMT, return (store, root, state_hash, state_store).
+    fn setup_one_account(
+        spk: &ScriptPublicKey,
+        balance: u64,
+    ) -> (MemStore, H256, Hash, MockStatesStore) {
+        let mut smt = MemStore::default();
+        let key = account_key_hash(spk);
+        let state = test_state(balance);
+        let state_hash = state.content_hash();
+        let value: [u8; 32] = state_hash.as_bytes().try_into().unwrap();
+        let root = sahyadri_smt::update(&mut smt, SMT_EMPTY, &key, Some(value)).unwrap();
+
+        let mut states = HashMap::new();
+        states.insert(state_hash, state);
+        (smt, root, state_hash, MockStatesStore(states))
+    }
+
+    fn to_smt_proof(p: &AccountProofPayload) -> sahyadri_smt::Proof {
+        sahyadri_smt::Proof {
+            siblings: p.siblings.clone(),
+            terminal: match &p.terminal {
+                AccountProofTerminal::Empty => sahyadri_smt::Terminal::Empty,
+                AccountProofTerminal::Leaf { key, value } => {
+                    sahyadri_smt::Terminal::Leaf { key: *key, value: *value }
+                }
+            },
+        }
+    }
+
+    #[test]
+    fn test_prove_account_inclusion() {
+        let spk = test_spk(1);
+        let (smt, root, state_hash, states) = setup_one_account(&spk, 1_000);
+
+        let proof = prove_account(&smt, &states, root, &spk).expect("proof generation failed");
+
+        // Leaf terminal expected
+        assert!(matches!(proof.proof.terminal, AccountProofTerminal::Leaf { .. }));
+        assert_eq!(proof.account_root, Hash::from_bytes(root));
+        assert_eq!(proof.key, account_key_hash(&spk));
+        let expected_value: [u8; 32] = state_hash.as_bytes().try_into().unwrap();
+        assert_eq!(proof.state_hash, expected_value);
+
+        // Resolved state
+        let s = proof.state.as_ref().expect("state should be Some");
+        assert_eq!(s.balance, 1_000);
+        assert!(s.recent_flashes.is_empty());
+
+        // Cryptographic verification
+        let value: [u8; 32] = state_hash.as_bytes().try_into().unwrap();
+        let smt_proof = to_smt_proof(&proof.proof);
+        assert!(
+            sahyadri_smt::verify_inclusion(&root, &proof.key, &value, &smt_proof),
+            "inclusion proof must verify against root"
+        );
+    }
+
+    #[test]
+    fn test_prove_account_exclusion() {
+        // Tree has account #1, we query #2
+        let existing = test_spk(1);
+        let (smt, root, _, states) = setup_one_account(&existing, 500);
+
+        let absent = test_spk(2);
+        let proof = prove_account(&smt, &states, root, &absent).expect("proof generation failed");
+
+        // Absence shape: either an empty terminal OR a divergent leaf
+        // (a leaf whose key differs from the queried key).
+        match &proof.proof.terminal {
+            AccountProofTerminal::Empty => {}
+            AccountProofTerminal::Leaf { key, .. } => {
+                assert_ne!(*key, proof.key, "divergent leaf must not carry the queried key");
+            }
+        }
+
+        // Either way, the queried account is absent.
+        assert!(proof.state.is_none(), "exclusion proof must not yield a state");
+        assert_eq!(proof.state_hash, [0u8; 32]);
+
+        // Cryptographic verification (handles both exclusion cases).
+        let smt_proof = to_smt_proof(&proof.proof);
+        assert!(
+            sahyadri_smt::verify_exclusion(&root, &proof.key, &smt_proof),
+            "exclusion proof must verify against root"
+        );
+    }
+
+    #[test]
+    fn test_prove_account_against_empty_tree() {
+        let smt = MemStore::default();
+        let root = SMT_EMPTY;
+        let states = MockStatesStore(HashMap::new());
+
+        let spk = test_spk(3);
+        let proof = prove_account(&smt, &states, root, &spk).expect("proof generation failed");
+
+        assert!(matches!(proof.proof.terminal, AccountProofTerminal::Empty));
+        assert!(proof.state.is_none());
+
+        let smt_proof = to_smt_proof(&proof.proof);
+        assert!(sahyadri_smt::verify_exclusion(&root, &proof.key, &smt_proof));
+    }
 }

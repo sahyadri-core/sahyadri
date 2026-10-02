@@ -171,15 +171,12 @@ mod tests {
     use crate::model::stores::account_roots::DbAccountRootsStore;
     use crate::model::stores::headers::DbHeadersStore;
     use crate::model::stores::smt_nodes::DbSmtNodeStore;
-    use crate::model::stores::account_store::AccountState;
-    use sahyadri_database::prelude::ConnBuilder;
     use sahyadri_database::prelude::CachePolicy;
-    use sahyadri_smt::{update_many, EMPTY};
 
     #[test]
     fn test_gc_empty_stores() {
         // Sanity: empty stores → no-op
-        let (db, lifetime) = test_db();
+        let (lifetime, db) = test_db();
         let smt = DbSmtNodeStore::new(db.clone(), 100);
         let states = DbAccountStatesStore::new(db.clone(), 100);
         let roots = DbAccountRootsStore::new(db.clone(), 100);
@@ -189,6 +186,10 @@ mod tests {
         assert_eq!(stats.deleted_states, 0);
         assert_eq!(stats.deleted_roots, 0);
         drop(lifetime);
+    }
+
+    fn test_db() -> (impl Drop, std::sync::Arc<sahyadri_database::prelude::DB>) {
+        sahyadri_database::create_temp_db!(sahyadri_database::prelude::ConnBuilder::default().with_files_limit(10))
     }
 
     // Helpers below — actual assertions on the algorithm
