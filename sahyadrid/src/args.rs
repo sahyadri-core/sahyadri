@@ -93,6 +93,11 @@ pub struct Args {
     pub disable_grpc: bool,
     pub ram_scale: f64,
     pub retention_period_days: Option<f64>,
+    /// Fast bootstrap: connect to a peer's gRPC URL and load a verified
+    /// SyncWave. Format: `grpc://host:port`. If unset, no SyncWave is used.
+    pub sync_wave: Option<String>,
+    /// Optional checkpoint hash for SyncWave. If unset, uses the peer's tip.
+    pub sync_wave_checkpoint: Option<String>,
 
     pub override_params_file: Option<String>,
 
@@ -151,6 +156,8 @@ impl Default for Args {
             disable_grpc: false,
             ram_scale: 1.0,
             retention_period_days: None,
+            sync_wave: None,
+            sync_wave_checkpoint: None,
             override_params_file: None,
             rocksdb_preset: None,
             rocksdb_wal_dir: None,
@@ -450,6 +457,18 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
 
     #[cfg(feature = "devnet-prealloc")]
     let cmd = cmd
+        .arg(
+            Arg::new("sync-wave")
+                .long("sync-wave")
+                .value_name("PEER_URL")
+                .help("Fast bootstrap from a peer's SyncWave. Format: grpc://host:port"),
+        )
+        .arg(
+            Arg::new("sync-wave-checkpoint")
+                .long("sync-wave-checkpoint")
+                .value_name("CHECKPOINT_HASH")
+                .help("Optional checkpoint hash for SyncWave bootstrap"),
+        )
         .arg(Arg::new("num-prealloc-registry_units").long("num-prealloc-registry_units").require_equals(true).value_parser(clap::value_parser!(u64)))
         .arg(Arg::new("prealloc-address").long("prealloc-address").require_equals(true).value_parser(clap::value_parser!(String)))
         .arg(Arg::new("prealloc-amount").long("prealloc-amount").require_equals(true).value_parser(clap::value_parser!(u64)));
@@ -527,6 +546,8 @@ impl Args {
             disable_grpc: arg_match_unwrap_or::<bool>(&m, "nogrpc", defaults.disable_grpc),
             ram_scale: arg_match_unwrap_or::<f64>(&m, "ram-scale", defaults.ram_scale),
             retention_period_days: m.get_one::<f64>("retention-period-days").cloned().or(defaults.retention_period_days),
+            sync_wave: m.get_one::<String>("sync-wave").cloned(),
+            sync_wave_checkpoint: m.get_one::<String>("sync-wave-checkpoint").cloned(),
 
             #[cfg(feature = "devnet-prealloc")]
             num_prealloc_registry_units: m.get_one::<u64>("num-prealloc-registry_units").cloned(),

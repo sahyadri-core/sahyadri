@@ -15,6 +15,7 @@ use sahyadri_database::{
     registry::DatabaseStorePrefixes,
 };
 use sahyadri_grpc_server::service::GrpcService;
+use sahyadri_hashes::Hash;
 use sahyadri_notify::{address::tracker::Tracker, subscription::context::SubscriptionContext};
 use sahyadri_p2p_lib::Hub;
 use sahyadri_p2p_mining::rule_engine::MiningRuleEngine;
@@ -726,9 +727,42 @@ Do you confirm? (y/n)";
     })
     .for_each(|server| async_runtime.register(server));
 
+    // ─── SyncWave fast bootstrap (opt-in) ───
+    // Runs synchronously before the node starts serving. On error, logs and panics
+    // — an operator who opted in expects a working bootstrap.
+    if let Some(peer_url) = args.sync_wave.clone() {
+        info!("SyncWave: bootstrapping from {}", peer_url);
+
+        let checkpoint = match args.sync_wave_checkpoint.as_deref() {
+            Some(h) => match h.parse::<Hash>() {
+                Ok(h) => Some(h),
+                Err(e) => {
+                    panic!("SyncWave: invalid checkpoint hash '{}': {}", h, e);
+                }
+            },
+            None => None,
+        };
+
+        let session = consensus_manager.consensus().unguarded_session_blocking();
+
+        let config = crate::sync_wave_bootstrap::SyncWaveBootstrapConfig {
+            peer_url,
+            checkpoint_hash: checkpoint,
+            timeout_secs: 120,
+        };
+
+        let result = futures::executor::block_on(
+            crate::sync_wave_bootstrap::bootstrap_from_peer(config, &*session)
+        );
+
+        match result {
+            Ok(_) => info!("SyncWave: bootstrap complete"),
+            Err(e) => panic!("SyncWave: bootstrap failed: {}", e),
+        }
+    }
+
     // Consensus must start first in order to init genesis in stores
     core.bind(consensus_manager);
     core.bind(async_runtime);
-
     (core, rpc_core_service)
 }

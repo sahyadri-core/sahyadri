@@ -614,6 +614,24 @@ impl Consensus {
         );
         exporter.export(block_hash)
     }
+
+    /// Load a SyncWave snapshot into local stores.
+    ///
+    /// Assumes the caller has already verified the snapshot
+    /// (`SyncWaveExporter::verify`). Idempotent content-addressed writes.
+    pub fn load_sync_wave(
+        &self,
+        snapshot: &sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot,
+    ) -> Result<(), sahyadri_consensus_core::model::sync_wave::SyncWaveError> {
+        use crate::model::sync_wave::SyncWaveExporter;
+        let exporter = SyncWaveExporter::new(
+            self.storage.smt_nodes_store.clone(),
+            self.storage.account_states_store.clone(),
+            self.storage.account_roots_store.clone(),
+            self.storage.headers_store.clone(),
+        );
+        exporter.load(snapshot)
+    }
 }
 
 impl ConsensusApi for Consensus {
@@ -690,6 +708,15 @@ impl ConsensusApi for Consensus {
             }
         })
     }
+
+
+    fn load_sync_wave(
+        &self,
+        snapshot: &sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot,
+    ) -> Result<(), sahyadri_consensus_core::model::sync_wave::SyncWaveError> {
+        Consensus::load_sync_wave(self, snapshot)
+    }
+
     fn validate_and_insert_block(&self, block: Block) -> BlockValidationFutures {
         let (block_task, virtual_state_task) = self.validate_and_insert_block_impl(BlockTask::Ordinary { block });
         BlockValidationFutures { block_task: Box::pin(block_task), virtual_state_task: Box::pin(virtual_state_task) }

@@ -5708,10 +5708,12 @@ name = "sahyadrid"
 version = "1.1.0"
 dependencies = [
  "async-channel 2.3.1",
+ "bincode",
  "cfg-if 1.0.0",
  "clap 4.5.51",
  "dhat",
  "dirs",
+ "futures",
  "futures-util",
  "itertools 0.13.0",
  "log",
@@ -5728,6 +5730,7 @@ dependencies = [
  "sahyadri-consensusmanager",
  "sahyadri-core",
  "sahyadri-database",
+ "sahyadri-grpc-client",
  "sahyadri-grpc-server",
  "sahyadri-hashes",
  "sahyadri-mining",

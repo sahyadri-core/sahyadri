@@ -102,6 +102,16 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+    /// Load a SyncWave into local stores.
+    ///
+    /// Assumes the caller already verified it. Idempotent.
+    fn load_sync_wave(
+        &self,
+        _snapshot: &crate::model::sync_wave::SyncWaveSnapshot,
+    ) -> Result<(), crate::model::sync_wave::SyncWaveError> {
+        unimplemented!()
+    }
+
     fn validate_and_insert_block(&self, _block: Block) -> BlockValidationFutures {
         unimplemented!()
     }
