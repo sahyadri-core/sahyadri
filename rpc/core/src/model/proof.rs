@@ -1,7 +1,14 @@
+//! RPC-side account proof types.
+//!
+//! Mirrors `sahyadri_consensus_core::model::proof::AccountProof` but
+//! hex-encodes every byte field for JSON-RPC friendliness and derives
+//! both Borsh (compact wire) and serde (JSON-RPC).
+
+use borsh::{BorshDeserialize, BorshSerialize};
 use sahyadri_consensus_core::model::proof::AccountProof;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcAccountProof {
     pub block_hash: String,
@@ -12,28 +19,28 @@ pub struct RpcAccountProof {
     pub state_hash: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcAccountProofPayload {
     pub siblings: Vec<String>,
     pub terminal: RpcAccountProofTerminal,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum RpcAccountProofTerminal {
     Empty,
     Leaf { key: String, value: String },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcAccountProofState {
     pub balance: u64,
     pub recent_flashes: Vec<RpcAccountProofFlashEntry>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcAccountProofFlashEntry {
     pub flash_id: String,
@@ -60,10 +67,14 @@ impl From<AccountProof> for RpcAccountProof {
             },
             state: p.state.map(|s| RpcAccountProofState {
                 balance: s.balance,
-                recent_flashes: s.recent_flashes.into_iter().map(|f| RpcAccountProofFlashEntry {
-                    flash_id: f.flash_id.to_string(),
-                    expiry_daa_score: f.expiry_daa_score,
-                }).collect(),
+                recent_flashes: s
+                    .recent_flashes
+                    .into_iter()
+                    .map(|f| RpcAccountProofFlashEntry {
+                        flash_id: f.flash_id.to_string(),
+                        expiry_daa_score: f.expiry_daa_score,
+                    })
+                    .collect(),
             }),
             state_hash: hex(&p.state_hash),
         }

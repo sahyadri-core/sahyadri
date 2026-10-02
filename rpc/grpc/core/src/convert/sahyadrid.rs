@@ -71,6 +71,7 @@ pub mod sahyadrid_request_convert {
     impl_into_sahyadrid_request!(GetCurrentBlockColor);
     impl_into_sahyadrid_request!(GetRegistryUnitReturnAddress);
     impl_into_sahyadrid_request!(GetVirtualChainFromBlockV2);
+    impl_into_sahyadrid_request!(GetAccountProof);
 
     impl_into_sahyadrid_request!(NotifyBlockAdded);
     impl_into_sahyadrid_request!(NotifyNewBlockTemplate);
@@ -216,6 +217,7 @@ pub mod sahyadrid_response_convert {
     impl_into_sahyadrid_response!(GetCurrentBlockColor);
     impl_into_sahyadrid_response!(GetRegistryUnitReturnAddress);
     impl_into_sahyadrid_response!(GetVirtualChainFromBlockV2);
+    impl_into_sahyadrid_response!(GetAccountProof);
 
     impl_into_sahyadrid_notify_response!(NotifyBlockAdded);
     impl_into_sahyadrid_notify_response!(NotifyNewBlockTemplate);

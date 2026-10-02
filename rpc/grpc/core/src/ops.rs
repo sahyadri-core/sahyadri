@@ -95,6 +95,7 @@ pub enum SahyadridPayloadOps {
     GetCurrentBlockColor,
     GetRegistryUnitReturnAddress,
     GetVirtualChainFromBlockV2,
+    GetAccountProof,
 
     // Subscription commands for starting/stopping notifications
     NotifyBlockAdded,

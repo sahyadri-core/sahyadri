@@ -70,6 +70,7 @@ message SahyadridRequest {
     GetCurrentBlockColorRequestMessage getCurrentBlockColorRequest = 1110;
     GetRegistryUnitReturnAddressRequestMessage getRegistryUnitReturnAddressRequest = 1112;
     GetVirtualChainFromBlockV2RequestMessage getVirtualChainFromBlockV2Request = 1114;
+    GetAccountProofRequestMessage getAccountProofRequest = 1116;
     SubmitDidCreateRequestMessage submitDidCreateRequest = 1300;
     SubmitDidUpdateRequestMessage submitDidUpdateRequest = 1301;
     SubmitDidDeactivateRequestMessage submitDidDeactivateRequest = 1302;
@@ -143,6 +144,7 @@ message SahyadridResponse {
     GetCurrentBlockColorResponseMessage getCurrentBlockColorResponse = 1111;
     GetRegistryUnitReturnAddressResponseMessage getRegistryUnitReturnAddressResponse = 1113;
     GetVirtualChainFromBlockV2ResponseMessage getVirtualChainFromBlockV2Response = 1115;
+    GetAccountProofResponseMessage getAccountProofResponse = 1117;
     SubmitDidCreateResponseMessage submitDidCreateResponse = 1303;
     SubmitDidUpdateResponseMessage submitDidUpdateResponse = 1304;
     SubmitDidDeactivateResponseMessage submitDidDeactivateResponse = 1305;

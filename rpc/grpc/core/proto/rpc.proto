@@ -563,6 +563,51 @@ message GetRegistryByAddressesResponseMessage {
   RPCError error = 1000;
 }
 
+
+// ─── GetAccountProof — light client state proof (Phase 9.3) ───
+
+message GetAccountProofRequestMessage {
+  string address = 1;
+  optional string blockHash = 2;
+}
+
+message GetAccountProofResponseMessage {
+  RpcAccountProof proof = 1;
+
+  RPCError error = 1000;
+}
+
+message RpcAccountProof {
+  string blockHash = 1;
+  string accountRoot = 2;
+  string key = 3;
+  RpcAccountProofPayload proof = 4;
+  optional RpcAccountProofState state = 5;
+  string stateHash = 6;
+}
+
+message RpcAccountProofPayload {
+  repeated string siblings = 1;
+  RpcAccountProofTerminal terminal = 2;
+}
+
+message RpcAccountProofTerminal {
+  // kind = "Empty" or "Leaf"
+  string kind = 1;
+  optional string key = 2;
+  optional string value = 3;
+}
+
+message RpcAccountProofState {
+  uint64 balance = 1;
+  repeated RpcAccountProofFlashEntry recentFlashes = 2;
+}
+
+message RpcAccountProofFlashEntry {
+  string flashId = 1;
+  uint64 expiryDaaScore = 2;
+}
+
 // GetBalanceByAddressRequest returns the total balance in unspent transactions towards a given address
 //
 // This call is only available when this sahyadrid was started with `--registryindex`

@@ -382,6 +382,57 @@ from!(item: RpcResult<&sahyadri_rpc_core::GetHeadersResponse>, protowire::GetHea
 from!(item: &sahyadri_rpc_core::GetRegistryByAddressesRequest, protowire::GetRegistryByAddressesRequestMessage, {
     Self { addresses: item.addresses.iter().map(|x| x.into()).collect() }
 });
+
+from!(item: &sahyadri_rpc_core::GetAccountProofRequest, protowire::GetAccountProofRequestMessage, {
+    Self {
+        address: item.address.to_string(),
+        block_hash: item.block_hash.map(|h| h.to_string()),
+    }
+});
+from!(item: RpcResult<&sahyadri_rpc_core::GetAccountProofResponse>, protowire::GetAccountProofResponseMessage, {
+    Self {
+        proof: Some((&item.proof).into()),
+        error: None,
+    }
+});
+from!(item: &sahyadri_rpc_core::RpcAccountProof, protowire::RpcAccountProof, {
+    Self {
+        block_hash: item.block_hash.clone(),
+        account_root: item.account_root.clone(),
+        key: item.key.clone(),
+        proof: Some((&item.proof).into()),
+        state: item.state.as_ref().map(|s| s.into()),
+        state_hash: item.state_hash.clone(),
+    }
+});
+from!(item: &sahyadri_rpc_core::RpcAccountProofPayload, protowire::RpcAccountProofPayload, {
+    Self {
+        siblings: item.siblings.clone(),
+        terminal: Some((&item.terminal).into()),
+    }
+});
+from!(item: &sahyadri_rpc_core::RpcAccountProofTerminal, protowire::RpcAccountProofTerminal, {
+    match item {
+        sahyadri_rpc_core::RpcAccountProofTerminal::Empty => Self {
+            kind: "Empty".to_string(), key: None, value: None,
+        },
+        sahyadri_rpc_core::RpcAccountProofTerminal::Leaf { key, value } => Self {
+            kind: "Leaf".to_string(), key: Some(key.clone()), value: Some(value.clone()),
+        },
+    }
+});
+from!(item: &sahyadri_rpc_core::RpcAccountProofState, protowire::RpcAccountProofState, {
+    Self {
+        balance: item.balance,
+        recent_flashes: item.recent_flashes.iter().map(|f| f.into()).collect(),
+    }
+});
+from!(item: &sahyadri_rpc_core::RpcAccountProofFlashEntry, protowire::RpcAccountProofFlashEntry, {
+    Self {
+        flash_id: item.flash_id.clone(),
+        expiry_daa_score: item.expiry_daa_score,
+    }
+});
 from!(item: RpcResult<&sahyadri_rpc_core::GetRegistryByAddressesResponse>, protowire::GetRegistryByAddressesResponseMessage, {
     debug!("GRPC, Creating GetRegistryByAddresses message with {} entries", item.entries.len());
     Self { entries: item.entries.iter().map(|x| x.into()).collect(), error: None }
@@ -949,6 +1000,64 @@ try_from!(item: &protowire::GetRegistryByAddressesResponseMessage, RpcResult<sah
     Self { entries: item.entries.iter().map(|x| x.try_into()).collect::<Result<Vec<_>, _>>()? }
 });
 
+try_from!(item: &protowire::GetAccountProofRequestMessage, sahyadri_rpc_core::GetAccountProofRequest, {
+    Self {
+        address: item.address.as_str().try_into()?,
+        block_hash: item.block_hash.as_ref().map(|h| RpcHash::from_str(h)).transpose()?,
+    }
+});
+
+try_from!(item: &protowire::GetAccountProofResponseMessage, RpcResult<sahyadri_rpc_core::GetAccountProofResponse>, {
+    Self {
+        proof: item.proof.as_ref()
+            .ok_or(RpcError::MissingRpcFieldError("GetAccountProofResponse".to_string(), "proof".to_string()))?
+            .try_into()?,
+    }
+});
+try_from!(item: &protowire::RpcAccountProof, sahyadri_rpc_core::RpcAccountProof, {
+    Self {
+        block_hash: item.block_hash.clone(),
+        account_root: item.account_root.clone(),
+        key: item.key.clone(),
+        proof: item.proof.as_ref()
+            .ok_or(RpcError::MissingRpcFieldError("RpcAccountProof".to_string(), "proof".to_string()))?
+            .try_into()?,
+        state: item.state.as_ref().map(|s| s.try_into()).transpose()?,
+        state_hash: item.state_hash.clone(),
+    }
+});
+try_from!(item: &protowire::RpcAccountProofPayload, sahyadri_rpc_core::RpcAccountProofPayload, {
+    Self {
+        siblings: item.siblings.clone(),
+        terminal: item.terminal.as_ref()
+            .ok_or(RpcError::MissingRpcFieldError("RpcAccountProofPayload".to_string(), "terminal".to_string()))?
+            .try_into()?,
+    }
+});
+try_from!(item: &protowire::RpcAccountProofTerminal, sahyadri_rpc_core::RpcAccountProofTerminal, {
+    match item.kind.as_str() {
+        "Empty" => sahyadri_rpc_core::RpcAccountProofTerminal::Empty,
+        "Leaf" => sahyadri_rpc_core::RpcAccountProofTerminal::Leaf {
+            key: item.key.clone()
+                .ok_or(RpcError::MissingRpcFieldError("RpcAccountProofTerminal".to_string(), "key".to_string()))?,
+            value: item.value.clone()
+                .ok_or(RpcError::MissingRpcFieldError("RpcAccountProofTerminal".to_string(), "value".to_string()))?,
+        },
+        other => return Err(RpcError::General(format!("unknown terminal kind: {other}"))),
+    }
+});
+try_from!(item: &protowire::RpcAccountProofState, sahyadri_rpc_core::RpcAccountProofState, {
+    Self {
+        balance: item.balance,
+        recent_flashes: item.recent_flashes.iter().map(|f| f.try_into()).collect::<Result<Vec<_>, _>>()?,
+    }
+});
+try_from!(item: &protowire::RpcAccountProofFlashEntry, sahyadri_rpc_core::RpcAccountProofFlashEntry, {
+    Self {
+        flash_id: item.flash_id.clone(),
+        expiry_daa_score: item.expiry_daa_score,
+    }
+});
 try_from!(item: &protowire::GetBalanceByAddressRequestMessage, sahyadri_rpc_core::GetBalanceByAddressRequest, {
     Self { address: item.address.as_str().try_into()? }
 });

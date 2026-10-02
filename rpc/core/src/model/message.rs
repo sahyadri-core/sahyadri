@@ -1506,6 +1506,34 @@ pub struct GetAccountProofRequest {
     pub block_hash: Option<RpcHash>,
 }
 
+
+/// Response wrapper for `get_account_proof`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetAccountProofResponse {
+    pub proof: RpcAccountProof,
+}
+
+impl GetAccountProofResponse {
+    pub fn new(proof: RpcAccountProof) -> Self {
+        Self { proof }
+    }
+}
+
+impl Serializer for GetAccountProofResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(RpcAccountProof, &self.proof, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetAccountProofResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let proof = load!(RpcAccountProof, reader)?;
+        Ok(Self { proof })
+    }
+}
+
 impl GetAccountProofRequest {
     pub fn new(address: RpcAddress, block_hash: Option<RpcHash>) -> Self {
         Self { address, block_hash }
@@ -1543,7 +1571,8 @@ impl Serializer for GetRegistryByAddressesRequest {
     }
 }
 
-impl Deserializer for GetRegistryByAddressesRequest {
+impl Deserializer for 
+GetRegistryByAddressesRequest {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u16, reader)?;
         let addresses = load!(Vec<RpcAddress>, reader)?;

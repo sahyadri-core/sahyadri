@@ -61,7 +61,6 @@ use sahyadri_rpc_core::{
     model::*,
     notify::connection::ChannelConnection,
 };
-use sahyadri_rpc_core::model::proof::RpcAccountProof;
 use sahyadri_txscript::{extract_script_pub_key_address, pay_to_address_script};
 use sahyadri_utils::expiring_cache::ExpiringCache;
 use sahyadri_utils::sysinfo::SystemInfo;
@@ -919,7 +918,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         &self,
         address: RpcAddress,
         block_hash: Option<RpcHash>,
-    ) -> RpcResult<RpcAccountProof> {
+    ) -> RpcResult<GetAccountProofResponse> {
         self.get_account_proof_call(None, GetAccountProofRequest::new(address, block_hash)).await
     }
 
@@ -927,10 +926,8 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         &self,
         _connection: Option<&DynRpcConnection>,
         request: GetAccountProofRequest,
-    ) -> RpcResult<RpcAccountProof> {
+    ) -> RpcResult<GetAccountProofResponse> {
         let session = self.consensus_manager.consensus().session().await;
-
-        // Resolve block hash (default: current tip)
         let block_hash = match request.block_hash {
             Some(h) => h,
             None => {
@@ -938,17 +935,12 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
                 *tips.first().ok_or_else(|| RpcError::General("no virtual tips available".into()))?
             }
         };
-
-        // RpcAddress → ScriptPublicKey
         let spk = sahyadri_txscript::pay_to_address_script(&request.address);
-
-        // Generate proof via consensus
         let proof = session
             .async_get_account_proof(spk, block_hash)
             .await
             .map_err(|e| RpcError::General(format!("{e:?}")))?;
-
-        Ok(proof.into())
+        Ok(GetAccountProofResponse::new(proof.into()))
     }
 
     async fn submit_account_transaction_call(

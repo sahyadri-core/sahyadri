@@ -12,7 +12,6 @@ use async_trait::async_trait;
 use downcast::{AnySync, downcast_sync};
 use sahyadri_notify::{listener::ListenerId, scope::Scope, subscription::Command};
 use std::sync::Arc;
-use crate::model::proof::RpcAccountProof;
 
 pub const MAX_SAFE_WINDOW_SIZE: u32 = 10_000;
 
@@ -40,18 +39,15 @@ pub trait RpcApi: Sync + Send + AnySync {
         &self,
         address: RpcAddress,
         block_hash: Option<RpcHash>,
-    ) -> RpcResult<RpcAccountProof> {
-        Ok(self
-            .get_account_proof_call(None, GetAccountProofRequest::new(address, block_hash))
-            .await?)
+    ) -> RpcResult<GetAccountProofResponse> {
+        self.get_account_proof_call(None, GetAccountProofRequest { address, block_hash }).await
     }
 
     async fn get_account_proof_call(
         &self,
         connection: Option<&DynRpcConnection>,
         request: GetAccountProofRequest,
-    ) -> RpcResult<RpcAccountProof>;
-
+    ) -> RpcResult<GetAccountProofResponse>;
 
     async fn submit_flash_transaction_call(
         &self,

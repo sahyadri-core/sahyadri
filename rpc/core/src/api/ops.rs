@@ -139,8 +139,9 @@ pub enum RpcApiOps {
     GetCurrentBlockColor = 149,
     /// Get REGISTRY_UNIT Return Addresses
     GetRegistryUnitReturnAddress = 150,
+    GetAccountProof = 151,
     /// Get Virtual Chain from Block V2
-    GetVirtualChainFromBlockV2 = 151,
+    GetVirtualChainFromBlockV2 = 152,
     SubmitAccountTransaction,
     SubmitFlashTransaction,
     SubmitDidCreate,
@@ -153,13 +154,12 @@ pub enum RpcApiOps {
     // DWN Relay — RAM-only encrypted envelope forwarding
     // ============================================================
     /// Subscribe this connection to receive envelopes for a DID
-    RelaySubscribe = 159,
+    RelaySubscribe = 160,
     /// Send an encrypted envelope to a recipient DID
-    RelaySend = 160,
+    RelaySend = 161,
     /// Poll pending envelopes for a DID
-    RelayPoll = 161,
-    /// Presence check for a list of DIDs
-    RelayPresence = 162,
+    RelayPoll = 162,
+    RelayPresence = 163,
 }
 
 impl RpcApiOps {
