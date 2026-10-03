@@ -812,10 +812,8 @@ async fn json_test(file_path: &str, concurrency: bool) {
 
     if proof_exists {
         info!("Importing the REGISTRY_UNIT set...");
-        let mut multiset = MuHash::new();
+        let multiset = MuHash::new();
 // REGISTRY_UNIT-REMOVED:         for outpoint_registry_unit_pairs in gzip_file_lines(&main_path.join("pp-registry_unit.json.gz")).map(json_line_to_registry_unit_pairs) {
-            tc.append_imported_pruning_point_registry_units(&outpoint_registry_unit_pairs, &mut multiset);
-        }
 
         tc.import_pruning_point_registry_unit_set(pruning_point.unwrap(), multiset).unwrap();
         // TODO: Add consensus validation that the pruning point is actually the right block according to the rules (in pruning depth etc).
@@ -857,7 +855,7 @@ async fn json_test(file_path: &str, concurrency: bool) {
     // Assert that the indexed selected chain store matches the virtual chain obtained
     // through the reachability iterator
     assert_selected_chain_store_matches_virtual_chain(&tc);
-    let virtual_registry_units: HashSet<RegistryRef> =
+    let _virtual_registry_units: HashSet<RegistryRef> =
         HashSet::from_iter(tc.get_virtual_registry(None, usize::MAX, false).into_iter().map(|(outpoint, _)| outpoint));
     // SAHYADRI: REGISTRY_UNIT index removed — the virtual REGISTRY_UNIT check no longer applies.
 }

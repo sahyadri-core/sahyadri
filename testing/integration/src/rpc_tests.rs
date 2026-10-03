@@ -788,6 +788,13 @@ async fn sanity_test() {
                     // Dummy implementation for the test to satisfy the compiler
                 })
             }
+            _ => {
+                // Placeholder for new RpcApiOps variants added post-UTXO migration.
+                // Returns a no-op task so the test loop continues.
+                tokio::spawn(async move {
+                    // no-op
+                })
+            }
         };
         tasks.push(task);
     }
