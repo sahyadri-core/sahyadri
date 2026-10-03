@@ -28,7 +28,7 @@ impl Mempool {
         transaction.calculated_non_contextual_masses = Some(consensus.calculate_transaction_non_contextual_masses(&transaction.tx));
         self.validate_transaction_in_isolation(&transaction)?;
         let feerate_threshold = self.get_replace_by_fee_constraint(&transaction, rbf_policy)?;
-        self.populate_mempool_entries(&mut transaction);
+        super::populate_entries_and_try_validate::populate_flash_tx_fields(&mut transaction);
         Ok(TransactionPreValidation { transaction, feerate_threshold })
     }
 

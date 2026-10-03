@@ -1920,8 +1920,10 @@ impl VirtualStateProcessor {
             TxValidationFlags::Full,
         );
 
-        if validated_transactions.len() < new_pruning_point_transactions.len() - 1 {
-            // Some non-coinbase transactions are invalid
+        // Account-model: non-coinbase txs may be absent/empty; guard against
+        // usize underflow on `len() - 1` and skip the check entirely if empty.
+        let expected = new_pruning_point_transactions.len().saturating_sub(1);
+        if validated_transactions.len() < expected {
             return Err(PruningImportError::NewPruningPointTxErrors);
         }
 

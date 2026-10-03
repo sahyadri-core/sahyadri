@@ -114,7 +114,27 @@ impl TransactionsPool {
         let id = transaction.id();
 
         assert!(!self.all_transactions.contains_key(&id), "transaction {id} to be added already exists in the transactions pool");
-        assert!(transaction.mtx.is_fully_populated(), "transaction {id} to be added in the transactions pool is not fully populated");
+
+        // ─── Account-model bypass ───
+        // All account-model transactions (FlashTx and DID ops) carry no UTXO
+        // inputs, so `calculated_fee` and `calculated_non_contextual_masses`
+        // are never populated through the UTXO validation path. Their effect
+        // is applied directly to the SMT during block application (see
+        // account_changes.rs). Only enforce the full-population invariant for
+        // legacy UTXO-style transactions.
+        let payload = &transaction.mtx.tx.payload;
+        let is_account_model = (payload.len() >= 8 && &payload[..8] == b"FLASH_V1")
+            || (payload.len() >= 4
+                && (&payload[..4] == b"DCRT"
+                    || &payload[..4] == b"DUPD"
+                    || &payload[..4] == b"DDEC"));
+
+        if !is_account_model {
+            assert!(
+                transaction.mtx.is_fully_populated(),
+                "transaction {id} to be added in the transactions pool is not fully populated"
+            );
+        }
 
         // Create the bijective parent/chained relations.
         // This concerns only the parents of the added transaction.

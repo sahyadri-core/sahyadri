@@ -43,3 +43,38 @@ pub(crate) fn populate_mempool_transactions_in_parallel(
 ) -> Vec<RuleResult<()>> {
     consensus.populate_mempool_transactions_in_parallel(transactions).into_iter().map(|x| x.map_err(RuleError::from)).collect()
 }
+
+
+/// Populate fee + mass fields for account-model FlashTx.
+///
+/// Flash transactions bypass UTXO validation, so `calculated_fee` and
+/// `calculated_non_contextual_masses` are normally `None`. We populate
+/// them here so downstream mempool code (frontier, orphan checks,
+/// standard checks) works without special-casing every call site.
+pub(crate) fn populate_flash_tx_fields(transaction: &mut MutableTransaction) {
+    let payload = &transaction.tx.payload;
+    if payload.len() < 8 || &payload[..8] != b"FLASH_V1" {
+        return;
+    }
+
+    // Flash payload layout (after magic):
+    //   [2] version | [4] pk_len | [pk_len] pk | [4] rc_len | [rc_len] rc
+    //   [8] amount | [8] fee | [8] expiry | [16] salt | [4] sig_len | [sig]
+    let mut off = 8 + 2;
+    if payload.len() < off + 4 { return; }
+    let pk_len = u32::from_le_bytes(payload[off..off+4].try_into().unwrap()) as usize;
+    off += 4 + pk_len;
+    if payload.len() < off + 4 { return; }
+    let rc_len = u32::from_le_bytes(payload[off..off+4].try_into().unwrap()) as usize;
+    off += 4 + rc_len;
+    if payload.len() < off + 16 { return; }
+    off += 8; // skip amount
+    let fee = u64::from_le_bytes(payload[off..off+8].try_into().unwrap());
+
+    transaction.calculated_fee = Some(fee);
+    let approx_mass = 1000u64 + payload.len() as u64;
+    transaction.calculated_non_contextual_masses = Some(sahyadri_consensus_core::mass::NonContextualMasses {
+        compute_mass: approx_mass,
+        transient_mass: approx_mass,
+    });
+}

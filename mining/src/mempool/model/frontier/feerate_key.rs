@@ -81,9 +81,18 @@ impl From<&MempoolTransaction> for FeerateTransactionKey {
         //       single one-dimension value (making it easier to select transactions for block templates).
         // Future mempool improvements are expected to refine this behavior and use the multi-dimension values
         // in order to optimize and increase block space usage.
-        let mass = ContextualMasses::new(tx.mtx.tx.mass())
-            .max(tx.mtx.calculated_non_contextual_masses.expect("masses are expected to be calculated"));
-        let fee = tx.mtx.calculated_fee.expect("fee is expected to be populated");
+        // ─── Account-model FlashTx tolerance ───
+        // Flash txs bypass UTXO validation, so `calculated_non_contextual_masses`
+        // and `calculated_fee` are never populated for them. Their fee is
+        // embedded in the tx payload and applied directly to the SMT during
+        // block application. Fall back to the tx-declared mass and 0 fee so
+        // the mempool frontier remains functional for both legacy UTXO txs
+        // and account-model FlashTx.
+        let mass = match tx.mtx.calculated_non_contextual_masses {
+            Some(ncm) => ContextualMasses::new(tx.mtx.tx.mass()).max(ncm),
+            None => tx.mtx.tx.mass(),
+        };
+        let fee = tx.mtx.calculated_fee.unwrap_or(0);
         Self::new(fee, mass, tx.mtx.tx.clone())
     }
 }

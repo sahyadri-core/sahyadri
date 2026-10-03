@@ -74,7 +74,11 @@ impl Mempool {
         // almost as much to process as the sender fees, limit the maximum
         // size of a transaction. This also helps mitigate CPU exhaustion
         // attacks.
-        let NonContextualMasses { compute_mass, transient_mass } = transaction.calculated_non_contextual_masses.unwrap();
+        let ncm = match transaction.calculated_non_contextual_masses {
+            Some(ncm) => ncm,
+            None => return Ok(()),  // FlashTx: skip standard checks
+        };
+        let NonContextualMasses { compute_mass, transient_mass } = ncm;
         if compute_mass > MAXIMUM_STANDARD_TRANSACTION_MASS {
             return Err(NonStandardError::RejectComputeMass(transaction_id, compute_mass, MAXIMUM_STANDARD_TRANSACTION_MASS));
         }
@@ -215,9 +219,11 @@ impl Mempool {
             // TODO: For now, until wallets adapt, we only require minimum fee as function of compute mass (but the fee/mass ratio will
             // use the max over all masses and will affect tx selection to block template)
             let minimum_fee =
-                self.minimum_required_transaction_relay_fee(transaction.calculated_non_contextual_masses.unwrap().compute_mass);
-            if transaction.calculated_fee.unwrap() < minimum_fee {
-                return Err(NonStandardError::RejectInsufficientFee(transaction_id, transaction.calculated_fee.unwrap(), minimum_fee));
+                self.minimum_required_transaction_relay_fee(
+                    transaction.calculated_non_contextual_masses.map(|m| m.compute_mass).unwrap_or(0)
+                );
+            if transaction.calculated_fee.unwrap_or(0) < minimum_fee {
+                return Err(NonStandardError::RejectInsufficientFee(transaction_id, transaction.calculated_fee.unwrap_or(0), minimum_fee));
             }
         }
 

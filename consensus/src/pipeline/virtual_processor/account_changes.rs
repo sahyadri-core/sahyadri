@@ -238,8 +238,8 @@ pub fn extract_block_effects(
         if let Some(flash) = FlashTransaction::from_transaction(tx) {
             flash_txs.push(flash);
         }
-        // DID (DCRT/DUPD/DDEC) — skip, SMT ke bahar
-        // Legacy account tx — skip, dead hai
+        // DID (DCRT/DUPD/DDEC) — skip
+        // Legacy account tx — skip, is dead 
     }
 
     (flash_txs, rewards)

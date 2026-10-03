@@ -99,11 +99,13 @@ impl OrphanPool {
     }
 
     fn check_orphan_mass(&self, transaction: &MutableTransaction) -> RuleResult<()> {
-        if transaction.calculated_non_contextual_masses.unwrap().max() > self.config.maximum_orphan_transaction_mass {
-            return Err(RuleError::RejectBadOrphanMass(
-                transaction.calculated_non_contextual_masses.unwrap().max(),
-                self.config.maximum_orphan_transaction_mass,
-            ));
+        // FlashTx tolerance: masses may be None (bypasses UTXO validation).
+        let ncm = match transaction.calculated_non_contextual_masses {
+            Some(ncm) => ncm,
+            None => return Ok(()),  // FlashTx: skip mass check
+        };
+        if ncm.max() > self.config.maximum_orphan_transaction_mass {
+            return Err(RuleError::RejectBadOrphanMass(ncm.max(), self.config.maximum_orphan_transaction_mass));
         }
         Ok(())
     }
