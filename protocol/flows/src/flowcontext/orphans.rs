@@ -294,6 +294,8 @@ mod tests {
     }
 
     impl ConsensusApi for MockProcessor {
+        fn get_did_document(&self, _did: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> { None }
+        fn get_did_by_address(&self, _address: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> { None }
         fn validate_and_insert_block(&self, block: Block) -> BlockValidationFutures {
             self.processed.write().insert(block.hash());
             BlockValidationFutures { block_task: Box::pin(block_process_mock()), virtual_state_task: Box::pin(block_process_mock()) }

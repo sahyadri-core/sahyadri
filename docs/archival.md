@@ -203,7 +203,6 @@ services:
       - --ram-scale=1.0
       - --rpclisten-borsh=0.0.0.0:17110
       - --rpclisten-json=0.0.0.0:18110
-      - --utxoindex
     volumes:
       - /mnt/hdd/sahyadri-archive:/app/data
     ports:
@@ -270,7 +269,7 @@ ExecStart=/usr/local/bin/sahyadrid \
   --appdir=/mnt/hdd/sahyadri-archive \
   --rpclisten-borsh=0.0.0.0:17110 \
   --rpclisten-json=0.0.0.0:18110 \
-  --utxoindex
+ 
 Restart=always
 RestartSec=10
 LimitNOFILE=65536

@@ -87,12 +87,6 @@ fn benchmark_all(c: &mut Criterion) {
     });
 
     g2.throughput(Throughput::Elements(1));
-    g2.bench_function("increment_nonce_batch", |b| {
-        let mut batch = rocksdb::WriteBatch::default();
-        b.iter(|| {
-            let _ = account_store.increment_nonce_batch(&mut batch, &spk);
-        });
-    });
     g2.finish();
 
     // ── BENCH 3: Simulated block processing (100 txs) ──

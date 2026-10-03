@@ -27,18 +27,18 @@ If you are a pool operator, it is _strongly recommended_ that you pick specs tha
 
 2. **Launch the Node**  
     ```
-    sahyadrid --utxoindex
+    sahyadrid
     ```
 
     *(If running from source code:)*  
     ```
-    cargo run --bin sahyadrid --release -- --utxoindex
+    cargo run --bin sahyadrid --release
     ```
 
     To run on testnet, simply add `--testnet` at the end. For example:
 
     ```
-    sahyadrid --utxoindex --testnet
+    sahyadrid --testnet
     ```
 
 Leave this process running. Closing it will stop your node. If you have other flags that you use for your current node, you may continue to use those.

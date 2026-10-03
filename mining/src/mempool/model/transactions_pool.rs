@@ -116,12 +116,12 @@ impl TransactionsPool {
         assert!(!self.all_transactions.contains_key(&id), "transaction {id} to be added already exists in the transactions pool");
 
         // ─── Account-model bypass ───
-        // All account-model transactions (FlashTx and DID ops) carry no UTXO
+        // All account-model transactions (FlashTx and DID ops) carry no legacy
         // inputs, so `calculated_fee` and `calculated_non_contextual_masses`
-        // are never populated through the UTXO validation path. Their effect
+        // are never populated through the legacy input validation path. Their effect
         // is applied directly to the SMT during block application (see
         // account_changes.rs). Only enforce the full-population invariant for
-        // legacy UTXO-style transactions.
+        // legacy input-based transactions.
         let payload = &transaction.mtx.tx.payload;
         let is_account_model = (payload.len() >= 8 && &payload[..8] == b"FLASH_V1")
             || (payload.len() >= 4

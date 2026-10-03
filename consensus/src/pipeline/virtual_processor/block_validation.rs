@@ -284,20 +284,20 @@ impl VirtualStateProcessor {
         let validated_transactions =
             self.validate_transactions_in_parallel(&txs, header.daa_score, TxValidationFlags::Full);
 
-        // Account-model txs (FlashTx + DID ops) bypass UTXO validation and are
+        // Account-model txs (FlashTx + DID ops) bypass legacy input validation and are
         // not returned by `validate_transactions_in_parallel`. Count them
         // separately so the check below does not spuriously disqualify blocks
-        // that carry only account-model txs (the UTXO era expected every
+        // that carry only account-model txs (the legacy era expected every
         // non-coinbase tx to appear in `validated_transactions`).
         let account_model_count = txs.iter().skip(1).filter(|tx| {
             let p = &tx.payload;
             (p.len() >= 8 && &p[..8] == b"FLASH_V1")
                 || (p.len() >= 4 && (&p[..4] == b"DCRT" || &p[..4] == b"DUPD" || &p[..4] == b"DDEC"))
         }).count();
-        let utxo_expected = txs.len().saturating_sub(1).saturating_sub(account_model_count);
-        if validated_transactions.len() < utxo_expected {
+        let account_expected = txs.len().saturating_sub(1).saturating_sub(account_model_count);
+        if validated_transactions.len() < account_expected {
             // Some non-coinbase transactions are invalid
-            return Err(InvalidTransactionsInBlockContext(utxo_expected - validated_transactions.len(), txs.len() - 1));
+            return Err(InvalidTransactionsInBlockContext(account_expected - validated_transactions.len(), txs.len() - 1));
         }
 
         Ok(())

@@ -16,13 +16,14 @@ use sahyadri_consensus_core::{
     mass::{ContextualMasses, NonContextualMasses, transaction_estimated_serialized_size},
     merkle::calc_hash_merkle_root,
     tx::{MutableTransaction, Transaction, TransactionId, RegistryRef, RegistryUnit},
-    registry_unit::registry_unit_collection::RegistryUnitCollection,
 };
 use sahyadri_core::time::unix_now;
 use sahyadri_hashes::{Hash, ZERO_HASH};
 
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
+
+type RegistryUnitCollection = HashMap<RegistryRef, RegistryUnit>;
 
 pub(crate) struct ConsensusMock {
     transactions: RwLock<HashMap<TransactionId, Arc<Transaction>>>,
@@ -75,6 +76,8 @@ impl ConsensusMock {
 }
 
 impl ConsensusApi for ConsensusMock {
+    fn get_did_document(&self, _did: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> { None }
+    fn get_did_by_address(&self, _address: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> { None }
     fn build_block_template(
         &self,
         miner_data: MinerData,

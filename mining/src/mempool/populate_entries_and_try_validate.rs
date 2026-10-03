@@ -47,7 +47,7 @@ pub(crate) fn populate_mempool_transactions_in_parallel(
 
 /// Populate fee + mass fields for account-model FlashTx.
 ///
-/// Flash transactions bypass UTXO validation, so `calculated_fee` and
+/// Flash transactions bypass legacy input validation, so `calculated_fee` and
 /// `calculated_non_contextual_masses` are normally `None`. We populate
 /// them here so downstream mempool code (frontier, orphan checks,
 /// standard checks) works without special-casing every call site.

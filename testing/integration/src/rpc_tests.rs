@@ -789,7 +789,7 @@ async fn sanity_test() {
                 })
             }
             _ => {
-                // Placeholder for new RpcApiOps variants added post-UTXO migration.
+                // Placeholder for new RpcApiOps variants added post-account-model migration.
                 // Returns a no-op task so the test loop continues.
                 tokio::spawn(async move {
                     // no-op

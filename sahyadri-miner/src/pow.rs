@@ -92,7 +92,7 @@ pub fn serialize_header<H: Hasher>(hasher: &mut H, header: &RpcBlockHeader, for_
 
     decode_to_slice(&header.accepted_id_merkle_root, &mut hash).unwrap();
     hasher.update(hash);
-    decode_to_slice(&header.utxo_commitment, &mut hash).unwrap();
+    decode_to_slice(&header.account_commitment, &mut hash).unwrap();
     hasher.update(hash);
 
     hasher

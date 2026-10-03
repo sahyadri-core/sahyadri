@@ -32,12 +32,12 @@ While the minimum specs suffice to sync and maintain a TN10 node with the accele
    While TN10 is the default netsuffix, specifying it explicitly is recommended:
 
    ```
-   sahyadrid --testnet --netsuffix=10 --utxoindex
+   sahyadrid --testnet --netsuffix=10
    ```
 
    *(If running from source code:)*  
    ```
-   cargo run --bin sahyadrid --release -- --testnet --netsuffix=10 --utxoindex
+   cargo run --bin sahyadrid --release -- --testnet --netsuffix=10
    ```
 
 Leave this process running. Closing it will stop your node.
@@ -87,7 +87,7 @@ Leave this process running. Closing it will stop your node.
 ## Summary & Next Steps
 
 - **Node Sync:**  
-  `sahyadrid --testnet --netsuffix=10 --utxoindex`
+  `sahyadrid --testnet --netsuffix=10`
 - **Transaction Generation:**  
   `garud --private-key <your-private-key> -t=10`
 - **Mining:**  

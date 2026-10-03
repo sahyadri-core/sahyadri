@@ -270,91 +270,26 @@ async fn daemon_registry_units_propagation_test() {
     assert_eq!(miner_balance, initial_blocks * SIMNET_PARAMS.pre_deflationary_phase_base_subsidy);
 
     // Get the miner REGISTRY_UNITs
-// REGISTRY_UNIT-REMOVED:     let registry_units = fetch_spendable_registry_units(&rpc_client1, miner_address.clone(), coinbase_maturity).await;
-// UTXO-REMOVED:     assert_eq!(registry_units.len(), EXTRA_BLOCKS - 1);
-// UTXO-REMOVED:     for registry_unit in registry_units.iter() {
-// UTXO-REMOVED:         assert!(registry_unit.1.is_coinbase);
-// UTXO-REMOVED:         assert_eq!(registry_unit.1.amount, SIMNET_PARAMS.pre_deflationary_phase_base_subsidy);
-// UTXO-REMOVED:         assert_eq!(registry_unit.1.script_public_key, miner_spk);
-// UTXO-REMOVED:     }
 
     // Drain REGISTRY_UNITs and Virtual DAA score changed notification channels
-// UTXO-REMOVED:     clients.iter().for_each(|x| x.registry_changed_listener().unwrap().drain());
-// UTXO-REMOVED:     clients.iter().for_each(|x| x.virtual_daa_score_changed_listener().unwrap().drain());
 
     // Spend some coins - sending funds from miner address to user address
     // The transaction here is later used to verify registry_unit return address RPC
-// UTXO-REMOVED:     const NUMBER_INPUTS: u64 = 2;
-// UTXO-REMOVED:     const NUMBER_OUTPUTS: u64 = 2;
-// UTXO-REMOVED:     const TX_AMOUNT: u64 = SIMNET_PARAMS.pre_deflationary_phase_base_subsidy * (NUMBER_INPUTS * 5 - 1) / 5;
-// UTXO-REMOVED:     let transaction = generate_tx(miner_kp.clone(), &registry_units[0..NUMBER_INPUTS as usize], TX_AMOUNT, NUMBER_OUTPUTS, &user_address);
-// UTXO-REMOVED:     rpc_client1.submit_transaction((&transaction).into(), false).await.unwrap();
 
-// UTXO-REMOVED:     let check_client = rpc_client1.clone();
-// UTXO-REMOVED:     let transaction_id = transaction.id();
-// UTXO-REMOVED:     wait_for(
-// UTXO-REMOVED:         50,
-// UTXO-REMOVED:         20,
-// UTXO-REMOVED:         move || {
-// UTXO-REMOVED:             async fn transaction_in_mempool(client: GrpcClient, transaction_id: RpcTransactionId) -> bool {
-// UTXO-REMOVED:                 let entry = client.get_mempool_entry(transaction_id, false, false).await;
-// UTXO-REMOVED:                 entry.is_ok()
-// UTXO-REMOVED:             }
-// UTXO-REMOVED:             Box::pin(transaction_in_mempool(check_client.clone(), transaction_id))
-// UTXO-REMOVED:         },
-// UTXO-REMOVED:         "the transaction was not added to the mempool",
-// UTXO-REMOVED:     )
-// UTXO-REMOVED:     .await;
 
-// UTXO-REMOVED:     mine_block(blank_address.clone(), &rpc_client1, &clients).await;
 
     // Check REGISTRY_UNITs changed notifications
-// UTXO-REMOVED:     for x in clients.iter() {
-// UTXO-REMOVED:         let Notification::RegistryChanged(uc) = x.registry_changed_listener().unwrap().receiver.recv().await.unwrap() else {
-// UTXO-REMOVED:             panic!("wrong notification type")
-// UTXO-REMOVED:         };
-// UTXO-REMOVED:         assert!(uc.removed.iter().all(|x| x.address.is_some() && *x.address.as_ref().unwrap() == miner_address));
-// UTXO-REMOVED:         assert!(uc.added.iter().all(|x| x.address.is_some() && *x.address.as_ref().unwrap() == user_address));
-// UTXO-REMOVED:         assert_eq!(uc.removed.len() as u64, NUMBER_INPUTS);
-// UTXO-REMOVED:         assert_eq!(uc.added.len() as u64, NUMBER_OUTPUTS);
-// UTXO-REMOVED:         assert_eq!(
-// UTXO-REMOVED:             uc.removed.iter().map(|x| x.registry_unit_entry.amount).sum::<u64>(),
-// UTXO-REMOVED:             SIMNET_PARAMS.pre_deflationary_phase_base_subsidy * NUMBER_INPUTS
-// UTXO-REMOVED:         );
-// UTXO-REMOVED:         assert_eq!(uc.added.iter().map(|x| x.registry_unit_entry.amount).sum::<u64>(), TX_AMOUNT);
-// UTXO-REMOVED:     }
 
     // Check the balance of both miner and user addresses
-// UTXO-REMOVED:     for x in clients.iter() {
-// UTXO-REMOVED:         let miner_balance = x.get_balance_by_address(miner_address.clone()).await.unwrap();
-// UTXO-REMOVED:         assert_eq!(miner_balance, (initial_blocks - NUMBER_INPUTS) * SIMNET_PARAMS.pre_deflationary_phase_base_subsidy);
 
-// UTXO-REMOVED:         let user_balance = x.get_balance_by_address(user_address.clone()).await.unwrap();
-// UTXO-REMOVED:         assert_eq!(user_balance, TX_AMOUNT);
-// UTXO-REMOVED:     }
 
     // REGISTRY_UNIT Return Address Test
     // Mine another block to accept the transactions from the previous block
     // The tx above is sending from miner address to user address
-// UTXO-REMOVED:     mine_block(blank_address.clone(), &rpc_client1, &clients).await;
-// UTXO-REMOVED:     let new_registry_units = rpc_client1.get_registry_by_addresses(vec![user_address]).await.unwrap();
-// UTXO-REMOVED:     let new_registry_unit = new_registry_units
-// UTXO-REMOVED:         .iter()
-// UTXO-REMOVED:         .find(|registry_unit| registry_unit.outpoint.transaction_id == transaction.id())
-// UTXO-REMOVED:         .expect("Did not find a registry_unit for the tx we just created but expected to");
 
-// UTXO-REMOVED:     let registry_unit_return_address = rpc_client1
-// UTXO-REMOVED:         .get_registry_unit_return_address(new_registry_unit.outpoint.transaction_id, new_registry_unit.registry_unit_entry.block_daa_score)
-// UTXO-REMOVED:         .await
-// UTXO-REMOVED:         .expect("We just created the tx and registry_unit here");
 
-// UTXO-REMOVED:     assert_eq!(miner_address, registry_unit_return_address);
 
     // Terminate multi-listener clients
-// UTXO-REMOVED:     for x in clients.iter() {
-// UTXO-REMOVED:         x.disconnect().await.unwrap();
-// UTXO-REMOVED:         x.join().await.unwrap();
-// UTXO-REMOVED:     }
 }
 
 // The following test runtime parameters are required for a graceful shutdown of the gRPC server

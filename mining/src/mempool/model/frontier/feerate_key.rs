@@ -82,11 +82,11 @@ impl From<&MempoolTransaction> for FeerateTransactionKey {
         // Future mempool improvements are expected to refine this behavior and use the multi-dimension values
         // in order to optimize and increase block space usage.
         // ─── Account-model FlashTx tolerance ───
-        // Flash txs bypass UTXO validation, so `calculated_non_contextual_masses`
+        // Flash txs bypass legacy input validation, so `calculated_non_contextual_masses`
         // and `calculated_fee` are never populated for them. Their fee is
         // embedded in the tx payload and applied directly to the SMT during
         // block application. Fall back to the tx-declared mass and 0 fee so
-        // the mempool frontier remains functional for both legacy UTXO txs
+        // the mempool frontier remains functional for both legacy input-based txs
         // and account-model FlashTx.
         let mass = match tx.mtx.calculated_non_contextual_masses {
             Some(ncm) => ContextualMasses::new(tx.mtx.tx.mass()).max(ncm),

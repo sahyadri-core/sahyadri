@@ -33,19 +33,19 @@ message SahyadridRequest {
     GetMempoolEntriesRequestMessage getMempoolEntriesRequest = 1043;
     ShutdownRequestMessage shutdownRequest = 1045;
     GetHeadersRequestMessage getHeadersRequest = 1047;
-    NotifyUtxosChangedRequestMessage notifyUtxosChangedRequest = 1049;
-    // UtxosChangedNotificationMessage utxosChangedNotification = 1051;
-    GetUtxosByAddressesRequestMessage getUtxosByAddressesRequest = 1052;
+    NotifyRegistryUnitsChangedRequestMessage notifyRegistryUnitsChangedRequest = 1049;
+    // RegistryUnitsChangedNotificationMessage registryUnitsChangedNotification = 1051;
+    GetRegistryUnitsByAddressesRequestMessage getRegistryUnitsByAddressesRequest = 1052;
     GetSinkBlueScoreRequestMessage getSinkBlueScoreRequest = 1054;
     NotifySinkBlueScoreChangedRequestMessage notifySinkBlueScoreChangedRequest = 1056;
     // SinkBlueScoreChangedNotificationMessage sinkBlueScoreChangedNotification = 1058;
     BanRequestMessage banRequest = 1059;
     UnbanRequestMessage unbanRequest = 1061;
     GetInfoRequestMessage getInfoRequest = 1063;
-    StopNotifyingUtxosChangedRequestMessage stopNotifyingUtxosChangedRequest = 1065;
-    NotifyPruningPointUtxoSetOverrideRequestMessage notifyPruningPointUtxoSetOverrideRequest = 1067;
-    // PruningPointUtxoSetOverrideNotificationMessage pruningPointUtxoSetOverrideNotification = 1069;
-    StopNotifyingPruningPointUtxoSetOverrideRequestMessage stopNotifyingPruningPointUtxoSetOverrideRequest = 1070;
+    StopNotifyingRegistryUnitsChangedRequestMessage stopNotifyingRegistryUnitsChangedRequest = 1065;
+    NotifyPruningPointRegistryUnitSetOverrideRequestMessage notifyPruningPointRegistryUnitSetOverrideRequest = 1067;
+    // PruningPointRegistryUnitSetOverrideNotificationMessage pruningPointRegistryUnitSetOverrideNotification = 1069;
+    StopNotifyingPruningPointRegistryUnitSetOverrideRequestMessage stopNotifyingPruningPointRegistryUnitSetOverrideRequest = 1070;
     EstimateNetworkHashesPerSecondRequestMessage estimateNetworkHashesPerSecondRequest = 1072;
     NotifyVirtualDaaScoreChangedRequestMessage notifyVirtualDaaScoreChangedRequest = 1074;
     // VirtualDaaScoreChangedNotificationMessage virtualDaaScoreChangedNotification = 1076;
@@ -66,7 +66,7 @@ message SahyadridRequest {
     GetFeeEstimateRequestMessage getFeeEstimateRequest = 1106;
     GetFeeEstimateExperimentalRequestMessage getFeeEstimateExperimentalRequest = 1108;
     GetCurrentBlockColorRequestMessage getCurrentBlockColorRequest = 1110;
-    GetUtxoReturnAddressRequestMessage getUtxoReturnAddressRequest = 1112;
+    GetRegistryUnitReturnAddressRequestMessage getRegistryUnitReturnAddressRequest = 1112;
     GetVirtualChainFromBlockV2RequestMessage getVirtualChainFromBlockV2Request = 1114;
   }
 }
@@ -101,19 +101,19 @@ message SahyadridResponse {
     GetMempoolEntriesResponseMessage getMempoolEntriesResponse = 1044;
     ShutdownResponseMessage shutdownResponse = 1046;
     GetHeadersResponseMessage getHeadersResponse = 1048;
-    NotifyUtxosChangedResponseMessage notifyUtxosChangedResponse = 1050;
-    UtxosChangedNotificationMessage utxosChangedNotification = 1051;
-    GetUtxosByAddressesResponseMessage getUtxosByAddressesResponse = 1053;
+    NotifyRegistryUnitsChangedResponseMessage notifyRegistryUnitsChangedResponse = 1050;
+    RegistryUnitsChangedNotificationMessage registryUnitsChangedNotification = 1051;
+    GetRegistryUnitsByAddressesResponseMessage getRegistryUnitsByAddressesResponse = 1053;
     GetSinkBlueScoreResponseMessage getSinkBlueScoreResponse = 1055;
     NotifySinkBlueScoreChangedResponseMessage notifySinkBlueScoreChangedResponse = 1057;
     SinkBlueScoreChangedNotificationMessage sinkBlueScoreChangedNotification = 1058;
     BanResponseMessage banResponse = 1060;
     UnbanResponseMessage unbanResponse = 1062;
     GetInfoResponseMessage getInfoResponse = 1064;
-    StopNotifyingUtxosChangedResponseMessage stopNotifyingUtxosChangedResponse = 1066;
-    NotifyPruningPointUtxoSetOverrideResponseMessage notifyPruningPointUtxoSetOverrideResponse = 1068;
-    PruningPointUtxoSetOverrideNotificationMessage pruningPointUtxoSetOverrideNotification = 1069;
-    StopNotifyingPruningPointUtxoSetOverrideResponseMessage stopNotifyingPruningPointUtxoSetOverrideResponse = 1071;
+    StopNotifyingRegistryUnitsChangedResponseMessage stopNotifyingRegistryUnitsChangedResponse = 1066;
+    NotifyPruningPointRegistryUnitSetOverrideResponseMessage notifyPruningPointRegistryUnitSetOverrideResponse = 1068;
+    PruningPointRegistryUnitSetOverrideNotificationMessage pruningPointRegistryUnitSetOverrideNotification = 1069;
+    StopNotifyingPruningPointRegistryUnitSetOverrideResponseMessage stopNotifyingPruningPointRegistryUnitSetOverrideResponse = 1071;
     EstimateNetworkHashesPerSecondResponseMessage estimateNetworkHashesPerSecondResponse = 1073;
     NotifyVirtualDaaScoreChangedResponseMessage notifyVirtualDaaScoreChangedResponse = 1075;
     VirtualDaaScoreChangedNotificationMessage virtualDaaScoreChangedNotification = 1076;
@@ -134,7 +134,7 @@ message SahyadridResponse {
     GetFeeEstimateResponseMessage getFeeEstimateResponse = 1107;
     GetFeeEstimateExperimentalResponseMessage getFeeEstimateExperimentalResponse = 1109;
     GetCurrentBlockColorResponseMessage getCurrentBlockColorResponse = 1111;
-    GetUtxoReturnAddressResponseMessage getUtxoReturnAddressResponse = 1113;
+    GetRegistryUnitReturnAddressResponseMessage getRegistryUnitReturnAddressResponse = 1113;
     GetVirtualChainFromBlockV2ResponseMessage getVirtualChainFromBlockV2Response = 1115;
   }
 }

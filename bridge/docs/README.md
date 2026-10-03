@@ -44,7 +44,7 @@ This will show all available bridge options and guidance for sahyadrid arguments
 Terminal A (node):
 
 ```bash
-cargo run --release --bin sahyadrid -- --utxoindex --rpclisten=127.0.0.1:16110 --rpclisten-borsh=127.0.0.1:17110
+cargo run --release --bin sahyadrid -- --rpclisten=127.0.0.1:16110 --rpclisten-borsh=127.0.0.1:17110
 ```
 
 Terminal B (bridge):
@@ -56,7 +56,7 @@ cargo run -p sahyadri-stratum-bridge --release --bin stratum-bridge -- --config 
 ### Run (in-process node)
 
 ```bash
-cargo run -p sahyadri-stratum-bridge --release --bin stratum-bridge -- --config bridge/config.yaml --node-mode inprocess -- --utxoindex --rpclisten=127.0.0.1:16110 --rpclisten-borsh=127.0.0.1:17110
+cargo run -p sahyadri-stratum-bridge --release --bin stratum-bridge -- --config bridge/config.yaml --node-mode inprocess -- --rpclisten=127.0.0.1:16110 --rpclisten-borsh=127.0.0.1:17110
 ```
 
 **Important:** Use `--` separator before sahyadrid arguments. Arguments starting with hyphens must come after the `--` separator.
@@ -64,7 +64,7 @@ cargo run -p sahyadri-stratum-bridge --release --bin stratum-bridge -- --config 
 **Examples:**
 ```bash
 # ✓ Correct - bridge args first, then --, then sahyadrid args
-cargo run --release --bin stratum-bridge -- --config config.yaml --node-mode inprocess -- --utxoindex --rpclisten=127.0.0.1:16110
+cargo run --release --bin stratum-bridge -- --config config.yaml --node-mode inprocess -- --rpclisten=127.0.0.1:16110
 
 # ✗ Incorrect - will show error message
 cargo run --release --bin stratum-bridge -- --rpclisten=127.0.0.1:16110 --config config.yaml --node-mode inprocess
@@ -76,7 +76,7 @@ cargo run --release --bin stratum-bridge -- --rpclisten=127.0.0.1:16110 --config
 If you want to override it, pass `--appdir` to the bridge (before the `--` separator):
 
 ```bash
-cargo run --release --bin stratum-bridge -- --config bridge/config.yaml --node-mode inprocess --appdir "C:\path\to\custom\datadir" -- --utxoindex --rpclisten=127.0.0.1:16110
+cargo run --release --bin stratum-bridge -- --config bridge/config.yaml --node-mode inprocess --appdir "C:\path\to\custom\datadir" -- --rpclisten=127.0.0.1:16110
 ```
 
 ### Miner / ASIC connection

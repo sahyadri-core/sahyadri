@@ -99,7 +99,7 @@ impl OrphanPool {
     }
 
     fn check_orphan_mass(&self, transaction: &MutableTransaction) -> RuleResult<()> {
-        // FlashTx tolerance: masses may be None (bypasses UTXO validation).
+        // FlashTx tolerance: masses may be None (bypasses legacy input validation).
         let ncm = match transaction.calculated_non_contextual_masses {
             Some(ncm) => ncm,
             None => return Ok(()),  // FlashTx: skip mass check
