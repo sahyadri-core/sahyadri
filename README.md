@@ -215,7 +215,7 @@ We welcome contributions to the Sahyadri core — optimizing the Rust codebase, 
 - **Docs:** https://docs.sahyadri.io
 - **API:** https://api.sahyadri.io
 - **Blog:** https://blog.sahyadri.io
-- **Explorer:** explorer.sahyadri.io *(upcoming)*
+- **Explorer:** explorer.sahyadri.io
 - **Wallet:** wallet.sahyadri.io *(upcoming)*
 - **X (Twitter):** https://x.com/sahyadricore
 - **Discord:** https://discord.gg/Dz9NDUwWPe
