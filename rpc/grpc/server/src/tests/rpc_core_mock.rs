@@ -65,6 +65,60 @@ impl RpcCoreMock {
 
 #[async_trait]
 impl RpcApi for RpcCoreMock {
+    async fn submit_flash_transaction(&self, _request: sahyadri_rpc_core::SubmitFlashTransactionRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitFlashTransactionResponse> {
+        unimplemented!()
+    }
+    async fn submit_did_create(&self, _request: sahyadri_rpc_core::SubmitDidCreateRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitDidCreateResponse> {
+        unimplemented!()
+    }
+    async fn submit_did_update(&self, _request: sahyadri_rpc_core::SubmitDidUpdateRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitDidUpdateResponse> {
+        unimplemented!()
+    }
+    async fn submit_did_deactivate(&self, _request: sahyadri_rpc_core::SubmitDidDeactivateRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitDidDeactivateResponse> {
+        unimplemented!()
+    }
+    async fn submit_flash_transaction_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::SubmitFlashTransactionRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitFlashTransactionResponse> {
+        unimplemented!()
+    }
+    async fn submit_did_create_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::SubmitDidCreateRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitDidCreateResponse> {
+        unimplemented!()
+    }
+    async fn submit_did_update_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::SubmitDidUpdateRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitDidUpdateResponse> {
+        unimplemented!()
+    }
+    async fn submit_did_deactivate_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::SubmitDidDeactivateRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::SubmitDidDeactivateResponse> {
+        unimplemented!()
+    }
+    async fn get_sync_wave_metadata_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::GetSyncWaveMetadataRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::GetSyncWaveMetadataResponse> {
+        unimplemented!()
+    }
+    async fn download_sync_wave_chunk_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::DownloadSyncWaveChunkRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::DownloadSyncWaveChunkResponse> {
+        unimplemented!()
+    }
+    async fn get_account_proof_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::GetAccountProofRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::GetAccountProofResponse> {
+        unimplemented!()
+    }
+    async fn resolve_did_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::ResolveDidRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::ResolveDidResponse> {
+        unimplemented!()
+    }
+    async fn resolve_did_by_address_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::ResolveDidByAddressRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::ResolveDidByAddressResponse> {
+        unimplemented!()
+    }
+    async fn relay_subscribe_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::RelaySubscribeRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::RelaySubscribeResponse> {
+        unimplemented!()
+    }
+    async fn relay_send_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::RelaySendRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::RelaySendResponse> {
+        unimplemented!()
+    }
+    async fn relay_poll_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::RelayPollRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::RelayPollResponse> {
+        unimplemented!()
+    }
+    async fn relay_presence_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::RelayPresenceRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::RelayPresenceResponse> {
+        unimplemented!()
+    }
+    async fn get_daa_score_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::GetDaaScoreRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::GetDaaScoreResponse> {
+        unimplemented!()
+    }
     async fn submit_account_transaction(
         &self,
         _request: sahyadri_rpc_core::SubmitAccountTransactionRequest,

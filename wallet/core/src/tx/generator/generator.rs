@@ -581,7 +581,7 @@ impl Generator {
     }
 
     /// Get next REGISTRY_UNIT entry. This function obtains REGISTRY_UNIT in the following order:
-    /// 1. From the REGISTRY_UNIT stash (used to store UTxOs that were consumed during previous transaction generation but were rejected due to various conditions, such as mass overflow)
+    /// 1. From the REGISTRY_UNIT stash (used to store registry units that were consumed during previous transaction generation but were rejected due to various conditions, such as mass overflow)
     /// 2. From the current stage
     /// 3. From priority REGISTRY_UNIT entries
     /// 4. From the REGISTRY_UNIT source iterator (while filtering against priority REGISTRY_UNIT entries)
