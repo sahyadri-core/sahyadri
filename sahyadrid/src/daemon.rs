@@ -751,7 +751,14 @@ Do you confirm? (y/n)";
             timeout_secs: 120,
         };
 
-        let result = futures::executor::block_on(
+        // GrpcClient relies on tokio's reactor; futures::executor::block_on
+        // does not provide one. Use a temporary current-thread tokio runtime.
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("SyncWave: failed to create tokio runtime");
+
+        let result = rt.block_on(
             crate::sync_wave_bootstrap::bootstrap_from_peer(config, &*session)
         );
 

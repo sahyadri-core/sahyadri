@@ -650,6 +650,23 @@ impl ConsensusApi for Consensus {
     }
 
 
+    fn export_sync_wave(
+        &self,
+        block_hash: Hash,
+    ) -> Result<
+        sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot,
+        sahyadri_consensus_core::model::sync_wave::SyncWaveError,
+    > {
+        Consensus::export_sync_wave(self, block_hash)
+    }
+
+    fn load_sync_wave(
+        &self,
+        snapshot: &sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot,
+    ) -> Result<(), sahyadri_consensus_core::model::sync_wave::SyncWaveError> {
+        Consensus::load_sync_wave(self, snapshot)
+    }
+
     fn get_account_proof(
         &self,
         spk: &ScriptPublicKey,
@@ -710,12 +727,6 @@ impl ConsensusApi for Consensus {
     }
 
 
-    fn load_sync_wave(
-        &self,
-        snapshot: &sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot,
-    ) -> Result<(), sahyadri_consensus_core::model::sync_wave::SyncWaveError> {
-        Consensus::load_sync_wave(self, snapshot)
-    }
 
     fn validate_and_insert_block(&self, block: Block) -> BlockValidationFutures {
         let (block_task, virtual_state_task) = self.validate_and_insert_block_impl(BlockTask::Ordinary { block });

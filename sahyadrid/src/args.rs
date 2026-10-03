@@ -453,10 +453,6 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
                 .help("RocksDB block cache size in MB. Default: 256MB for HDD preset (scales with --ram-scale). \
                        Increase for public RPC nodes with heavy query loads. Example: --rocksdb-cache-size=2048 for 2GB cache.")
         )
-        ;
-
-    #[cfg(feature = "devnet-prealloc")]
-    let cmd = cmd
         .arg(
             Arg::new("sync-wave")
                 .long("sync-wave")
@@ -469,6 +465,10 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
                 .value_name("CHECKPOINT_HASH")
                 .help("Optional checkpoint hash for SyncWave bootstrap"),
         )
+        ;
+
+    #[cfg(feature = "devnet-prealloc")]
+    let cmd = cmd
         .arg(Arg::new("num-prealloc-registry_units").long("num-prealloc-registry_units").require_equals(true).value_parser(clap::value_parser!(u64)))
         .arg(Arg::new("prealloc-address").long("prealloc-address").require_equals(true).value_parser(clap::value_parser!(String)))
         .arg(Arg::new("prealloc-amount").long("prealloc-amount").require_equals(true).value_parser(clap::value_parser!(u64)));

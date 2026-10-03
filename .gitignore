@@ -19,3 +19,4 @@ rustbridge_*.log
 .aider*
 target/
 sahyadri-miner/target/
+sahyadri-b.sh
