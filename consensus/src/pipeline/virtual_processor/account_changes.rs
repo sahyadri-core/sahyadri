@@ -212,14 +212,14 @@ pub fn extract_block_effects(
         return (flash_txs, rewards);
     }
 
-    // ── Coinbase reward split (txs[0]) ──
+    // ── Coinbase reward split: 95% miner / 5% treasury ──
     if let Ok(cb) = coinbase_manager.deserialize_coinbase_payload(&txs[0].payload) {
         let total = cb.subsidy;
         if total > 0 {
             let dev_fee = if treasury_hex.is_empty() {
                 0
             } else {
-                total / 50
+                total / 20
             };
             let miner_reward = total - dev_fee;
 

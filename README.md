@@ -147,7 +147,7 @@ cd sahyadri-miner
 | `-t` | Number of CPU miner threads |
 | `--mine-when-not-synced` | Begin mining immediately, do not wait for full sync |
 
-Rewards are credited to your CSM address at 98% of the block subsidy; 2% goes to the Sahyadri Treasury.
+Rewards are credited to your CSM address at 95% of the block subsidy; 5% goes to the Sahyadri Treasury. Transaction fees are split 90% miner / 10% treasury.
 
 ## SyncWave — Fast Node Bootstrap
 

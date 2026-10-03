@@ -119,10 +119,10 @@ impl CoinbaseManager {
             let total_reward = reward_data.subsidy + reward_data.total_fees;
 
             if total_reward > 0 {
-                // 98-2 split for Block Subsidy -> 2% to treasury
-                let subsidy_dev_fee = reward_data.subsidy / 50;
+                // 95-5 split for Block Subsidy -> 5% to treasury
+                let subsidy_dev_fee = reward_data.subsidy / 20;
 
-                // 90-10 split for Transaction Fees -> 10% to treasury
+                // 90-10 split for Transaction Fees -> 10% to treasury (unchanged)
                 let tx_dev_fee = reward_data.total_fees / 10;
 
                 // Total dev fee and remaining for miner
@@ -157,10 +157,10 @@ impl CoinbaseManager {
         let total_red_reward = red_subsidy + red_fees;
 
         if total_red_reward > 0 {
-            // 98-2 split for Block Subsidy -> 2% to treasury
-            let subsidy_dev_fee = red_subsidy / 50;
+            // 95-5 split for Block Subsidy -> 5% to treasury
+            let subsidy_dev_fee = red_subsidy / 20;
 
-            // 90-10 split for Tx Fees -> 10% to treasury
+            // 90-10 split for Tx Fees -> 10% to treasury (unchanged)
             let tx_dev_fee = red_fees / 10;
 
             // Total dev fee and remaining for miner

@@ -833,7 +833,7 @@ impl VirtualStateProcessor {
 
                             if total_reward > 0 {
                                 // 2.
-                                let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 50 };
+                                let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 20 };
                                 let miner_reward = total_reward - dev_fee;
 
                                 // 3.
