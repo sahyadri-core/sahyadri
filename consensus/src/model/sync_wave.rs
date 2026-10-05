@@ -14,14 +14,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use sahyadri_consensus_core::model::sync_wave::{
-    SyncWaveFlashEntry, SyncWaveMetadata, SyncWaveNode, SyncWaveSnapshot, SyncWaveState,
+    SyncWaveDidState, SyncWaveFlashEntry, SyncWaveMetadata, SyncWaveNode, SyncWaveSnapshot, SyncWaveState,
 };
 use sahyadri_consensus_core::Hash;
 use sahyadri_database::prelude::StoreError;
 use sahyadri_smt::{Node as SmtNode, NodeStore as SmtNodeStoreTrait, H256};
 use sahyadri_smt::EMPTY as SMT_EMPTY;
 
-
+use crate::model::stores::did_store::DidDocument;
+use crate::model::stores::did_states::{DbDidStatesStore, DidStatesStoreReader};
+use crate::pipeline::virtual_processor::did_changes::did_content_hash;
 use crate::model::stores::account_states::{AccountStatesStoreReader, DbAccountStatesStore};
 use crate::model::stores::account_store::{AccountState, FlashEntry};
 use crate::model::stores::headers::{DbHeadersStore, HeaderStoreReader};
@@ -57,6 +59,7 @@ pub const DEFAULT_CHUNK_SIZE: u32 = 2048;
 pub struct SyncWaveExporter {
     pub smt_nodes_store: Arc<DbSmtNodeStore>,
     pub account_states_store: Arc<DbAccountStatesStore>,
+    pub did_states_store: Arc<DbDidStatesStore>,
     pub account_roots_store: Arc<crate::model::stores::account_roots::DbAccountRootsStore>,
     pub headers_store: Arc<DbHeadersStore>,
 }
@@ -65,10 +68,17 @@ impl SyncWaveExporter {
     pub fn new(
         smt_nodes_store: Arc<DbSmtNodeStore>,
         account_states_store: Arc<DbAccountStatesStore>,
+        did_states_store: Arc<DbDidStatesStore>,
         account_roots_store: Arc<crate::model::stores::account_roots::DbAccountRootsStore>,
         headers_store: Arc<DbHeadersStore>,
     ) -> Self {
-        Self { smt_nodes_store, account_states_store, account_roots_store, headers_store }
+        Self {
+            smt_nodes_store,
+            account_states_store,
+            did_states_store,
+            account_roots_store,
+            headers_store,
+        }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -87,23 +97,32 @@ impl SyncWaveExporter {
         let mut nodes: HashMap<H256, SyncWaveNode> = HashMap::new();
         self.collect_smt_nodes(&base, root, &mut nodes)?;
 
-        // 2. For each leaf, fetch its AccountState
+        // 2. For each leaf, fetch its state — account first, then DID.
         let mut states: Vec<(Hash, SyncWaveState)> = Vec::new();
+        let mut did_states: Vec<(Hash, SyncWaveDidState)> = Vec::new();
+
         for node in nodes.values() {
             if let SyncWaveNode::Leaf { value, .. } = node {
                 let state_hash = h256_to_hash(*value);
-                let state = self
-                    .account_states_store
-                    .get(state_hash)
-                    .map_err(store_err)?;
-                states.push((state_hash, to_sync_state(&state)));
+
+                if let Ok(state) = self.account_states_store.get(state_hash) {
+                    states.push((state_hash, to_sync_state(&state)));
+                    continue;
+                }
+                if let Ok(doc) = self.did_states_store.get(state_hash) {
+                    did_states.push((state_hash, to_sync_did_state(&doc)));
+                    continue;
+                }
+                return Err(SyncWaveError::MissingNode(*value));
             }
         }
 
         let total_smt_nodes = nodes.len() as u64;
         let total_accounts = states.len() as u64;
+        let total_did_states = did_states.len() as u64;
         let chunk_size = DEFAULT_CHUNK_SIZE;
-        let total_chunks = ((total_smt_nodes + total_accounts) as u32).div_ceil(chunk_size);
+        let total_chunks = ((total_smt_nodes + total_accounts + total_did_states) as u32)
+            .div_ceil(chunk_size);
 
         let metadata = SyncWaveMetadata {
             block_hash,
@@ -111,13 +130,19 @@ impl SyncWaveExporter {
             account_root: header.account_commitment,
             total_smt_nodes,
             total_accounts,
+            total_did_states,
             chunk_size,
             total_chunks,
         };
 
         let smt_nodes: Vec<(H256, SyncWaveNode)> = nodes.into_iter().collect();
 
-        Ok(SyncWaveSnapshot { metadata, smt_nodes, account_states: states })
+        Ok(SyncWaveSnapshot {
+            metadata,
+            smt_nodes,
+            account_states: states,
+            did_states,
+        })
     }
 
     /// DFS over the SMT, collecting every reachable node into `out`.
@@ -154,17 +179,15 @@ impl SyncWaveExporter {
     pub fn verify(snapshot: &SyncWaveSnapshot) -> SyncWaveResult<()> {
         let root = hash_to_h256(snapshot.metadata.account_root);
 
-        // Build the node index
-        let mut index: HashMap<H256, &SyncWaveNode> = HashMap::with_capacity(snapshot.smt_nodes.len());
+        let mut index: HashMap<H256, &SyncWaveNode> =
+            HashMap::with_capacity(snapshot.smt_nodes.len());
         for (h, node) in &snapshot.smt_nodes {
-            // Content-address must match the declared hash
             if node.hash() != *h {
                 return Err(SyncWaveError::NodeHashMismatch(*h));
             }
             index.insert(*h, node);
         }
 
-        // Walk from the root, ensure every visited node exists and nodes are exact
         let mut visited: HashMap<H256, ()> = HashMap::new();
         Self::walk_and_check(root, &index, &mut visited)?;
 
@@ -175,9 +198,6 @@ impl SyncWaveExporter {
             });
         }
 
-        // Recompute the root: the declared root must be reachable from itself
-        // (a self-consistent walk already checked content-addresses, so if the
-        // walk from `root` succeeded, the root IS the root of the declared set).
         let computed = root;
         if computed != hash_to_h256(snapshot.metadata.account_root) {
             return Err(SyncWaveError::RootMismatch {
@@ -186,10 +206,18 @@ impl SyncWaveExporter {
             });
         }
 
-        // Verify each state's content-hash matches its key
+        // Account states
         for (state_hash, state) in &snapshot.account_states {
             let s = from_sync_state(state);
             if s.content_hash() != *state_hash {
+                return Err(SyncWaveError::StateHashMismatch(*state_hash));
+            }
+        }
+
+        // DID states
+        for (state_hash, did_state) in &snapshot.did_states {
+            let doc = from_sync_did_state(did_state);
+            if did_content_hash(&doc) != *state_hash {
                 return Err(SyncWaveError::StateHashMismatch(*state_hash));
             }
         }
@@ -208,7 +236,9 @@ impl SyncWaveExporter {
         if visited.contains_key(&hash) {
             return Ok(());
         }
-        let node = index.get(&hash).ok_or(SyncWaveError::DanglingReference(hash))?;
+        let node = index
+            .get(&hash)
+            .ok_or(SyncWaveError::DanglingReference(hash))?;
         visited.insert(hash, ());
         if let SyncWaveNode::Branch { left, right } = node {
             Self::walk_and_check(*left, index, visited)?;
@@ -221,31 +251,47 @@ impl SyncWaveExporter {
     // load — atomic persist into local stores
     // ─────────────────────────────────────────────────────────────
 
-    /// Persist the snapshot into local stores.
-    ///
-    /// Assumes `verify()` has already passed. Idempotent: content-addressed
-    /// nodes are simply re-inserted (same hash → same value).
     pub fn load(&self, snapshot: &SyncWaveSnapshot) -> SyncWaveResult<()> {
         // 1. SMT nodes
         for (h, node) in &snapshot.smt_nodes {
             let smt_node = match node {
-                SyncWaveNode::Leaf { key, value } => SmtNode::Leaf { key: *key, value: *value },
-                SyncWaveNode::Branch { left, right } => SmtNode::Branch { left: *left, right: *right },
+                SyncWaveNode::Leaf { key, value } => SmtNode::Leaf {
+                    key: *key,
+                    value: *value,
+                },
+                SyncWaveNode::Branch { left, right } => SmtNode::Branch {
+                    left: *left,
+                    right: *right,
+                },
             };
-            self.smt_nodes_store.insert_sync(*h, smt_node).map_err(store_err)?;
+            self.smt_nodes_store
+                .insert_sync(*h, smt_node)
+                .map_err(store_err)?;
         }
 
-        // 2. Account states
+        // 2a. Account states
         for (state_hash, state) in &snapshot.account_states {
             let s = from_sync_state(state);
-            self.account_states_store.insert_sync(*state_hash, &s).map_err(store_err)?;
+            self.account_states_store
+                .insert_sync(*state_hash, &s)
+                .map_err(store_err)?;
+        }
+
+        // 2b. DID states
+        for (state_hash, did_state) in &snapshot.did_states {
+            let doc = from_sync_did_state(did_state);
+            self.did_states_store
+                .insert_sync(*state_hash, &doc)
+                .map_err(store_err)?;
         }
 
         // 3. Account root — keyed by the checkpoint block hash
-        self.account_roots_store.insert_sync(
-            snapshot.metadata.block_hash,
-            hash_to_h256(snapshot.metadata.account_root),
-        ).map_err(store_err)?;
+        self.account_roots_store
+            .insert_sync(
+                snapshot.metadata.block_hash,
+                hash_to_h256(snapshot.metadata.account_root),
+            )
+            .map_err(store_err)?;
 
         Ok(())
     }
@@ -283,6 +329,36 @@ fn from_sync_state(s: &SyncWaveState) -> AccountState {
                 block_hash: Hash::default(),
             })
             .collect(),
+    }
+}
+
+fn to_sync_did_state(d: &DidDocument) -> SyncWaveDidState {
+    SyncWaveDidState {
+        did: d.did.clone(),
+        csm_address: d.csm_address.clone(),
+        public_key: d.public_key.clone(),
+        document: d.document.clone(),
+        purposes: d.purposes.clone(),
+        services: d.services.clone(),
+        active: d.active,
+        created_at: d.created_at,
+        updated_at: d.updated_at,
+        version: d.version,
+    }
+}
+
+fn from_sync_did_state(s: &SyncWaveDidState) -> DidDocument {
+    DidDocument {
+        did: s.did.clone(),
+        csm_address: s.csm_address.clone(),
+        public_key: s.public_key.clone(),
+        document: s.document.clone(),
+        purposes: s.purposes.clone(),
+        services: s.services.clone(),
+        active: s.active,
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+        version: s.version,
     }
 }
 
@@ -331,11 +407,13 @@ mod tests {
                 account_root: h256_to_hash(root),
                 total_smt_nodes: smt_nodes.len() as u64,
                 total_accounts: states.len() as u64,
+                total_did_states: 0,
                 chunk_size: 2048,
                 total_chunks: 1,
             },
             smt_nodes,
             account_states: states,
+            did_states: vec![],
         };
         (smt, root, snapshot)
     }

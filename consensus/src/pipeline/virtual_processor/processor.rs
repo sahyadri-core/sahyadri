@@ -1,5 +1,6 @@
 
 // SAHYADRI: DID support
+use crate::model::stores::did_states::{DbDidStatesStore, DidStatesStore};
 use crate::{
     consensus::{
         services::{
@@ -22,7 +23,6 @@ use crate::{
             account_roots::{AccountRootsStore, DbAccountRootsStore},
             account_states::{AccountStatesStore, DbAccountStatesStore},
             smt_nodes::DbSmtNodeStore,
-            did_store::{DidDocument, DidStore, DidStoreReader, DbDidStore},
             block_transactions::{BlockTransactionsStoreReader, DbBlockTransactionsStore},
             block_window_cache::{BlockWindowCacheStore, BlockWindowCacheWriter},
             daa::DbDaaStore,
@@ -173,13 +173,13 @@ pub struct VirtualStateProcessor {
     
     pub(super) acceptance_data_store: Arc<DbAcceptanceDataStore>,
     pub(super) account_store: Arc<DbAccountStore>,
-    pub(super) did_store: Arc<DbDidStore>,
     pub(super) virtual_stores: Arc<RwLock<VirtualStores>>,
 
     // Account state commitment (SMT)
     pub(super) smt_nodes_store: Arc<DbSmtNodeStore>,
     pub(super) account_roots_store: Arc<DbAccountRootsStore>,
     pub(super) account_states_store: Arc<DbAccountStatesStore>,
+    pub(super) did_states_store: Arc<DbDidStatesStore>,
     pub(super) pruning_meta_stores: Arc<RwLock<PruningMetaStores>>,
 
     /// The "last known good" virtual state. To be used by any logic which does not want to wait
@@ -257,11 +257,11 @@ impl VirtualStateProcessor {
             pruning_samples_store: storage.pruning_samples_store.clone(),
             acceptance_data_store: storage.acceptance_data_store.clone(),
             account_store: storage.account_store.clone(),
-            did_store: storage.did_store.clone(),
             virtual_stores: storage.virtual_stores.clone(),
             smt_nodes_store: storage.smt_nodes_store.clone(),
             account_roots_store: storage.account_roots_store.clone(),
             account_states_store: storage.account_states_store.clone(),
+            did_states_store: storage.did_states_store.clone(),
             pruning_meta_stores: storage.pruning_meta_stores.clone(),
             lkg_virtual_state: storage.lkg_virtual_state.clone(),
 
@@ -793,35 +793,69 @@ impl VirtualStateProcessor {
                     let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
                     let mut overlay = sahyadri_smt::OverlayStore::new(&db_base);
 
-                    match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
-                        parent_root,
-                        &mut overlay,
-                        &*self.account_states_store,
-                        &flash_txs,
-                        &rewards,
-                        daa,
-                    ) {
-                        Ok((new_root, changes)) => {
-                            let pending_nodes: Vec<_> = overlay.into_pending().collect();
-                            if let Err(e) = self.smt_nodes_store.insert_sync_many(pending_nodes) {
-                                log::error!("SAHYADRI: sync SMT write failed in commit for {}: {:?}", hash, e);
-                            }
-                            if let Err(e) = self.account_roots_store.insert_batch(&mut batch, hash, new_root) {
-                                log::error!("SAHYADRI: account_root persist failed for {}: {:?}", hash, e);
-                            }
-                            for (_spk, state) in changes {
-                                let state_hash = state.content_hash();
-                                if let Err(e) = self.account_states_store.insert_batch(&mut batch, state_hash, &state) {
-                                    log::error!("SAHYADRI: account_state persist failed: {:?}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("SAHYADRI: account commitment compute failed for {}: {:?}", hash, e);
-                        }
+let did_ops: Vec<_> = txs.iter().skip(1)
+    .filter_map(|tx| crate::pipeline::virtual_processor::did_changes::parse_did_op(&tx.payload, SIG_SIZE))
+    .collect();
+
+// Dilithium verify closure
+let did_verify = |pk: &[u8], sig: &[u8], msg: &[u8]| -> bool {
+    if sig.len() != SIG_SIZE { return false; }
+    let s = DilithiumSignature::from_slice(sig);
+    VERIFY_POOL.install(|| {
+        DilithiumKeyPair::verify(pk, &s, msg, b"", SAHYADRI_MODE)
+    })
+};
+
+match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+    parent_root,
+    &mut overlay,
+    &*self.account_states_store,
+    &flash_txs,
+    &rewards,
+    daa,
+) {
+    Ok((accounts_root, changes)) => {
+        match crate::pipeline::virtual_processor::did_changes::compute_block_did_changes(
+            accounts_root,
+            &mut overlay,
+            &*self.did_states_store,
+            &did_ops,
+            daa,
+            &did_verify,
+        ) {
+            Ok((final_root, did_docs)) => {
+                let pending_nodes: Vec<_> = overlay.into_pending().collect();
+                if let Err(e) = self.smt_nodes_store.insert_sync_many(pending_nodes) {
+                    log::error!("SAHYADRI: sync SMT write failed in commit for {}: {:?}", hash, e);
+                }
+                // Persist FINAL root (DID included)
+                if let Err(e) = self.account_roots_store.insert_batch(&mut batch, hash, final_root) {
+                    log::error!("SAHYADRI: account_root persist failed for {}: {:?}", hash, e);
+                }
+                // Account states
+                for (_spk, state) in changes {
+                    let state_hash = state.content_hash();
+                    if let Err(e) = self.account_states_store.insert_batch(&mut batch, state_hash, &state) {
+                        log::error!("SAHYADRI: account_state persist failed: {:?}", e);
                     }
                 }
-
+                for doc in did_docs {
+                    let doc_hash = crate::pipeline::virtual_processor::did_changes::did_content_hash(&doc);
+                    if let Err(e) = self.did_states_store.insert_batch(&mut batch, doc_hash, &doc) {
+                        log::error!("SAHYADRI: did_state persist failed: {:?}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("SAHYADRI: DID compute failed for {}: {:?}", hash, e);
+            }
+        }
+    }
+    Err(e) => {
+        log::error!("SAHYADRI: account commitment compute failed for {}: {:?}", hash, e);
+    }
+}
+}
                 for (i, tx) in txs.iter().enumerate() {
                     // ==========================================
                     // FIX 1: MINER REWARD
@@ -881,204 +915,9 @@ impl VirtualStateProcessor {
                             &tx.payload[..4] == b"DUPD" ||
                             &tx.payload[..4] == b"DDEC"
                         );
+
                         if is_did_tx && tx.payload.len() >= 20 {
-                            let did_tx_type = &tx.payload[..4];
-
-                            match did_tx_type {
-                                b"DCRT" => {
-                                    log::info!("SAHYADRI: Processing DID_CREATE transaction");
-                                    if tx.payload.len() < 100 { 
-                                        log::warn!("DID_CREATE FAIL #1: payload short = {}", tx.payload.len());
-                                        continue; 
-                                    }
-
-                                    let mut offset = 4;
-                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
-                                    offset += 4;
-                                    if offset + did_len > tx.payload.len() { 
-                                        log::warn!("DID_CREATE FAIL #2: did_len overflow");
-                                        continue; 
-                                    }
-                                    let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
-                                    offset += did_len;
-
-                                    const DILITHIUM_PUBKEY_SIZE: usize = 1952;
-                                    if offset + DILITHIUM_PUBKEY_SIZE > tx.payload.len() { 
-                                        log::warn!("DID_CREATE FAIL #3: pubkey overflow");
-                                        continue; 
-                                    }
-                                    let did_pubkey = &tx.payload[offset..offset+DILITHIUM_PUBKEY_SIZE];
-                                    offset += DILITHIUM_PUBKEY_SIZE;
-
-                                    let addr_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
-                                    offset += 4;
-                                    if offset + addr_len > tx.payload.len() { 
-                                        log::warn!("DID_CREATE FAIL #4: addr_len overflow");
-                                        continue; 
-                                     }
-                                    let csm_address = String::from_utf8_lossy(&tx.payload[offset..offset+addr_len]).to_string();
-                                    offset += addr_len;
-
-                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
-                                    offset += 4;
-                                    if offset + doc_len > tx.payload.len() { 
-                                        log::warn!("DID_CREATE FAIL #5: doc_len overflow");
-                                        continue; 
-                                    }
-                                    let document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
-                                    offset += doc_len;
-
-                                    // Timestamp (8 bytes before signature)
-                                    if offset + 8 > tx.payload.len() { continue; }
-                                    let timestamp = u64::from_le_bytes(
-                                        tx.payload[offset..offset+8].try_into().unwrap()
-                                    );
-
-                                    const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
-                                    if tx.payload.len() < DILITHIUM_SIG_SIZE { continue; }
-                                    let sig_start = tx.payload.len() - DILITHIUM_SIG_SIZE;
-                                    let sig_bytes = &tx.payload[sig_start..];
-
-                                    // Verify over "did:create:addr:ts" (matches wallet + RPC)
-                                    let message = format!("did:create:{}:{}", csm_address, timestamp);
-                                    let sig = DilithiumSignature::from_slice(sig_bytes);
-
-                                    let is_valid = VERIFY_POOL.install(|| {
-                                        DilithiumKeyPair::verify(did_pubkey, &sig, message.as_bytes(), b"", SAHYADRI_MODE)
-                                    });
-                                    if !is_valid {
-                                        log::warn!("SAHYADRI: DID_CREATE invalid signature");
-                                        continue;
-                                    }
-
-                                    if self.did_store.is_active(&did).unwrap_or(false) {
-                                        log::warn!("SAHYADRI: DID already exists: {}", did);
-                                        continue;
-                                    }
-
-                                    let now = unix_now();
-                                    let did_doc = DidDocument {
-                                        did: did.clone(),
-                                        csm_address,
-                                        public_key: faster_hex::hex_string(did_pubkey),
-                                        document,
-                                        purposes: vec!["authentication".to_string()],
-                                        services: vec![],
-                                        active: true,
-                                        created_at: now,
-                                        updated_at: now,
-                                        version: 1,
-                                    };
-
-            {
-                                        if let Err(e) = self.did_store.set_batch(&mut batch, &did_doc) {
-                                            log::error!("SAHYADRI: CRITICAL — failed to store DID: {:?}", e);
-                                            continue;
-                                        }
-                                    }
-
-                                    log::info!("SAHYADRI: DID created: {}", did);
-                                }
-
-                                b"DUPD" => {
-                                    log::info!("SAHYADRI: Processing DID_UPDATE");
-                                    if tx.payload.len() < 100 { continue; }
-
-                                    let mut offset = 4;
-                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
-                                    offset += 4;
-                                    if offset + did_len > tx.payload.len() { continue; }
-                                    let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
-
-                                    let existing_doc = match self.did_store.get_by_did(&did) {
-                                        Ok(Some(doc)) => doc,
-                                        _ => { continue; }
-                                    };
-
-                                    offset += did_len;
-                                    let doc_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
-                                    offset += 4;
-                                    if offset + doc_len > tx.payload.len() { continue; }
-                                    let new_document = String::from_utf8_lossy(&tx.payload[offset..offset+doc_len]).to_string();
-
-                                    // Read timestamp (8 bytes before signature)
-                                    if tx.payload.len() < DILITHIUM_SIG_SIZE + 8 { continue; }
-                                    let ts_start = tx.payload.len() - DILITHIUM_SIG_SIZE - 8;
-                                    let timestamp = u64::from_le_bytes(
-                                        tx.payload[ts_start..ts_start+8].try_into().unwrap()
-                                    );
-
-                                    const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
-                                    let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
-                                    let orig_pk = existing_doc.public_key.as_bytes().to_vec();
-
-                                    let sig = DilithiumSignature::from_slice(sig_bytes);
-
-                                    // Verify over "did:update:addr:ts" (matches wallet + RPC)
-                                    let message = format!("did:update:{}:{}", existing_doc.csm_address, timestamp);
-
-                                    let is_valid = VERIFY_POOL.install(|| {
-                                        DilithiumKeyPair::verify(&orig_pk, &sig, message.as_bytes(), b"", SAHYADRI_MODE)
-                                    });
-
-                                    if !is_valid {
-                                        continue;
-                                    }
-
-                                    let mut updated = existing_doc;
-                                    updated.document = new_document;
-                                    updated.updated_at = unix_now();
-                                    updated.version += 1;
-
-                                    self.did_store.update_batch(&mut batch, &updated).ok();
-                                    log::info!("SAHYADRI: DID updated: {}", did);
-                                }
-
-                                b"DDEC" => {
-                                    log::info!("SAHYADRI: Processing DID_DEACTIVATE");
-                                    if tx.payload.len() < 50 { continue; }
-
-                                    let mut offset = 4;
-                                    let did_len = u32::from_le_bytes(tx.payload[offset..offset+4].try_into().map_err(|_| log::error!("SAHYADRI: malformed payload slice")).ok().unwrap_or([0u8; 4])) as usize;
-                                    offset += 4;
-                                    if offset + did_len > tx.payload.len() { continue; }
-                                    let did = String::from_utf8_lossy(&tx.payload[offset..offset+did_len]).to_string();
-
-                                    let existing = match self.did_store.get_by_did(&did) {
-                                        Ok(Some(d)) => d,
-                                        _ => { continue; }
-                                    };
-
-                                    const DILITHIUM_SIG_SIZE: usize = SIG_SIZE;
-                                    
-                                    // Read timestamp (8 bytes before signature)
-                                    if tx.payload.len() < DILITHIUM_SIG_SIZE + 8 { continue; }
-                                    let ts_start = tx.payload.len() - DILITHIUM_SIG_SIZE - 8;
-                                    let timestamp = u64::from_le_bytes(
-                                        tx.payload[ts_start..ts_start+8].try_into().unwrap()
-                                    );
-
-                                    let sig_bytes = &tx.payload[tx.payload.len()-DILITHIUM_SIG_SIZE..];
-                                    let orig_pk = existing.public_key.as_bytes().to_vec();
-                                    let sig = DilithiumSignature::from_slice(sig_bytes);
-
-                                    // Verify over "did:deactivate:addr:ts"
-                                    let message = format!("did:deactivate:{}:{}", existing.csm_address, timestamp);
-
-                                    let is_valid = VERIFY_POOL.install(|| {
-                                        DilithiumKeyPair::verify(&orig_pk, &sig, message.as_bytes(), b"", SAHYADRI_MODE)
-                                    });
-
-                                    if !is_valid {
-                                        continue;
-                                    }
-
-                                    self.did_store.deactivate_batch(&mut batch, &did).ok();
-                                    log::info!("SAHYADRI: DID deactivated: {}", did);
-                                }
-
-                                _ => {}
-                            }
+                            // SAHYADRI Phase B: DID ab SMT path se handle hota hai (did_changes.rs)
                             continue;
                         }
 
@@ -1303,6 +1142,7 @@ impl VirtualStateProcessor {
                 let stats = crate::model::stores::gc::mark_and_sweep(
                     &self.smt_nodes_store,
                     &self.account_states_store,
+                    &self.did_states_store,
                     &self.account_roots_store,
                     &self.headers_store,
                 );
@@ -1384,7 +1224,7 @@ impl VirtualStateProcessor {
             let candidate = match heap.pop() {
                 Some(s) => s.hash,
                 None => {
-                    log::error!("SAHYADRI: CRITICAL — sink heap is empty during GHOSTDAG");
+                    log::error!("SAHYADRI: CRITICAL — sink heap is empty during Ashwa Ordering");
                     return (Default::default(), Default::default());
                 }
             };

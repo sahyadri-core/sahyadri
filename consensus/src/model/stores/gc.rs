@@ -21,6 +21,7 @@ use sahyadri_hashes::Hash;
 use sahyadri_smt::{Node, H256};
 use std::collections::HashSet;
 
+use super::did_states::DbDidStatesStore;
 use super::account_roots::DbAccountRootsStore;
 use super::account_states::DbAccountStatesStore;
 use super::headers::{DbHeadersStore, HeaderStoreReader};
@@ -31,10 +32,13 @@ pub struct GcStats {
     pub live_roots: usize,
     pub scanned_nodes: usize,
     pub scanned_states: usize,
+    pub scanned_did_states: usize,
     pub marked_nodes: usize,
     pub marked_states: usize,
+    pub marked_did_states: usize,
     pub deleted_nodes: usize,
     pub deleted_states: usize,
+    pub deleted_did_states: usize,
     pub deleted_roots: usize,
 }
 
@@ -45,6 +49,7 @@ pub struct GcStats {
 pub fn mark_and_sweep(
     smt_store: &DbSmtNodeStore,
     state_store: &DbAccountStatesStore,
+    did_states_store: &DbDidStatesStore,
     roots_store: &DbAccountRootsStore,
     headers_store: &DbHeadersStore,
 ) -> GcStats {
@@ -138,15 +143,37 @@ pub fn mark_and_sweep(
         .filter(|h| !marked_states.contains(h))
         .collect();
     let deleted_states = states_to_delete.len();
+    if !states_to_delete.is_empty() {
+        if let Err(e) = state_store.delete_many_sync(&states_to_delete) {
+            log::error!("SAHYADRI GC: state delete failed: {:?}", e);
+        }
+    }
+
+    // ── 5b. Sweep DID states ──
+    let all_did: Vec<Hash> = did_states_store.iter_hashes().collect();
+    let scanned_did_states = all_did.len();
+    let did_to_delete: Vec<Hash> = all_did
+        .into_iter()
+        .filter(|h| !marked_states.contains(h))
+        .collect();
+    let deleted_did_states = did_to_delete.len();
+    if !did_to_delete.is_empty() {
+        if let Err(e) = did_states_store.delete_many_sync(&did_to_delete) {
+            log::error!("SAHYADRI GC: did state delete failed: {:?}", e);
+        }
+    }
 
     let stats = GcStats {
         live_roots: live_roots_count,
         scanned_nodes,
         scanned_states,
+        scanned_did_states,
         marked_nodes: marked_nodes.len(),
         marked_states: marked_states.len(),
+        marked_did_states: marked_states.len(),
         deleted_nodes,
         deleted_states,
+        deleted_did_states,
         deleted_roots,
     };
 

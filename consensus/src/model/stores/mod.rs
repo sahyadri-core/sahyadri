@@ -3,6 +3,7 @@ pub mod account_roots;
 pub mod account_states;
 pub mod account_store;
 pub mod did_store;
+pub mod did_states;
 pub mod block_transactions;
 pub mod block_window_cache;
 pub mod children;

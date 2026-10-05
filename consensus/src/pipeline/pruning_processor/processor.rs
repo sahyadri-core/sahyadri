@@ -593,6 +593,7 @@ impl PruningProcessor {
             let stats = crate::model::stores::gc::mark_and_sweep(
                 &self.smt_nodes_store,
                 &self.account_states_store,
+                &self.did_states_store,
                 &self.account_roots_store,
                 &self.headers_store,
             );

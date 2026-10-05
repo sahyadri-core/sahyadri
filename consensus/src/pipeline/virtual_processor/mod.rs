@@ -8,3 +8,4 @@ pub mod test_block_builder;
 mod tests;
 pub mod flash_tx;
 pub mod account_changes;
+pub mod did_changes;

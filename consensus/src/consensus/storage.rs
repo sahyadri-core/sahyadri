@@ -8,6 +8,7 @@ use crate::{
         account_states::DbAccountStatesStore,
         smt_nodes::DbSmtNodeStore,
         did_store::DbDidStore,
+        did_states::DbDidStatesStore,
         block_transactions::DbBlockTransactionsStore,
         block_window_cache::BlockWindowCacheStore,
         daa::DbDaaStore,
@@ -72,6 +73,7 @@ pub struct ConsensusStorage {
     pub smt_nodes_store: Arc<DbSmtNodeStore>,
     pub account_roots_store: Arc<DbAccountRootsStore>,
     pub account_states_store: Arc<DbAccountStatesStore>,
+    pub did_states_store: Arc<DbDidStatesStore>,
 
     // Block window caches
     pub block_window_cache_for_difficulty: Arc<BlockWindowCacheStore>,
@@ -219,6 +221,10 @@ impl ConsensusStorage {
         let smt_nodes_store = Arc::new(DbSmtNodeStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64));
         let account_roots_store = Arc::new(DbAccountRootsStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64));
         let account_states_store = Arc::new(DbAccountStatesStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64));
+        let did_states_store = Arc::new(DbDidStatesStore::new(
+            db.clone(),
+            perf_params.registry_unit_set_cache_size as u64,
+        ));
 
         // Tips
         let headers_selected_tip_store = Arc::new(RwLock::new(DbHeadersSelectedTipStore::new(db.clone())));
@@ -264,6 +270,7 @@ impl ConsensusStorage {
             smt_nodes_store,
             account_roots_store,
             account_states_store,
+            did_states_store,
             did_store: Arc::new(DbDidStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64)),
         })
     }

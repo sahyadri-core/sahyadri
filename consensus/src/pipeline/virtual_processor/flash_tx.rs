@@ -69,7 +69,7 @@ pub fn apply_flash_tx(
 /// Reorg a block's `FlashTransaction`s.
 ///
 /// Only unwinds entries whose `block_hash` matches the disconnected block.
-/// This is safe under GhostDAG: parallel flash-txs from *other* blocks stay
+/// This is safe under Ashwa Ordering: parallel flash-txs from *other* blocks stay
 /// intact and remain replay-protected.
 pub fn reorg_flash_block(
     account_store: &DbAccountStore,

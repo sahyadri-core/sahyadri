@@ -217,7 +217,28 @@ impl VirtualStateProcessor {
         let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
         let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
 
-        let (my_root, changes) = crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+        // NAYA: DID ops extract karo
+        let did_ops: Vec<_> = txs_for_effects.iter().skip(1)
+            .filter_map(|tx| {
+                crate::pipeline::virtual_processor::did_changes::parse_did_op(
+                    &tx.payload,
+                    sahyadri_dilithium::SIG_SIZE,
+                )
+            })
+            .collect();
+
+        // Dilithium verify closure
+        let did_verify = |pk: &[u8], sig: &[u8], msg: &[u8]| -> bool {
+            if sig.len() != sahyadri_dilithium::SIG_SIZE {
+                return false;
+            }
+            let s = sahyadri_dilithium::DilithiumSignature::from_slice(sig);
+            sahyadri_dilithium::DilithiumKeyPair::verify(
+                pk, &s, msg, b"", sahyadri_dilithium::SAHYADRI_MODE,
+            )
+        };
+
+        let (accounts_root, changes) = crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
             parent_root,
             &mut smt_overlay,
             &*self.account_states_store,
@@ -230,18 +251,37 @@ impl VirtualStateProcessor {
             AccountCommitmentComputeFailed
         })?;
 
-        // SAHYADRI: sync-persist SMT nodes AND state snapshots. Both are
-        // content-addressed (idempotent), so writes from even a disqualified
-        // block are harmless — they only make subsequent blocks' reads
-        // resolve correctly. This closes the race with async commit flush.
+        // NAYA: DID ops accounts root ke upar
+        let (my_root, did_docs) = crate::pipeline::virtual_processor::did_changes::compute_block_did_changes(
+            accounts_root,
+            &mut smt_overlay,
+            &*self.did_states_store,
+            &did_ops,
+            header.daa_score,
+            &did_verify,
+        )
+        .map_err(|e| {
+            log::error!("SAHYADRI: DID compute failed during verify: {:?}", e);
+            AccountCommitmentComputeFailed
+        })?;
+
+        // SAHYADRI: sync-persist SMT nodes AND state snapshots
         let pending: Vec<_> = smt_overlay.into_pending().collect();
         if let Err(e) = self.smt_nodes_store.insert_sync_many(pending) {
             log::error!("SAHYADRI: sync SMT write failed in verify: {:?}", e);
         }
+
         for (_spk, state) in &changes {
             let state_hash = state.content_hash();
             if let Err(e) = self.account_states_store.insert_sync(state_hash, state) {
                 log::error!("SAHYADRI: sync state write failed in verify: {:?}", e);
+            }
+        }
+
+        for doc in &did_docs {
+            let doc_hash = crate::pipeline::virtual_processor::did_changes::did_content_hash(doc);
+            if let Err(e) = self.did_states_store.insert_sync(doc_hash, doc) {
+                log::error!("SAHYADRI: sync DID state write failed in verify: {:?}", e);
             }
         }
 

@@ -30,6 +30,8 @@ pub struct SyncWaveMetadata {
     pub total_smt_nodes: u64,
     /// Number of account states in the snapshot.
     pub total_accounts: u64,
+    /// Number of DID states in the snapshot.
+    pub total_did_states: u64,
     /// Entries per chunk (for wire transport).
     pub chunk_size: u32,
     /// Total number of chunks.
@@ -83,6 +85,23 @@ pub struct SyncWaveState {
     pub recent_flashes: Vec<SyncWaveFlashEntry>,
 }
 
+/// DID state carried in the snapshot.
+/// Mirror of `crate::model::stores::did_store::DidDocument`.
+#[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncWaveDidState {
+    pub did: String,
+    pub csm_address: String,
+    pub public_key: String,
+    pub document: String,
+    pub purposes: Vec<String>,
+    pub services: Vec<String>,
+    pub active: bool,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub version: u64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncWaveFlashEntry {
@@ -99,6 +118,8 @@ pub struct SyncWaveSnapshot {
     pub smt_nodes: Vec<(H256, SyncWaveNode)>,
     /// Account states keyed by content-hash (the SMT leaf `value`).
     pub account_states: Vec<(Hash, SyncWaveState)>,
+    /// DID states keyed by content-hash (the SMT leaf `value`).
+    pub did_states: Vec<(Hash, SyncWaveDidState)>,
 }
 
 #[cfg(test)]

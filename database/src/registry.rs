@@ -52,7 +52,9 @@ pub enum DatabaseStorePrefixes {
     // ---- Account state commitment (SMT) ----
     AccountRoots = 34,
     SmtNodes = 35,
+    
     AccountStates = 36,
+    DidStates = 37,
 
     // ---- SahyadriConsensus Proof
     TempSahyadriConsensus = 40,

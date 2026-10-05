@@ -609,6 +609,7 @@ impl Consensus {
         let exporter = SyncWaveExporter::new(
             self.storage.smt_nodes_store.clone(),
             self.storage.account_states_store.clone(),
+            self.storage.did_states_store.clone(),
             self.storage.account_roots_store.clone(),
             self.storage.headers_store.clone(),
         );
@@ -627,6 +628,7 @@ impl Consensus {
         let exporter = SyncWaveExporter::new(
             self.storage.smt_nodes_store.clone(),
             self.storage.account_states_store.clone(),
+            self.storage.did_states_store.clone(),
             self.storage.account_roots_store.clone(),
             self.storage.headers_store.clone(),
         );

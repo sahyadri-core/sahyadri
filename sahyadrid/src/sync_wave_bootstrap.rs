@@ -142,6 +142,7 @@ pub async fn bootstrap_from_peer(
         account_root: metadata.account_root,
         total_smt_nodes: metadata.total_smt_nodes,
         total_accounts: metadata.total_accounts,
+        total_did_states: 0,
         chunk_size: metadata.chunk_size,
         total_chunks: metadata.total_chunks,
     };
@@ -150,6 +151,7 @@ pub async fn bootstrap_from_peer(
         metadata: core_metadata,
         smt_nodes: all_smt_nodes,
         account_states: all_states,
+        did_states: vec![],
     };
 
     info!("SyncWave: verifying snapshot against checkpoint root");

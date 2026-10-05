@@ -209,20 +209,20 @@ message BlockWithTrustedDataMessage {
   BlockMessage block = 1;
   uint64 daaScore = 2;
   repeated DaaBlock daaWindow = 3;
-  repeated BlockGhostdagDataHashPair ghostdagData = 4;
+  repeated BlockAshwaDataHashPair ghostdagData = 4;
 }
 
 message DaaBlock {
   BlockMessage block = 3;
-  GhostdagData ghostdagData = 2;
+  AshwaData ghostdagData = 2;
 }
 
-message BlockGhostdagDataHashPair {
+message BlockAshwaDataHashPair {
   Hash hash = 1;
-  GhostdagData ghostdagData = 2;
+  AshwaData ghostdagData = 2;
 }
 
-message GhostdagData {
+message AshwaData {
   uint64 blueScore = 1;
   bytes blueWork = 2;
   Hash selectedParent = 3;
