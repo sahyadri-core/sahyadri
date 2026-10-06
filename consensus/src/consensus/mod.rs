@@ -4,8 +4,11 @@ pub mod factory;
 pub mod services;
 pub mod storage;
 pub mod test_consensus;
-use crate::model::stores::did_store::DidStoreReader;
+use crate::model::stores::did_states::DidStatesStoreReader;
 use crate::model::stores::account_store::AccountStoreReader;
+use crate::model::stores::smt_nodes::DbSmtNodeStoreBase;
+use crate::pipeline::virtual_processor::did_changes::did_key_hash;
+use sahyadri_smt;
 
 use crate::{
     config::Config,
@@ -103,7 +106,6 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::model::stores::smt_nodes::DbSmtNodeStoreBase;
 use sahyadri_consensus_core::model::proof::AccountProof;
 use sahyadri_consensus_core::tx::ScriptPublicKey;
 use sahyadri_smt::H256;
@@ -699,8 +701,8 @@ impl ConsensusApi for Consensus {
 
     // ============= SAHYADRI DID IMPLEMENTATIONS =============
     fn get_did_document(&self, did: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> {
-        self.storage.did_store.get_by_did(did).ok().flatten().map(|doc| {
-            sahyadri_consensus_core::api::DidDocumentDto {
+            let doc = self.resolve_did_from_smt(did)?;
+            Some(sahyadri_consensus_core::api::DidDocumentDto {
                 did: doc.did,
                 csm_address: doc.csm_address,
                 public_key: doc.public_key,
@@ -709,26 +711,14 @@ impl ConsensusApi for Consensus {
                 version: doc.version,
                 created_at: doc.created_at,
                 updated_at: doc.updated_at,
-            }
         })
     }
 
     fn get_did_by_address(&self, address: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> {
-        self.storage.did_store.get_by_address(address).ok().flatten().map(|doc| {
-            sahyadri_consensus_core::api::DidDocumentDto {
-                did: doc.did,
-                csm_address: doc.csm_address,
-                public_key: doc.public_key,
-                document: doc.document,
-                active: doc.active,
-                version: doc.version,
-                created_at: doc.created_at,
-                updated_at: doc.updated_at,
-            }
-        })
+        // DID format is deterministic from the CSM address.
+        let did = format!("did:sahyadri:{}", address);
+        self.get_did_document(&did)
     }
-
-
 
     fn validate_and_insert_block(&self, block: Block) -> BlockValidationFutures {
         let (block_task, virtual_state_task) = self.validate_and_insert_block_impl(BlockTask::Ordinary { block });
@@ -1538,5 +1528,57 @@ impl ConsensusApi for Consensus {
     fn get_n_last_pruning_points(&self, n: usize) -> Vec<Hash> {
         let (_pruning_point, pruning_index) = self.pruning_point_store.read().pruning_point_and_index().unwrap();
         (0..=pruning_index).rev().take(n).map(|ind| self.past_pruning_points_store.get(ind).unwrap()).collect_vec()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Private helpers on Consensus (non-trait methods)
+// ═══════════════════════════════════════════════════════════════
+
+impl Consensus {
+    /// Resolve a DID document by reading its SMT leaf at the current virtual root
+    /// and fetching the content-addressed document from the DID states store.
+    ///
+    /// Returns `None` if the DID is not present in SMT (never created or deactivated-removed).
+    fn resolve_did_from_smt(
+        &self,
+        did: &str,
+    ) -> Option<crate::model::stores::did_store::DidDocument> {
+        // 1. Get the current virtual account root.
+        // Get current sink (tip) and read its account root from account_roots_store
+        let root = {
+            let sink_block = self
+                .headers_selected_tip_store
+                .read()
+                .get()
+                .ok()?;
+            self.account_roots_store
+                .get(sink_block.hash)
+                .ok()?
+        };
+
+        // 2. Compute SMT leaf key: H("DID1" || did)
+        let leaf_key = did_key_hash(did);
+
+        // 3. Read the leaf value (content hash of the DID document).
+        let smt_base = DbSmtNodeStoreBase::new(&*self.storage.smt_nodes_store);
+        let doc_hash_bytes = match sahyadri_smt::get(&smt_base, root, &leaf_key) {
+            Ok(Some(h)) => h,
+            Ok(None) => return None,
+            Err(e) => {
+                log::warn!("DID resolve SMT read failed for {}: {:?}", did, e);
+                return None;
+            }
+        };
+        let doc_hash = sahyadri_hashes::Hash::from_bytes(doc_hash_bytes);
+
+        // 4. Fetch the content-addressed document.
+        match self.storage.did_states_store.get(doc_hash) {
+            Ok(doc) => Some(doc),
+            Err(e) => {
+                log::warn!("DID resolve content fetch failed for {}: {:?}", did, e);
+                None
+            }
+        }
     }
 }

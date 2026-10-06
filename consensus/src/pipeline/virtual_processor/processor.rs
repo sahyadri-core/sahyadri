@@ -1,5 +1,7 @@
 
 // SAHYADRI: DID support
+use sahyadri_addresses::Prefix;
+use sahyadri_consensus_core::network::NetworkType;
 use crate::model::stores::did_states::{DbDidStatesStore, DidStatesStore};
 use crate::{
     consensus::{
@@ -155,6 +157,8 @@ pub struct VirtualStateProcessor {
     pub(super) mergeset_size_limit: u64,
     /// Enables the Sahyadri Flash Transaction (SFT) nonce-less path.
     pub(super) enable_flash_tx: bool,
+    /// Network prefix for address derivation (csm / csmtest / ...).
+    pub(super) network_prefix: Prefix,
 
     // Stores
     pub(super) statuses_store: Arc<RwLock<DbStatusesStore>>,
@@ -242,6 +246,12 @@ impl VirtualStateProcessor {
             max_block_parents: params.max_block_parents(),
             mergeset_size_limit: params.mergeset_size_limit(),
             enable_flash_tx,
+            network_prefix: match NetworkType::from(params.net) {
+                NetworkType::Mainnet => Prefix::Mainnet,
+                NetworkType::Testnet => Prefix::Testnet,
+                NetworkType::Simnet  => Prefix::Simnet,
+                NetworkType::Devnet  => Prefix::Devnet,
+            },
 
             db,
             statuses_store: storage.statuses_store.clone(),
@@ -821,6 +831,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
             &*self.did_states_store,
             &did_ops,
             daa,
+            self.network_prefix,
             &did_verify,
         ) {
             Ok((final_root, did_docs)) => {

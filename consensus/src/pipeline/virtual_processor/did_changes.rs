@@ -6,6 +6,7 @@
 //! No wall-clock: created_at / updated_at carry the block DAA score.
 
 use crate::model::stores::did_store::DidDocument;
+use sahyadri_addresses::Prefix;
 use sahyadri_database::prelude::StoreError;
 use sahyadri_hashes::Hash;
 use sahyadri_smt::{NodeStore, SmtError, H256};
@@ -75,6 +76,41 @@ pub fn did_content_hash(d: &DidDocument) -> Hash {
     h.update(b"SAHYADRI_DID_STATE_V1");
     h.update(&out);
     Hash::from_slice(&h.finalize())
+}
+
+/// Binding hash — used ONLY for DCRT/DUPD signature binding.
+/// Excludes created_at/updated_at (which carry DAA score and are not
+/// known to the wallet at signing time). Binding covers:
+///   did + csm_address + public_key + document + version
+pub fn did_binding_hash(
+    did: &str,
+    csm_address: &str,
+    public_key_hex: &str,
+    document: &str,
+    version: u64,
+) -> Hash {
+    let mut out = Vec::with_capacity(256 + document.len());
+    put_str(&mut out, did);
+    put_str(&mut out, csm_address);
+    put_str(&mut out, public_key_hex);
+    put_str(&mut out, document);
+    out.extend_from_slice(&version.to_le_bytes());
+
+    let mut h = Sha3_256::new();
+    h.update(b"SAHYADRI_DID_BIND_V1");
+    h.update(&out);
+    Hash::from_slice(&h.finalize())
+}
+
+/// Derive CSM address from Dilithium pubkey with network-aware prefix.
+/// MUST match SDK's `pubkeyToAddress` in `sahyadri-sdk/src/address.ts`.
+fn derive_csm_address(pubkey: &[u8], prefix: Prefix) -> String {
+    use sha3::{Digest, Sha3_256};
+    use sahyadri_addresses::{Address, Version};
+
+    let hash = Sha3_256::digest(pubkey);
+    let hash20 = &hash[..20];
+    Address::new(prefix, Version::PubKeyDilithium, hash20).to_string()
 }
 
 // ── Payload parsing (same wire format as the current commit handlers) ──
@@ -177,20 +213,35 @@ pub fn compute_block_did_changes(
     states: &dyn DidStatesReader,
     ops: &[DidOp],
     daa_score: u64,
+    prefix: Prefix,
     verify: &dyn Fn(&[u8], &[u8], &[u8]) -> bool,
 ) -> Result<(H256, Vec<DidDocument>), DidError> {
     let mut touched: HashMap<String, DidDocument> = HashMap::new();
 
     for op in ops {
         match op {
-            DidOp::Create { pubkey, did, csm_address, document, timestamp, sig } => {
+            DidOp::Create { pubkey, did, csm_address, document, timestamp: _timestamp, sig } => {
                 if document.len() > MAX_DID_DOC_BYTES || *did != format!("{}{}", DID_PREFIX, csm_address) {
                     continue;
                 }
+
+                // Squatting check — csm_address must derive from pubkey
+                let derived = derive_csm_address(pubkey, prefix);
+                if derived != *csm_address {
+                    log::warn!(
+                        "SAHYADRI DID: csm_address mismatch — expected {}, got {}",
+                        derived, csm_address
+                    );
+                    continue;
+                }
+
                 if lookup(&*smt, states, root, &touched, did)?.is_some() {
                     continue;
                 }
-                let msg = format!("did:create:{}:{}", csm_address, timestamp);
+                let pubkey_hex = faster_hex::hex_string(pubkey);
+                let binding = did_binding_hash(did, csm_address, &pubkey_hex, document, 1);
+                let binding_hex = faster_hex::hex_string(&binding.as_bytes());
+                let msg = format!("did:create:{}:1:{}", csm_address, binding_hex);
                 if !verify(pubkey, sig, msg.as_bytes()) {
                     continue;
                 }
@@ -210,7 +261,7 @@ pub fn compute_block_did_changes(
                     },
                 );
             }
-            DidOp::Update { did, document, timestamp, sig } => {
+            DidOp::Update { did, document, timestamp: _timestamp, sig } => {
                 if document.len() > MAX_DID_DOC_BYTES {
                     continue;
                 }
@@ -219,7 +270,16 @@ pub fn compute_block_did_changes(
                     continue;
                 }
                 let Some(pk) = hex_to_bytes(&cur.public_key) else { continue };
-                let msg = format!("did:update:{}:{}", cur.csm_address, timestamp);
+                let new_version = cur.version + 1;
+                let binding = did_binding_hash(
+                    &cur.did,
+                    &cur.csm_address,
+                    &cur.public_key,
+                    document,
+                    new_version,
+                );
+                let binding_hex = faster_hex::hex_string(&binding.as_bytes());
+                let msg = format!("did:update:{}:{}:{}", cur.csm_address, new_version, binding_hex);
                 if !verify(&pk, sig, msg.as_bytes()) {
                     continue;
                 }
@@ -228,13 +288,14 @@ pub fn compute_block_did_changes(
                 cur.version += 1;
                 touched.insert(did.clone(), cur);
             }
-            DidOp::Deactivate { did, timestamp, sig } => {
+            DidOp::Deactivate { did, timestamp: _timestamp, sig } => {
                 let Some(mut cur) = lookup(&*smt, states, root, &touched, did)? else { continue };
                 if !cur.active {
                     continue;
                 }
                 let Some(pk) = hex_to_bytes(&cur.public_key) else { continue };
-                let msg = format!("did:deactivate:{}:{}", cur.csm_address, timestamp);
+                let new_version = cur.version + 1;
+                let msg = format!("did:deactivate:{}:{}", cur.csm_address, new_version);
                 if !verify(&pk, sig, msg.as_bytes()) {
                     continue;
                 }

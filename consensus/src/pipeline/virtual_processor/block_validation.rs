@@ -251,13 +251,13 @@ impl VirtualStateProcessor {
             AccountCommitmentComputeFailed
         })?;
 
-        // NAYA: DID ops accounts root ke upar
         let (my_root, did_docs) = crate::pipeline::virtual_processor::did_changes::compute_block_did_changes(
             accounts_root,
             &mut smt_overlay,
             &*self.did_states_store,
             &did_ops,
             header.daa_score,
+            self.network_prefix,
             &did_verify,
         )
         .map_err(|e| {
