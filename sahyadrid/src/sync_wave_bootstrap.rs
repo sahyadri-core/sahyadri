@@ -103,6 +103,7 @@ pub async fn bootstrap_from_peer(
     info!("SyncWave: downloading {} chunks", metadata.total_chunks);
     let mut all_smt_nodes = Vec::with_capacity(metadata.total_smt_nodes as usize);
     let mut all_states = Vec::with_capacity(metadata.total_accounts as usize);
+    let mut all_did_states = Vec::with_capacity(metadata.total_did_states as usize);
 
     for i in 0..metadata.total_chunks {
         let resp = client
@@ -115,6 +116,7 @@ pub async fn bootstrap_from_peer(
 
         all_smt_nodes.extend(chunk.smt_nodes);
         all_states.extend(chunk.account_states);
+        all_did_states.extend(chunk.did_states);
 
         if i % 8 == 0 || i + 1 == metadata.total_chunks {
             debug!(
@@ -151,7 +153,7 @@ pub async fn bootstrap_from_peer(
         metadata: core_metadata,
         smt_nodes: all_smt_nodes,
         account_states: all_states,
-        did_states: vec![],
+        did_states: all_did_states,
     };
 
     info!("SyncWave: verifying snapshot against checkpoint root");

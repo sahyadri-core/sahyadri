@@ -1031,6 +1031,7 @@ from!(item: &sahyadri_rpc_core::RpcSyncWaveMetadata, protowire::RpcSyncWaveMetad
         account_root: item.account_root.to_string(),
         total_smt_nodes: item.total_smt_nodes,
         total_accounts: item.total_accounts,
+        total_did_states: item.total_did_states,
         chunk_size: item.chunk_size,
         total_chunks: item.total_chunks,
     }
@@ -1042,6 +1043,7 @@ try_from!(item: &protowire::RpcSyncWaveMetadata, sahyadri_rpc_core::RpcSyncWaveM
         account_root: RpcHash::from_str(&item.account_root)?,
         total_smt_nodes: item.total_smt_nodes,
         total_accounts: item.total_accounts,
+        total_did_states: item.total_did_states,
         chunk_size: item.chunk_size,
         total_chunks: item.total_chunks,
     }

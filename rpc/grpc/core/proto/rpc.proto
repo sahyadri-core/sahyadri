@@ -626,6 +626,7 @@ message RpcSyncWaveMetadata {
   string accountRoot = 3;
   uint64 totalSmtNodes = 4;
   uint64 totalAccounts = 5;
+  uint64 total_did_states = 8;
   uint32 chunkSize = 6;
   uint32 totalChunks = 7;
 }

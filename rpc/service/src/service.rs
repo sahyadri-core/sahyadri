@@ -468,7 +468,7 @@ impl RpcCoreService {
     ) -> RpcResult<SubmitDidCreateResponse> {
         eprintln!("[DID CREATE] Creating DID transaction for did={}", request.did);
 
-        // ──── STEP 1: VERIFY SIGNATURE ────
+        // ──── STEP 1: BUILD + VERIFY SIGNATURE ────
         // Decode pubkey and signature from hex
         let mut pubkey_bytes = vec![0u8; request.public_key_hex.len() / 2];
         faster_hex::hex_decode(request.public_key_hex.as_bytes(), &mut pubkey_bytes)
@@ -478,10 +478,31 @@ impl RpcCoreService {
         faster_hex::hex_decode(request.signature.as_bytes(), &mut sig_bytes)
             .map_err(|_| RpcError::General("Invalid signature hex".into()))?;
 
-        // Reconstruct the exact message that was signed
-        // SDK signs: `did:create:${address}:${timestamp}`
-        let message = format!("did:create:{}:{}", request.sender, request.timestamp);
-        
+        // Compute binding hash — must match consensus did_binding_hash
+        let binding_hex = {
+            use sha3::{Digest, Sha3_256};
+            let mut out: Vec<u8> = Vec::new();
+            // put_str: u32 LE length prefix + bytes
+            let put_str = |out: &mut Vec<u8>, s: &str| {
+                let b = s.as_bytes();
+                out.extend_from_slice(&(b.len() as u32).to_le_bytes());
+                out.extend_from_slice(b);
+            };
+            put_str(&mut out, &request.did);
+            put_str(&mut out, &request.sender);
+            put_str(&mut out, &request.public_key_hex);
+            put_str(&mut out, &request.document);
+            out.extend_from_slice(&1u64.to_le_bytes()); // version = 1
+
+            let mut h = Sha3_256::new();
+            h.update(b"SAHYADRI_DID_BIND_V1");
+            h.update(&out);
+            faster_hex::hex_string(&h.finalize())
+        };
+
+        // Reconstruct signed message — matches wallet
+        let message = format!("did:create:{}:1:{}", request.sender, binding_hex);
+
         // Verify ML-DSA-65 signature
         let sig = sahyadri_dilithium::DilithiumSignature::from_slice(&sig_bytes);
         let msg_bytes = message.as_bytes();
@@ -492,7 +513,7 @@ impl RpcCoreService {
             b"",
             sahyadri_dilithium::SAHYADRI_MODE,
         );
-        
+
         if !is_valid {
             eprintln!("[DID CREATE] Signature verification FAILED");
             return Ok(SubmitDidCreateResponse {
@@ -501,7 +522,6 @@ impl RpcCoreService {
             });
         }
         eprintln!("[DID CREATE] Signature verified");
-
         
         // ──── STEP 2: Build payload (raw bytes, no length prefixes for fixed-size fields) ────
         let mut payload = Vec::new();
@@ -900,6 +920,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             account_root: m.account_root,
             total_smt_nodes: m.total_smt_nodes,
             total_accounts: m.total_accounts,
+            total_did_states: m.total_did_states,
             chunk_size: m.chunk_size,
             total_chunks: m.total_chunks,
         }))
@@ -922,24 +943,35 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             )));
         }
 
-        // Concatenate (smt_nodes, account_states) and slice
+        // Concatenate (smt_nodes, account_states, did_states) and slice
         let start = request.chunk_index as usize * chunk_size;
-        let end = (start + chunk_size).min(snapshot.smt_nodes.len() + snapshot.account_states.len());
+        let total_items = snapshot.smt_nodes.len()
+            + snapshot.account_states.len()
+            + snapshot.did_states.len();
+        let end = (start + chunk_size).min(total_items);
 
-        // Take from smt_nodes first, then account_states
+        // Slice smt_nodes first
         let n_smt = snapshot.smt_nodes.len();
         let smt_start = start.min(n_smt);
         let smt_end = end.min(n_smt);
-        let st_start = start.saturating_sub(n_smt);
-        let st_end = end.saturating_sub(n_smt);
+
+        // Then account_states
+        let n_acct = snapshot.account_states.len();
+        let acct_start = start.saturating_sub(n_smt).min(n_acct);
+        let acct_end = end.saturating_sub(n_smt).min(n_acct);
+
+        // Then did_states
+        let n_did = snapshot.did_states.len();
+        let did_start = start.saturating_sub(n_smt + n_acct).min(n_did);
+        let did_end = end.saturating_sub(n_smt + n_acct).min(n_did);
 
         let chunk = sahyadri_consensus_core::model::sync_wave::SyncWaveChunkWire {
             chunk_index: request.chunk_index,
             total_chunks,
             smt_nodes: snapshot.smt_nodes[smt_start..smt_end].to_vec(),
-            account_states: snapshot.account_states[st_start..st_end].to_vec(),
+            account_states: snapshot.account_states[acct_start..acct_end].to_vec(),
+            did_states: snapshot.did_states[did_start..did_end].to_vec(),
         };
-
         let data = bincode::serialize(&chunk)
             .map_err(|e| RpcError::General(format!("serialize chunk: {e}")))?;
 

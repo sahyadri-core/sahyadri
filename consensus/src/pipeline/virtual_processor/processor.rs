@@ -809,11 +809,17 @@ let did_ops: Vec<_> = txs.iter().skip(1)
 
 // Dilithium verify closure
 let did_verify = |pk: &[u8], sig: &[u8], msg: &[u8]| -> bool {
-    if sig.len() != SIG_SIZE { return false; }
+    log::warn!("DID_DBG verify: pk_len={} sig_len={} msg_len={}", pk.len(), sig.len(), msg.len());
+    if sig.len() != SIG_SIZE {
+        log::warn!("DID_DBG verify: sig_len mismatch: {} != {}", sig.len(), SIG_SIZE);
+        return false;
+    }
     let s = DilithiumSignature::from_slice(sig);
-    VERIFY_POOL.install(|| {
+    let result = VERIFY_POOL.install(|| {
         DilithiumKeyPair::verify(pk, &s, msg, b"", SAHYADRI_MODE)
-    })
+    });
+    log::warn!("DID_DBG verify result: {}", result);
+    result
 };
 
 match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
@@ -1620,7 +1626,8 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
 
         let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
         let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
-        let account_commitment_h256 = match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+        // First compute accounts root
+        let accounts_root_h256 = match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
             parent_root,
             &mut smt_overlay,
             &*self.account_states_store,
@@ -1628,22 +1635,58 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
             &template_rewards,
             virtual_state.daa_score,
         ) {
-            Ok((root, _changes)) => {
-                // SAHYADRI: build path = in-memory only. Nothing written to
-                // disk here — templates are speculative and most never become
-                // blocks. The verify path persists the same nodes when a
-                // block is actually submitted, so no race is reintroduced.
-                let pending: Vec<_> = smt_overlay.into_pending().collect();
-                for (h, n) in pending {
-                    self.smt_nodes_store.mem_put(h, n);
-                }
-                root
-            }
+            Ok((root, _changes)) => root,
             Err(e) => {
                 log::error!("SAHYADRI: account commitment compute failed in build: {:?}", e);
                 sahyadri_smt::EMPTY
             }
         };
+
+        // Extract DID ops from template txs
+        let template_did_ops: Vec<_> = txs.iter().skip(1)
+            .filter_map(|tx| {
+                crate::pipeline::virtual_processor::did_changes::parse_did_op(
+                    &tx.payload,
+                    SIG_SIZE,
+                )
+            })
+            .collect();
+
+        // Dilithium verify closure (for DID ops)
+        let template_did_verify = |pk: &[u8], sig: &[u8], msg: &[u8]| -> bool {
+            if sig.len() != SIG_SIZE {
+                return false;
+            }
+            let s = DilithiumSignature::from_slice(sig);
+            VERIFY_POOL.install(|| {
+                DilithiumKeyPair::verify(pk, &s, msg, b"", SAHYADRI_MODE)
+            })
+        };
+
+        // Apply DID ops on top of accounts root
+        let account_commitment_h256 = match crate::pipeline::virtual_processor::did_changes::compute_block_did_changes(
+            accounts_root_h256,
+            &mut smt_overlay,
+            &*self.did_states_store,
+            &template_did_ops,
+            virtual_state.daa_score,
+            self.network_prefix,
+            &template_did_verify,
+        ) {
+            Ok((final_root, _did_docs)) => {
+                // Build path = in-memory only — persist to mem pool
+                let pending: Vec<_> = smt_overlay.into_pending().collect();
+                for (h, n) in pending {
+                    self.smt_nodes_store.mem_put(h, n);
+                }
+                final_root
+            }
+            Err(e) => {
+                log::error!("SAHYADRI: DID compute failed in build: {:?}", e);
+                accounts_root_h256
+            }
+        };
+
         let account_commitment = sahyadri_hashes::Hash::from_bytes(account_commitment_h256);
         // Past median time is the exclusive lower bound for valid block time, so we increase by 1 to get the valid min
         let min_block_time = virtual_state.past_median_time + 1;

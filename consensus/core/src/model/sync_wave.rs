@@ -170,8 +170,8 @@ pub struct SyncWaveChunkWire {
     pub total_chunks: u32,
     pub smt_nodes: Vec<(H256, SyncWaveNode)>,
     pub account_states: Vec<(Hash, SyncWaveState)>,
+    pub did_states: Vec<(Hash, SyncWaveDidState)>,
 }
-
 
 /// Errors from SyncWave export / verify / load.
 #[derive(Debug)]

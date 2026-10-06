@@ -14,6 +14,7 @@ pub struct RpcSyncWaveMetadata {
     pub account_root: RpcHash,
     pub total_smt_nodes: u64,
     pub total_accounts: u64,
+    pub total_did_states: u64,
     pub chunk_size: u32,
     pub total_chunks: u32,
 }
@@ -87,6 +88,7 @@ impl Serializer for RpcSyncWaveMetadata {
         store!(RpcHash, &self.account_root, writer)?;
         store!(u64, &self.total_smt_nodes, writer)?;
         store!(u64, &self.total_accounts, writer)?;
+        store!(u64, &self.total_did_states, writer)?;
         store!(u32, &self.chunk_size, writer)?;
         store!(u32, &self.total_chunks, writer)?;
         Ok(())
@@ -101,6 +103,7 @@ impl Deserializer for RpcSyncWaveMetadata {
             account_root: load!(RpcHash, reader)?,
             total_smt_nodes: load!(u64, reader)?,
             total_accounts: load!(u64, reader)?,
+            total_did_states: load!(u64, reader)?,
             chunk_size: load!(u32, reader)?,
             total_chunks: load!(u32, reader)?,
         })

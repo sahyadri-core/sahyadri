@@ -345,6 +345,10 @@ impl ConsensusFactory for Factory {
         // We write the new active entry only once the instance was created successfully.
         // This way we can safely avoid processing genesis in future process runs
         if is_new_consensus {
+            self.management_store
+                .write()
+                .save_new_active_consensus(entry.clone())
+                .unwrap();
         }
 
         (ConsensusInstance::new(session_lock, consensus.clone()), Arc::new(Ctl::new(self.management_store.clone(), db, consensus)))
