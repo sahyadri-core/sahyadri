@@ -1,3 +1,4 @@
+
 //! Sahyadri Sparse Merkle Tree (SMT).
 //!
 //! 256-level binary tree keyed by a 32-byte hash. Subtrees holding a single
@@ -6,7 +7,11 @@
 //! never on insertion order. Nodes are content-addressed, so a new root can
 //! be derived from a parent root without mutating any existing state.
 
-use sha3::{Digest, Sha3_256};
+use p3_field::{PrimeCharacteristicRing, PrimeField64};
+use p3_goldilocks::{Goldilocks, Poseidon2Goldilocks};
+use p3_symmetric::{CryptographicHasher, PaddingFreeSponge};
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 use std::collections::HashMap;
 
 pub type H256 = [u8; 32];
@@ -69,34 +74,127 @@ pub enum SmtError {
     DepthExceeded,
 }
 
-pub fn hash_leaf(key: &H256, value: &H256) -> H256 {
-    let mut h = Sha3_256::new();
-    h.update(b"SAHYADRI_SMT_LEAF_V1");
-    h.update(key);
-    h.update(value);
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&h.finalize());
+// ── Poseidon2 hash for STARK-friendly SMT ──────────────────────
+
+/// Poseidon2 permutation for Goldilocks, width 8.
+pub type Perm = Poseidon2Goldilocks<8>;
+
+/// Sponge hash: width=8, rate=4, output=4 field elements.
+pub type MyHash = PaddingFreeSponge<Perm, 8, 4, 4>;
+
+/// Build the hasher with deterministic round constants.
+/// Seed 42 matches the STARK config, so the same hash is reproducible
+/// across prover / verifier.
+fn make_poseidon2_hasher() -> MyHash {
+    let mut rng = SmallRng::seed_from_u64(42);
+    let perm = Perm::new_from_rng_128(&mut rng);
+    MyHash::new(perm)
+}
+
+/// Convert 32 bytes → 4 Goldilocks field elements (8 bytes each, LE).
+fn bytes_to_goldilocks(bytes: &[u8; 32]) -> [Goldilocks; 4] {
+    let mut out = [Goldilocks::from_u64(0); 4];
+    let mut i = 0;
+    while i < 4 {
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(&bytes[i * 8..(i + 1) * 8]);
+        out[i] = Goldilocks::from_u64(u64::from_le_bytes(buf));
+        i += 1;
+    }
     out
 }
 
-pub fn hash_branch(left: &H256, right: &H256) -> H256 {
-    let mut h = Sha3_256::new();
-    h.update(b"SAHYADRI_SMT_BRANCH_V1");
-    h.update(left);
-    h.update(right);
+/// Convert 4 Goldilocks field elements → 32 bytes (canonical, LE).
+fn goldilocks_to_bytes(fields: &[Goldilocks; 4]) -> [u8; 32] {
     let mut out = [0u8; 32];
-    out.copy_from_slice(&h.finalize());
+    for (i, f) in fields.iter().enumerate() {
+        let bytes = f.as_canonical_u64().to_le_bytes();
+        out[i * 8..(i + 1) * 8].copy_from_slice(&bytes);
+    }
     out
+}
+
+/// Build a domain separator as 4 Goldilocks field elements from an
+/// ASCII string (padded with zeros to 32 bytes).
+fn domain_from_bytes(bytes: &[u8]) -> [Goldilocks; 4] {
+    let mut padded = [0u8; 32];
+    let n = bytes.len().min(32);
+    padded[..n].copy_from_slice(&bytes[..n]);
+    bytes_to_goldilocks(&padded)
+}
+
+fn leaf_domain() -> [Goldilocks; 4] {
+    domain_from_bytes(b"SAHYADRI_SMT_LEAF_V1")
+}
+
+fn branch_domain() -> [Goldilocks; 4] {
+    domain_from_bytes(b"SAHYADRI_SMT_BRANCH_V1")
+}
+
+fn key_domain() -> [Goldilocks; 4] {
+    domain_from_bytes(b"SAHYADRI_SMT_KEY_V1")
+}
+
+/// Hash a leaf as Poseidon2(domain_leaf || key || value).
+/// Input is 12 field elements (multiple of rate 4).
+pub fn hash_leaf(key: &H256, value: &H256) -> H256 {
+    let hasher = make_poseidon2_hasher();
+    let key_f = bytes_to_goldilocks(key);
+    let value_f = bytes_to_goldilocks(value);
+    let domain = leaf_domain();
+
+    let mut input = [Goldilocks::from_u64(0); 12];
+    input[0..4].copy_from_slice(&domain);
+    input[4..8].copy_from_slice(&key_f);
+    input[8..12].copy_from_slice(&value_f);
+
+    let digest: [Goldilocks; 4] = hasher.hash_iter(input.iter().copied());
+    goldilocks_to_bytes(&digest)
+}
+
+/// Hash a branch as Poseidon2(domain_branch || left || right).
+/// Input is 12 field elements (multiple of rate 4).
+pub fn hash_branch(left: &H256, right: &H256) -> H256 {
+    let hasher = make_poseidon2_hasher();
+    let left_f = bytes_to_goldilocks(left);
+    let right_f = bytes_to_goldilocks(right);
+    let domain = branch_domain();
+
+    let mut input = [Goldilocks::from_u64(0); 12];
+    input[0..4].copy_from_slice(&domain);
+    input[4..8].copy_from_slice(&left_f);
+    input[8..12].copy_from_slice(&right_f);
+
+    let digest: [Goldilocks; 4] = hasher.hash_iter(input.iter().copied());
+    goldilocks_to_bytes(&digest)
 }
 
 /// Hash arbitrary bytes into a tree key (use for account keys).
+/// Input: domain_key (4) + ceil(len/32) chunks × 4 field elements.
+/// Total is always a multiple of rate 4.
 pub fn hash_key(data: &[u8]) -> H256 {
-    let mut h = Sha3_256::new();
-    h.update(b"SAHYADRI_SMT_KEY_V1");
-    h.update(data);
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&h.finalize());
-    out
+    let hasher = make_poseidon2_hasher();
+    let domain = key_domain();
+
+    // Pad input to multiple of 32 bytes; ensure at least one chunk.
+    let mut padded = data.to_vec();
+    while padded.len() % 32 != 0 {
+        padded.push(0);
+    }
+    if padded.is_empty() {
+        padded.resize(32, 0);
+    }
+
+    let mut input: Vec<Goldilocks> = Vec::with_capacity(4 + (padded.len() / 32) * 4);
+    input.extend_from_slice(&domain);
+    for chunk in padded.chunks(32) {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(chunk);
+        input.extend_from_slice(&bytes_to_goldilocks(&arr));
+    }
+
+    let digest: [Goldilocks; 4] = hasher.hash_iter(input.into_iter());
+    goldilocks_to_bytes(&digest)
 }
 
 #[inline]

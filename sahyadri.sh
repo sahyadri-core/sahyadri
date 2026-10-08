@@ -16,19 +16,19 @@ echo " Mode:       Fast bootstrap via SyncWave"
 echo "---------------------------------------------------"
 
 # Seed peer URL — override with SAHYADRI_SEED env var
-SEED="${SAHYADRI_SEED:-grpc://seed.sahyadri.io:27113}"
+SEED="${SAHYADRI_SEED:-}"
 
 # Data directory — if empty, use SyncWave; else regular startup
 APPDIR="${SAHYADRI_APPDIR:-$HOME/.sahyadri}"
 
 NODE_BIN=~/sahyadri-final/sahyadri/target/release/sahyadrid
 
-if [ -d "$APPDIR/sahyadri-mainnet/datadir" ] && [ "$(ls -A "$APPDIR/sahyadri-mainnet/datadir" 2>/dev/null)" ]; then
-    echo " Existing data directory found — starting normally"
-    SYNC_FLAG=""
-else
+if [ -n "$SEED" ] && [ ! -d "$APPDIR/sahyadri-mainnet/datadir" ]; then
     echo " Fresh data directory — will attempt SyncWave from: $SEED"
     SYNC_FLAG="--sync-wave $SEED"
+else
+    echo " Starting normally (no SyncWave)"
+    SYNC_FLAG=""
 fi
 
 $NODE_BIN \
