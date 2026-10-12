@@ -3,8 +3,8 @@
 use p3_air::AirBuilder;
 use p3_field::PrimeCharacteristicRing;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_matrix::Matrix;
 use p3_uni_stark::{prove, verify, Proof};
+use p3_air::WindowAccess;
 
 use super::matrix_vec_stark::{build_matrix_vec_trace, MatrixVecAir};
 use super::params::*;
@@ -47,12 +47,12 @@ impl<Fld> p3_air::BaseAir<Fld> for SubAir {
 }
 impl<AB> p3_air::Air<AB> for SubAir
 where
-    AB: p3_air::AirBuilderWithPublicValues<F = F>,
+    AB: p3_air::AirBuilder<F = F>,
 {
     fn eval(&self, b: &mut AB) {
         let m = b.main();
-        let l = m.row_slice(0).unwrap();
-        let n = m.row_slice(1).unwrap();
+        let l = m.current_slice();
+        let n = m.next_slice();
         let a = l[2].clone();
         let c = l[3].clone();
         let d = l[4].clone();
@@ -117,12 +117,12 @@ pub fn prove_signature(w: &DilithiumVerifyWitness) -> Result<DilithiumSigProof, 
     let pv: Vec<F> = vec![];
     // 1. Matrix-vector: A * z
     let mv_t = build_matrix_vec_trace(&w.a_matrix, &w.z_coeffs);
-    let mv_p = prove(&cfg, &MatrixVecAir, to_matrix(mv_t, 9), &pv);
+    let mv_p = prove(&cfg, &MatrixVecAir, to_matrix(mv_t, 9), &pv).unwrap();
     // 2. Poly-mult: cp * t1[k] for each k
     let mut pm = Vec::new();
     for k in 0..K {
         let t = build_poly_mult_trace(&w.cp_coeffs, &w.t1_shifted_coeffs[k]);
-        let p = prove(&cfg, &PolyMultAir, to_matrix(t, 6), &pv);
+        let p = prove(&cfg, &PolyMultAir, to_matrix(t, 6), &pv).unwrap();
         pm.push(ser(&p));
     }
     // 3. Compute Az and c*t1 for subtraction trace
@@ -144,21 +144,21 @@ pub fn prove_signature(w: &DilithiumVerifyWitness) -> Result<DilithiumSigProof, 
     }
     // 4. Subtraction: Az - c*t1 mod Q
     let sub_t = build_sub_trace(&az, &ct1);
-    let sub_p = prove(&cfg, &SubAir, to_matrix(sub_t, SUB_COLS), &pv);
+    let sub_p = prove(&cfg, &SubAir, to_matrix(sub_t, SUB_COLS), &pv).unwrap();
     // 5. Norm bounds on z (L polys) and h (K polys)
     let mut nm = Vec::new();
     for j in 0..L {
         let t = build_rejection_trace(&w.z_coeffs[j]);
-        let p = prove(&cfg, &RejectionAir, to_matrix(t, 4), &pv);
+        let p = prove(&cfg, &RejectionAir, to_matrix(t, 4), &pv).unwrap();
         nm.push(ser(&p));
     }
     for k in 0..K {
         let t = build_rejection_trace(&w.h_coeffs[k]);
-        let p = prove(&cfg, &RejectionAir, to_matrix(t, 4), &pv);
+        let p = prove(&cfg, &RejectionAir, to_matrix(t, 4), &pv).unwrap();
         nm.push(ser(&p));
     }
     let fs_t = super::fiat_shamir_stark::build_fiat_shamir_trace(&w.c_tilde_bytes, &w.c2_bytes);
-    let fs_p = prove(&cfg, &super::fiat_shamir_stark::FiatShamirAir, to_matrix(fs_t, 2), &pv);
+    let fs_p = prove(&cfg, &super::fiat_shamir_stark::FiatShamirAir, to_matrix(fs_t, 2), &pv).unwrap();
     Ok(DilithiumSigProof {
         mv_proof: ser(&mv_p),
         pm_proofs: pm,

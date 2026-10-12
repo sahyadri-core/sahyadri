@@ -5,6 +5,7 @@ use crate::{
         acceptance_data::DbAcceptanceDataStore,
         account_store::DbAccountStore, // <--- 1. IMPORT SAHYADRI BANK
         account_roots::DbAccountRootsStore,
+        proof_roots::DbProofRootsStore,
         account_states::DbAccountStatesStore,
         smt_nodes::DbSmtNodeStore,
         did_store::DbDidStore,
@@ -71,6 +72,7 @@ pub struct ConsensusStorage {
 
     // Account state commitment (SMT)
     pub smt_nodes_store: Arc<DbSmtNodeStore>,
+    pub proof_roots_store: Arc<DbProofRootsStore>,
     pub account_roots_store: Arc<DbAccountRootsStore>,
     pub account_states_store: Arc<DbAccountStatesStore>,
     pub did_states_store: Arc<DbDidStatesStore>,
@@ -226,6 +228,11 @@ impl ConsensusStorage {
             perf_params.registry_unit_set_cache_size as u64,
         ));
 
+        let proof_roots_store = Arc::new(DbProofRootsStore::new(
+            db.clone(),
+            perf_params.registry_unit_set_cache_size as u64,
+        ));
+
         // Tips
         let headers_selected_tip_store = Arc::new(RwLock::new(DbHeadersSelectedTipStore::new(db.clone())));
         let body_tips_store = Arc::new(RwLock::new(DbTipsStore::new(db.clone())));
@@ -271,6 +278,7 @@ impl ConsensusStorage {
             account_roots_store,
             account_states_store,
             did_states_store,
+            proof_roots_store,
             did_store: Arc::new(DbDidStore::new(db.clone(), perf_params.registry_unit_set_cache_size as u64)),
         })
     }

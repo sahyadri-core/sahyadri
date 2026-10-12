@@ -10,7 +10,7 @@
 use p3_field::{PrimeCharacteristicRing, PrimeField64};
 use p3_goldilocks::{Goldilocks, Poseidon2Goldilocks};
 use p3_symmetric::{CryptographicHasher, PaddingFreeSponge};
-use rand::rngs::SmallRng;
+use rand::rngs::Xoshiro256PlusPlus;
 use rand::SeedableRng;
 use std::collections::HashMap;
 
@@ -86,7 +86,7 @@ pub type MyHash = PaddingFreeSponge<Perm, 8, 4, 4>;
 /// Seed 42 matches the STARK config, so the same hash is reproducible
 /// across prover / verifier.
 fn make_poseidon2_hasher() -> MyHash {
-    let mut rng = SmallRng::seed_from_u64(42);
+    let mut rng = Xoshiro256PlusPlus::seed_from_u64(1);
     let perm = Perm::new_from_rng_128(&mut rng);
     MyHash::new(perm)
 }

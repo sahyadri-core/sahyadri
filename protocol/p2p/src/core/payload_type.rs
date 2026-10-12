@@ -47,6 +47,7 @@ pub enum SahyadridMessagePayloadType {
     RequestAntipast,
     RequestNextPruningPointAndItsAnticoneBlocks,
     BlockBody,
+    BlockRootProof,
     RequestBlockBodies,
 }
 
@@ -105,6 +106,7 @@ impl From<&SahyadridMessagePayload> for SahyadridMessagePayloadType {
                 SahyadridMessagePayloadType::RequestNextPruningPointAndItsAnticoneBlocks
             }
             SahyadridMessagePayload::BlockBody(_) => SahyadridMessagePayloadType::BlockBody,
+            SahyadridMessagePayload::BlockRootProof(_) => SahyadridMessagePayloadType::BlockRootProof,
             SahyadridMessagePayload::RequestBlockBodies(_) => SahyadridMessagePayloadType::RequestBlockBodies,
         }
     }

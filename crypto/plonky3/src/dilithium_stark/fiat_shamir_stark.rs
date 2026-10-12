@@ -1,8 +1,7 @@
 //! Fiat-Shamir equality STARK: proves c_tilde == c2 byte-by-byte.
 use crate::config::F;
-use p3_air::{Air, BaseAir};
+use p3_air::{Air, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
-use p3_matrix::Matrix;
 
 pub const FS_COLS: usize = 2;
 pub struct FiatShamirAir;
@@ -15,7 +14,7 @@ impl BaseAir<F> for FiatShamirAir {
 impl<AB: p3_air::AirBuilder<F = F>> Air<AB> for FiatShamirAir {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local = main.row_slice(0).expect("trace >= 1 row");
+        let local = main.current_slice();
         builder.assert_zero(local[0].clone() - local[1].clone());
     }
 }
@@ -55,7 +54,7 @@ mod tests {
                 v[i * 2 + j] = val;
             }
         }
-        let proof = prove(&cfg, &FiatShamirAir, RowMajorMatrix::new(v, 2), &pv);
+        let proof = prove(&cfg, &FiatShamirAir, RowMajorMatrix::new(v, 2), &pv).unwrap();
         assert!(verify(&cfg, &FiatShamirAir, &proof, &pv).is_ok());
     }
 }

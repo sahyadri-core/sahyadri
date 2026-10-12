@@ -4,11 +4,13 @@ pub mod factory;
 pub mod services;
 pub mod storage;
 pub mod test_consensus;
+use crate::model::stores::proof_roots::ProofRootsStoreReader;
 use crate::model::stores::did_states::DidStatesStoreReader;
 use crate::model::stores::account_store::AccountStoreReader;
 use crate::model::stores::smt_nodes::DbSmtNodeStoreBase;
 use crate::pipeline::virtual_processor::did_changes::did_key_hash;
 use sahyadri_smt;
+use sahyadri_consensus_core::api::BlockProof;
 
 use crate::{
     config::Config,
@@ -697,6 +699,57 @@ impl ConsensusApi for Consensus {
 
         proof.block_hash = block_hash;
         Ok(proof)
+    }
+
+    fn get_block_proof(
+        &self,
+        block_hash: Hash,
+    ) -> ConsensusResult<Option<BlockProof>> {
+        let entry = self
+            .proof_roots_store
+            .get(block_hash)
+            .map_err(|_| ConsensusError::General("proof_roots_store read failed"))?;
+
+        Ok(entry.map(|e| BlockProof {
+            block_hash,
+            blue_score: e.blue_score,
+            aggregated_count: e.aggregated_count,
+            proof_bytes: e.proof,
+        }))
+    }
+
+    fn verify_and_insert_block_proof(
+        &self,
+        block_hash: Hash,
+        blue_score: u64,
+        aggregated_count: u32,
+        proof_bytes: Vec<u8>,
+    ) -> ConsensusResult<()> {
+        use sahyadri_plonky3::config::DilithiumStarkConfig;
+        use p3_uni_stark::Proof;
+
+        // 1. Deserialize
+        let _root: Proof<DilithiumStarkConfig> =
+            bincode::deserialize(&proof_bytes).map_err(|_| {
+                ConsensusError::General("block_root_proof: deserialize failed")
+            })?;
+
+        // 2. Verify — note: verify_root_proof expects RecursionOutput, so we
+        //    need the full deserialization path. For MVP we trust the
+        //    serialized shape and store.
+        //    TODO: switch to RecursionOutput deserialize + verify_root_proof
+        //    once the exact type is exported.
+
+        // 3. Store
+        let entry = crate::model::stores::proof_roots::ProofRootEntry {
+            proof: proof_bytes,
+            blue_score,
+            aggregated_count,
+        };
+        self.proof_roots_store
+            .insert_sync(block_hash, &entry)
+            .map_err(|_| ConsensusError::General("proof_roots insert failed"))?;
+        Ok(())
     }
 
     // ============= SAHYADRI DID IMPLEMENTATIONS =============

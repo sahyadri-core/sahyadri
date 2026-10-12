@@ -172,6 +172,37 @@ from!(item: RpcResult<&sahyadri_rpc_core::GetBlockTemplateResponse>, protowire::
 from!(item: &sahyadri_rpc_core::GetBlockRequest, protowire::GetBlockRequestMessage, {
     Self { hash: item.hash.to_string(), include_transactions: item.include_transactions }
 });
+from!(item: &sahyadri_rpc_core::GetBlockProofRequest, protowire::GetBlockProofRequestMessage, {
+    Self {
+        block_hash: item.block_hash.to_string(),
+    }
+});
+
+try_from!(item: &protowire::GetBlockProofRequestMessage, sahyadri_rpc_core::GetBlockProofRequest, {
+    Self {
+        block_hash: item.block_hash.parse()?,
+    }
+});
+
+from!(item: RpcResult<&sahyadri_rpc_core::GetBlockProofResponse>, protowire::GetBlockProofResponseMessage, {
+    Self {
+        block_hash: item.block_hash.to_string(),
+        blue_score: item.blue_score.unwrap_or(0),
+        aggregated_count: item.aggregated_count.unwrap_or(0),
+        proof_bytes: item.proof_bytes.clone().unwrap_or_default(),
+        has_proof: item.proof_bytes.is_some(),
+        error: None,
+    }
+});
+
+try_from!(item: &protowire::GetBlockProofResponseMessage, sahyadri_rpc_core::GetBlockProofResponse, {
+    Self {
+        block_hash: item.block_hash.parse()?,
+        blue_score: if item.has_proof { Some(item.blue_score) } else { None },
+        aggregated_count: if item.has_proof { Some(item.aggregated_count) } else { None },
+        proof_bytes: if item.has_proof { Some(item.proof_bytes.clone()) } else { None },
+    }
+});
 from!(item: RpcResult<&sahyadri_rpc_core::GetBlockResponse>, protowire::GetBlockResponseMessage, {
     Self { block: Some((&item.block).into()), error: None }
 });

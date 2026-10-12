@@ -303,3 +303,14 @@ message TrustedDataMessage {
   repeated DaaBlockV4 daaWindow = 1; // TODO: rename to `trustedSubDag` once v5 is obsolete
   repeated BlockSahyadriConsensusDataHashPair sahyadri_consensusData = 2; // TODO: remove once v5 is obsolete
 }
+
+// Recursively-aggregated root STARK proof for a block.
+//
+// Broadcast by the node that generated the proof so peers can verify
+// and store it locally (avoids trust in any single RPC provider).
+message BlockRootProofMessage{
+  Hash blockHash = 1;
+  uint64 blueScore = 2;
+  uint32 aggregatedCount = 3;
+  bytes proofBytes = 4;
+}

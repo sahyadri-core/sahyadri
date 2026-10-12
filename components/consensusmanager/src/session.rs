@@ -5,7 +5,7 @@
 use sahyadri_consensus_core::{
     BlockHashSet, BlueWorkType, ChainPath, Hash,
     acceptance_data::{AcceptanceData, MergesetBlockAcceptanceData},
-    api::{BlockCount, BlockValidationFutures, ConsensusApi, ConsensusStats, DynConsensus},
+    api::{BlockCount, BlockProof, BlockValidationFutures, ConsensusApi, ConsensusStats, DynConsensus},
     block::Block,
     blockstatus::BlockStatus,
     daa_score_timestamp::DaaScoreTimestamp,
@@ -310,6 +310,27 @@ impl ConsensusSessionOwned {
     ) -> ConsensusResult<sahyadri_consensus_core::model::proof::AccountProof> {
         self.clone()
             .spawn_blocking(move |c| c.get_account_proof(&spk, block_hash))
+            .await
+    }
+
+    pub async fn async_get_block_proof(
+        &self,
+        block_hash: Hash,
+    ) -> ConsensusResult<Option<BlockProof>> {
+        self.clone().spawn_blocking(move |c| c.get_block_proof(block_hash)).await
+    }
+
+    pub async fn async_verify_and_insert_block_proof(
+        &self,
+        block_hash: Hash,
+        blue_score: u64,
+        aggregated_count: u32,
+        proof_bytes: Vec<u8>,
+    ) -> ConsensusResult<()> {
+        self.clone()
+            .spawn_blocking(move |c| {
+                c.verify_and_insert_block_proof(block_hash, blue_score, aggregated_count, proof_bytes)
+            })
             .await
     }
 

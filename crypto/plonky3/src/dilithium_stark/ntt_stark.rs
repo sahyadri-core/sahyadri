@@ -11,9 +11,8 @@
 //! Each butterfly uses 2 consecutive rows.
 //! Total rows = LOG_N stages x N rows/stage = 8 x 256 = 2048.
 
-use p3_air::{Air, AirBuilder, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
-use p3_matrix::Matrix;
 
 use crate::config::F;
 
@@ -37,12 +36,12 @@ impl<F> BaseAir<F> for NttAir {
 
 impl<AB> Air<AB> for NttAir
 where
-    AB: p3_air::AirBuilderWithPublicValues<F = F>,
+    AB: p3_air::AirBuilder<F = F>,
 {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local = main.row_slice(0).unwrap();
-        let next = main.row_slice(1).unwrap();
+        let local = main.current_slice();
+        let next = main.next_slice();
 
         // Row-0: marker must be 0
         builder.assert_zero(local[5].clone());

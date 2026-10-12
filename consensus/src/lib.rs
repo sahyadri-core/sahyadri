@@ -58,3 +58,15 @@ pub mod params;
 pub mod pipeline;
 pub mod processes;
 pub mod test_helpers;
+
+
+// ─── Global signal: worker → P2P broadcast ────────────────────────
+//
+// Worker thread signals when a root proof is stored in `proof_roots_store`.
+// The P2P flow (protocol/flows) reads from this channel to broadcast
+// `BlockRootProof` messages to peers — event-driven, no polling.
+
+pub static PROOF_BROADCAST: once_cell::sync::Lazy<(
+    crossbeam_channel::Sender<sahyadri_hashes::Hash>,
+    crossbeam_channel::Receiver<sahyadri_hashes::Hash>,
+)> = once_cell::sync::Lazy::new(crossbeam_channel::unbounded);

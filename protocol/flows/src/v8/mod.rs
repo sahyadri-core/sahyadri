@@ -1,3 +1,5 @@
+pub(crate) mod block_root_proof;
+use block_root_proof::HandleBlockRootProofFlow;
 use crate::v7::{
     address::{ReceiveAddressesFlow, SendAddressesFlow},
     blockrelay::{flow::HandleRelayInvsFlow, handle_requests::HandleRelayBlockRequests},
@@ -51,6 +53,11 @@ pub fn register(ctx: FlowContext, router: Arc<Router>, protocol_version: u32) ->
             relay_receiver,
             body_only_ibd_permitted,
             header_format,
+        )),
+        Box::new(HandleBlockRootProofFlow::new(
+            ctx.clone(),
+            router.clone(),
+            router.subscribe(vec![SahyadridMessagePayloadType::BlockRootProof]),
         )),
         Box::new(HandleRelayBlockRequests::new(
             ctx.clone(),
@@ -166,6 +173,56 @@ pub fn register(ctx: FlowContext, router: Arc<Router>, protocol_version: u32) ->
     // We do not register the below two messages since they are deprecated also in go-sahyadri
     // SahyadridMessagePayloadType::BlockWithTrustedData,
     // SahyadridMessagePayloadType::IbdBlockLocator,
+
+    // ── Broadcast root proofs via global worker channel ────────
+    // Worker thread signals when a proof is stored; we read here
+    // and broadcast to all P2P peers. Event-driven, no polling.
+    {
+        let ctx_clone = ctx.clone();
+        tokio::spawn(async move {
+            loop {
+                // Block on channel receive — wakes up only when signaled
+                match sahyadri_consensus::PROOF_BROADCAST.1.recv_timeout(
+                    std::time::Duration::from_secs(30),
+                ) {
+                    Ok(block_hash) => {
+                        let session = ctx_clone.consensus().session().await;
+                        match session.async_get_block_proof(block_hash).await {
+                            Ok(Some(proof)) => {
+                                let msg =
+                                    sahyadri_p2p_lib::convert::messages::block_root_proof_to_message(
+                                        &proof,
+                                    );
+                                ctx_clone.hub().broadcast(msg, None).await;
+                                log::info!(
+                                    "P2P: broadcast BlockRootProof for {} (N={})",
+                                    block_hash,
+                                    proof.aggregated_count
+                                );
+                            }
+                            Ok(None) => {
+                                log::warn!(
+                                    "P2P: no proof in store for {} on broadcast",
+                                    block_hash
+                                );
+                            }
+                            Err(e) => {
+                                log::warn!("P2P: fetch proof {} failed: {e:?}", block_hash);
+                            }
+                        }
+                    }
+                    Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                        // Idle — nothing to do
+                        continue;
+                    }
+                    Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                        log::info!("P2P: PROOF_BROADCAST channel disconnected, exiting");
+                        break;
+                    }
+                }
+            }
+        });
+    }
 
     flows
 }

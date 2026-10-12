@@ -55,6 +55,7 @@ pub enum DatabaseStorePrefixes {
     
     AccountStates = 36,
     DidStates = 37,
+    ProofRoots = 38,
 
     // ---- SahyadriConsensus Proof
     TempSahyadriConsensus = 40,

@@ -11,9 +11,8 @@
 //!   4: result    - (a_val * b_val) % Q = c[i]
 //!   5: padding   - reserved for future use
 
-use p3_air::{Air, AirBuilder, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
-use p3_matrix::Matrix;
 
 use super::params::{N, Q};
 use crate::config::F;
@@ -56,12 +55,12 @@ impl<F> BaseAir<F> for PolyMultAir {
 
 impl<AB> Air<AB> for PolyMultAir
 where
-    AB: p3_air::AirBuilderWithPublicValues<F = F>,
+    AB: p3_air::AirBuilder<F = F>,
 {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local = main.row_slice(0).unwrap();
-        let next = main.row_slice(1).unwrap();
+        let local = main.current_slice();
+        let next = main.next_slice();
 
         // Core constraint: a * b = q * Q + result
         let a = local[1].clone();

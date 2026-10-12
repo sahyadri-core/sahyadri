@@ -32,6 +32,7 @@ sahyadri-hashes.workspace = true
 sahyadri-math.workspace = true
 sahyadri-merkle.workspace = true
 sahyadri-muhash.workspace = true
+sahyadri-smt.workspace = true
 sahyadri-txscript-errors.workspace = true
 sahyadri-utils.workspace = true
 rand.workspace = true

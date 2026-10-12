@@ -74,6 +74,24 @@ pub struct DidDocumentDto {
     /// Block timestamp when last updated
     pub updated_at: u64,
 }
+
+/// A recursively-aggregated root STARK proof attached to a block.
+///
+/// Serialized form of `RecursionOutput` produced by the background proof
+/// worker. Light clients and RPC consumers use this to verify a block
+/// without downloading individual transaction proofs.
+#[derive(Clone, Debug)]
+pub struct BlockProof {
+    /// The block this proof attests to.
+    pub block_hash: Hash,
+    /// Sahyadri Score at which the proof was generated.
+    pub blue_score: u64,
+    /// Number of child Dilithium proofs aggregated into this root.
+    pub aggregated_count: u32,
+    /// Serialized `RecursionOutput` (bincode).
+    pub proof_bytes: Vec<u8>,
+}
+
 pub trait ConsensusApi: Send + Sync {
     fn build_block_template(
         &self,
@@ -92,6 +110,28 @@ pub trait ConsensusApi: Send + Sync {
         unimplemented!()
     }
 
+    /// Return the recursively-aggregated root proof for `block_hash`, if generated.
+    ///
+    /// Proofs are produced asynchronously after block commit; a freshly
+    /// committed block may not have a proof yet — callers should retry.
+    fn get_block_proof(
+        &self,
+        block_hash: Hash,
+    ) -> ConsensusResult<Option<BlockProof>>;
+
+    /// Verify an incoming P2P `BlockRootProof` and store it locally.
+    ///
+    /// Deserializes the root STARK proof, runs `verify_root_proof` (35 ms),
+    /// and inserts into `proof_roots_store` on success. Returns an error if
+    /// the proof is malformed or fails verification — callers should drop
+    /// the peer's message in that case.
+    fn verify_and_insert_block_proof(
+        &self,
+        block_hash: Hash,
+        blue_score: u64,
+        aggregated_count: u32,
+        proof_bytes: Vec<u8>,
+    ) -> ConsensusResult<()>;
 
     /// Export a SyncWave snapshot at the given block.
     /// Bulk state transfer primitive for fresh node bootstrap.

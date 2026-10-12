@@ -2,6 +2,7 @@
 // SAHYADRI: DID support
 use sahyadri_addresses::Prefix;
 use sahyadri_consensus_core::network::NetworkType;
+use sahyadri_dilithium::{PUBKEY_SIZE, SIG_SIZE};
 use crate::model::stores::did_states::{DbDidStatesStore, DidStatesStore};
 use crate::{
     consensus::{
@@ -94,7 +95,7 @@ use sahyadri_consensus_notify::{
 use sahyadri_consensusmanager::SessionLock;
 use sahyadri_core::{debug, info, time::unix_now, trace, warn};
 use sahyadri_database::prelude::{StoreResultExt, StoreResultUnitExt};
-use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, PUBKEY_SIZE, SAHYADRI_MODE, SIG_SIZE};
+use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, SAHYADRI_MODE};
 
 // TODO: Replace with treasury Dilithium pubkey hex (1952 bytes = 3904 hex chars)
 // Until set, 100% reward goes to miner
@@ -184,6 +185,7 @@ pub struct VirtualStateProcessor {
     pub(super) account_roots_store: Arc<DbAccountRootsStore>,
     pub(super) account_states_store: Arc<DbAccountStatesStore>,
     pub(super) did_states_store: Arc<DbDidStatesStore>,
+    pub(super) proof_queue: crossbeam_channel::Sender<Hash>,
     pub(super) pruning_meta_stores: Arc<RwLock<PruningMetaStores>>,
 
     /// The "last known good" virtual state. To be used by any logic which does not want to wait
@@ -236,6 +238,35 @@ impl VirtualStateProcessor {
         mining_rules: Arc<MiningRules>,
         enable_flash_tx: bool,
     ) -> Self {
+        // ── Proof worker: bounded queue + single dedicated thread ────
+        // Ensures 1 BPS block production does not spawn 1 thread per
+        // second (which would pile up ~30 threads in 30s).
+        let (proof_queue_tx, proof_queue_rx) =
+            crossbeam_channel::bounded::<Hash>(64);
+
+        let proof_roots_store_worker = storage.proof_roots_store.clone();
+        let block_transactions_store_worker = storage.block_transactions_store.clone();
+        let headers_store_worker = storage.headers_store.clone();
+
+        let disable_worker = std::env::var("SAHYADRI_DISABLE_PROOF_WORKER").is_ok();
+
+        if !disable_worker {
+            std::thread::Builder::new()
+                .name("sahyadri-proof-worker".into())
+                .spawn(move || {
+                    while let Ok(block_hash) = proof_queue_rx.recv() {
+                        if let Err(e) = generate_root_proof_for_block(
+                            block_hash,
+                            &proof_roots_store_worker,
+                            &block_transactions_store_worker,
+                            &headers_store_worker,
+                        ) {
+                            log::warn!("SAHYADRI: proof gen failed for {block_hash}: {e}");
+                        }
+                    }
+                })
+                .expect("spawn sahyadri-proof-worker");
+        }
         Self {
             receiver,
             pruning_sender,
@@ -272,6 +303,7 @@ impl VirtualStateProcessor {
             account_roots_store: storage.account_roots_store.clone(),
             account_states_store: storage.account_states_store.clone(),
             did_states_store: storage.did_states_store.clone(),
+            proof_queue: proof_queue_tx,
             pruning_meta_stores: storage.pruning_meta_stores.clone(),
             lkg_virtual_state: storage.lkg_virtual_state.clone(),
 
@@ -588,6 +620,22 @@ impl VirtualStateProcessor {
         self.db.write(batch).unwrap();
         // Calling the drops explicitly after the batch is written in order to avoid possible errors.
         drop(write_guard);
+        self.schedule_root_proof_generation(current);
+    }
+
+    /// Background: generate root proof for a committed block.
+    ///
+    /// Runs on its own thread — block production is never blocked.
+    /// Enqueue a block for background root-proof generation.
+    ///
+    /// Non-blocking: block commit is never delayed. If the queue is
+    /// full (worker behind), the block is dropped and logged.
+    fn schedule_root_proof_generation(&self, block_hash: Hash) {
+        if let Err(e) = self.proof_queue.try_send(block_hash) {
+            log::warn!(
+                "SAHYADRI: proof queue full, dropping block {block_hash}: {e:?}"
+            );
+        }
     }
 
     fn calculate_and_commit_virtual_state(
@@ -1884,4 +1932,301 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
 enum MergesetIncreaseResult {
     Accepted { increase_size: u64 },
     Rejected { new_candidate: Hash },
+}
+
+/// Background worker: generates a root STARK proof for a committed block.
+///
+/// Runs on a single dedicated thread (see `sahyadri-proof-worker`).
+/// Errors are logged, never propagate — proof generation is best-effort
+/// and does not block consensus.
+fn generate_root_proof_for_block(
+    block_hash: Hash,
+    proof_roots_store: &crate::model::stores::proof_roots::DbProofRootsStore,
+    block_transactions_store: &crate::model::stores::block_transactions::DbBlockTransactionsStore,
+    headers_store: &crate::model::stores::headers::DbHeadersStore,
+) -> Result<(), String> {
+    use sahyadri_consensus_core::tx::FlashTransaction;
+    use sahyadri_dilithium::{PUBKEY_SIZE, SIG_SIZE};
+    use sahyadri_plonky3::aggregate::{aggregate_batch, verify_root_proof};
+    use sahyadri_plonky3::batch::DilithiumBatch;
+    use sahyadri_plonky3::config::DilithiumStarkConfig;
+    use sahyadri_plonky3::dilithium_stark::composed_stark::DilithiumSigProof;
+    use sahyadri_plonky3::dilithium_stark::matrix_vec_stark::MatrixVecAir;
+    use sahyadri_plonky3::generate_stark_proof;
+    use p3_uni_stark::Proof;
+
+    // ── 1. Fetch txs ────────────────────────────────────────
+    let txs = block_transactions_store
+        .get(block_hash)
+        .map_err(|e| format!("fetch txs: {e:?}"))?;
+
+    log::info!(
+        "SAHYADRI proof worker: fetched {} txs for block {}",
+        txs.len(),
+        block_hash
+    );
+    if txs.is_empty() {
+        return Ok(());
+    }
+
+    // ── 2. Extract Dilithium auths → batch ─────────────────
+    let mut batch = DilithiumBatch::new();
+
+    for tx in txs.iter() {
+        // FlashTransaction path
+        log::info!(
+            "SAHYADRI worker: tx payload_len={} first8={:?}",
+            tx.payload.len(),
+            &tx.payload.get(..8.min(tx.payload.len())).unwrap_or(&[])
+        );
+
+        if let Some(flash) = FlashTransaction::from_transaction(tx) {
+            log::info!("SAHYADRI worker: decoded FlashTransaction OK");
+            let msg = flash.sighash();
+            if let Err(e) = batch.add_and_verify(&msg, &flash.signature, &flash.pubkey) {
+                log::warn!("SAHYADRI: add_and_verify failed (flash): {e:?}");
+            }
+            continue;
+        }
+
+        log::info!("SAHYADRI worker: NOT a FlashTransaction, trying account-tx path");
+
+        // Account-tx path: [pubkey | nonce(8) | sig]
+        let payload = &tx.payload;
+        if payload.len() < PUBKEY_SIZE + 8 + SIG_SIZE {
+            continue;
+        }
+        let sig_start = payload.len() - SIG_SIZE;
+        let nonce_start = sig_start - 8;
+        let pubkey = &payload[..nonce_start];
+        let sig_bytes = &payload[sig_start..];
+        let signable = &payload[..sig_start];
+
+        if pubkey.len() != PUBKEY_SIZE {
+            continue;
+        }
+
+        let sighash = tx.compute_account_tx_sighash(signable);
+        if let Err(e) = batch.add_and_verify(&sighash, sig_bytes, pubkey) {
+            log::warn!("SAHYADRI: add_and_verify failed (account): {e:?}");
+        }
+    }
+
+    let n = batch.attestations.len();
+    log::info!(
+        "SAHYADRI proof worker: batch has {} attestations for block {}",
+        n, block_hash
+    );
+    if n < 1 {
+        return Ok(());
+    }
+
+    // ── 3. Batch STARK proof ───────────────────────────────
+    let batch_proof = generate_stark_proof(&mut batch)
+        .map_err(|e| format!("batch stark: {e:?}"))?;
+    // ── N=1: store batch proof directly (no aggregation needed) ──
+    if n == 1 {
+        let proof_bytes = bincode::serialize(&batch_proof)
+            .map_err(|e| format!("serialize batch: {e:?}"))?;
+        let blue_score = headers_store
+            .get_header(block_hash)
+            .map(|h| h.blue_score)
+            .unwrap_or(0);
+        let entry = crate::model::stores::proof_roots::ProofRootEntry {
+            proof: proof_bytes,
+            blue_score,
+            aggregated_count: 1,
+        };
+        proof_roots_store
+            .insert_sync(block_hash, &entry)
+            .map_err(|e| format!("store N=1: {e:?}"))?;
+        let _ = crate::PROOF_BROADCAST.0.try_send(block_hash);
+        log::info!("SAHYADRI: N=1 batch proof stored for block {block_hash}");
+        return Ok(());
+    }
+
+    // ── 4. Extract per-sig mv_proofs ───────────────────────
+
+
+    // ── 4. Extract per-sig mv_proofs ───────────────────────
+    let sig_proofs: Vec<DilithiumSigProof> =
+        bincode::deserialize(&batch_proof.proof_bytes)
+            .map_err(|e| format!("deser sig proofs: {e:?}"))?;
+
+    let mut mv_proofs: Vec<Proof<DilithiumStarkConfig>> =
+        Vec::with_capacity(sig_proofs.len());
+
+    for sp in sig_proofs.iter() {
+        if let Ok(p) = bincode::deserialize::<Proof<DilithiumStarkConfig>>(&sp.mv_proof) {
+            mv_proofs.push(p);
+        }
+    }
+
+    // Even count for binary tree
+    let n = mv_proofs.len() & !1;
+    if n < 2 {
+        return Ok(());
+    }
+    mv_proofs.truncate(n);
+
+    // ── 5. Aggregate N→1 ───────────────────────────────────
+    let publics = vec![Vec::new(); n];
+    let root = aggregate_batch(mv_proofs, publics, &MatrixVecAir, 16)
+        .map_err(|e| format!("aggregate: {e:?}"))?;
+
+    if verify_root_proof(&root).is_err() {
+        return Err("root verify failed".into());
+    }
+
+    // ── 6. Store ───────────────────────────────────────────
+    let blue_score = headers_store
+        .get_header(block_hash)
+        .map(|h| h.blue_score)
+        .unwrap_or(0);
+
+    let proof_bytes = bincode::serialize(&root.0)
+        .map_err(|e| format!("serialize root: {e:?}"))?;
+
+    let entry = crate::model::stores::proof_roots::ProofRootEntry {
+        proof: proof_bytes,
+        blue_score,
+        aggregated_count: n as u32,
+    };
+
+    proof_roots_store
+        .insert_sync(block_hash, &entry)
+        .map_err(|e| format!("store root: {e:?}"))?;
+
+    // Signal P2P flow to broadcast this proof to peers
+    let _ = crate::PROOF_BROADCAST.0.try_send(block_hash);
+
+    log::info!(
+        "SAHYADRI: root proof stored for block {block_hash} (N={n}, {} bytes)",
+        entry.proof.len()
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod root_proof_tests {
+    use crate::model::stores::block_transactions::BlockTransactionsStore;
+    use crate::model::stores::{
+        block_transactions::DbBlockTransactionsStore,
+        headers::DbHeadersStore,
+        proof_roots::{DbProofRootsStore, ProofRootsStoreReader},
+    };
+    use sahyadri_database::{create_temp_db, prelude::{CachePolicy, ConnBuilder}};
+    use sahyadri_hashes::Hash;
+
+    /// Empty block → worker returns Ok, nothing stored.
+    #[test]
+    fn test_empty_block_noop() {
+        let (_lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+        // db is already Arc<DB> — no extra wrapping
+
+        let proof_roots = DbProofRootsStore::new(db.clone(), 100);
+        let txs_store = DbBlockTransactionsStore::new(db.clone(), CachePolicy::Count(100));
+        let headers_store = DbHeadersStore::new(
+            db.clone(),
+            CachePolicy::Count(100),
+            CachePolicy::Count(100),
+        );
+
+        let block_hash = Hash::from_bytes([7u8; 32]);
+
+        let result = super::generate_root_proof_for_block(
+            block_hash,
+            &proof_roots,
+            &txs_store,
+            &headers_store,
+        );
+
+        assert!(result.is_ok(), "empty block must be Ok: {result:?}");
+        assert!(proof_roots.get(block_hash).unwrap().is_none());
+    }
+
+    /// Full pipeline: real FlashTransactions → STARK proof → aggregation → DB store.
+    #[test]
+    fn test_e2e_two_flash_transactions() {
+        use sahyadri_consensus_core::tx::FlashTransaction;
+        use std::sync::Arc;
+
+        // ── 1. Temp DB + stores ─────────────────────────────
+        let (_lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+
+        let proof_roots = DbProofRootsStore::new(db.clone(), 100);
+        let txs_store = DbBlockTransactionsStore::new(db.clone(), CachePolicy::Count(100));
+        let headers_store = DbHeadersStore::new(
+            db.clone(),
+            CachePolicy::Count(100),
+            CachePolicy::Count(100),
+        );
+
+        // ── 2. Dilithium keypair ────────────────────────────
+        let kp = sahyadri_dilithium::generate_keypair().expect("keypair");
+        let pk_hex = sahyadri_dilithium::pubkey_to_hex(&kp);
+        let (_mode, pk_bytes) = sahyadri_dilithium::pubkey_from_hex(&pk_hex).unwrap();
+
+        // ── 3. Two signed FlashTransactions ─────────────────
+        let mut txs: Vec<sahyadri_consensus_core::tx::Transaction> = Vec::new();
+
+        for i in 0..2u8 {
+            let mut flash = FlashTransaction {
+                version: 1,
+                pubkey: pk_bytes.clone(),
+                recipient: vec![0xAAu8; 20],
+                amount: 1_000,
+                fee: 1_000,
+                expiry_daa_score: 1_000_000,
+                salt: [i; 16],
+                signature: vec![],
+            };
+
+            // sighash → hex string (sign_message takes &str)
+            let sighash = flash.sighash();
+            let sig = sahyadri_dilithium::sign_bytes(&sighash, &kp)
+                .expect("sign flash tx sighash");
+            flash.signature = sig.as_bytes().to_vec();
+
+            let tx = flash.to_transaction();
+            txs.push(tx);
+        }
+
+        // ── 4. Insert txs ───────────────────────────────────
+        let block_hash = Hash::from_bytes([0xEE; 32]);
+        txs_store
+            .insert(block_hash, Arc::new(txs))
+            .expect("insert txs");
+
+        // ── 5. Run worker ───────────────────────────────────
+        println!("Running generate_root_proof_for_block...");
+        let t0 = std::time::Instant::now();
+        let result = super::generate_root_proof_for_block(
+            block_hash,
+            &proof_roots,
+            &txs_store,
+            &headers_store,
+        );
+        let elapsed = t0.elapsed();
+
+        // ── 6. Assertions ───────────────────────────────────
+        match result {
+            Ok(()) => {
+                let entry = proof_roots
+                    .get(block_hash)
+                    .expect("get")
+                    .expect("proof must exist");
+                println!(
+                    "Root proof stored: {} bytes, N={}, blue_score={}, time={:.2}s",
+                    entry.proof.len(),
+                    entry.aggregated_count,
+                    entry.blue_score,
+                    elapsed.as_secs_f64()
+                );
+                assert!(entry.proof.len() > 100_000, "proof too small");
+                assert_eq!(entry.aggregated_count, 2, "should aggregate 2 txs");
+            }
+            Err(e) => panic!("generate_root_proof_for_block failed: {e}"),
+        }
+    }
 }

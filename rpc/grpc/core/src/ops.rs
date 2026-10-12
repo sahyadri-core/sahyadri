@@ -98,6 +98,7 @@ pub enum SahyadridPayloadOps {
     GetAccountProof,
     GetSyncWaveMetadata,
     DownloadSyncWaveChunk,
+    GetBlockProof,
 
     // Subscription commands for starting/stopping notifications
     NotifyBlockAdded,

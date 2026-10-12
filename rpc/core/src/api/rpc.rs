@@ -58,6 +58,23 @@ pub trait RpcApi: Sync + Send + AnySync {
             .metadata)
     }
 
+    /// Return the recursively-aggregated root STARK proof for a block.
+    ///
+    /// Proofs are produced asynchronously after block commit (~30s for N=8).
+    /// A freshly committed block may return `None`; callers should retry.
+    async fn get_block_proof(
+        &self,
+        block_hash: RpcHash,
+    ) -> RpcResult<GetBlockProofResponse> {
+        self.get_block_proof_call(None, GetBlockProofRequest::new(block_hash)).await
+    }
+
+    async fn get_block_proof_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: GetBlockProofRequest,
+    ) -> RpcResult<GetBlockProofResponse>;
+
     async fn get_sync_wave_metadata_call(
         &self,
         connection: Option<&DynRpcConnection>,

@@ -53,26 +53,9 @@ impl SyncWaveNode {
     /// the receiving node rebuilds the SMT root from these hashes and
     /// compares it against the checkpoint header's `account_commitment`.
     pub fn hash(&self) -> H256 {
-        use sha3::{Digest, Sha3_256};
         match self {
-            Self::Leaf { key, value } => {
-                let mut h = Sha3_256::new();
-                h.update(b"SAHYADRI_SMT_LEAF_V1");
-                h.update(key);
-                h.update(value);
-                let mut out = [0u8; 32];
-                out.copy_from_slice(&h.finalize());
-                out
-            }
-            Self::Branch { left, right } => {
-                let mut h = Sha3_256::new();
-                h.update(b"SAHYADRI_SMT_BRANCH_V1");
-                h.update(left);
-                h.update(right);
-                let mut out = [0u8; 32];
-                out.copy_from_slice(&h.finalize());
-                out
-            }
+            Self::Leaf { key, value } => sahyadri_smt::hash_leaf(key, value),
+            Self::Branch { left, right } => sahyadri_smt::hash_branch(left, right),
         }
     }
 }
@@ -126,36 +109,29 @@ pub struct SyncWaveSnapshot {
 mod tests {
     use super::*;
 
+    /// Verify SyncWave's node hash matches SMT crate's hash exactly.
+    ///
+    /// If this test fails, either `SyncWaveNode::hash()` or the SMT crate
+    /// hashing was changed without updating the other — SyncWave bootstrap
+    /// will fail on the network with `NodeHashMismatch`.
     #[test]
-    fn test_node_hash_matches_smt_domain_separation() {
-        // Hardcoded expected values computed from sahyadri_smt::hash_leaf/hash_branch
-        // domain separation prefixes. If this test fails, the prefix constants
-        // in either place have drifted — SyncWave verification will fail on the network.
+    fn test_node_hash_matches_smt() {
         let key = [0x11u8; 32];
         let value = [0x22u8; 32];
 
         let leaf = SyncWaveNode::Leaf { key, value };
-        let h = leaf.hash();
-
-        // Recompute reference: SHA3("SAHYADRI_SMT_LEAF_V1" || key || value)
-        use sha3::{Digest, Sha3_256};
-        let mut ref_h = Sha3_256::new();
-        ref_h.update(b"SAHYADRI_SMT_LEAF_V1");
-        ref_h.update(key);
-        ref_h.update(value);
-        let mut expected = [0u8; 32];
-        expected.copy_from_slice(&ref_h.finalize());
-        assert_eq!(h, expected, "leaf hash must match SMT domain separation");
+        assert_eq!(
+            leaf.hash(),
+            sahyadri_smt::hash_leaf(&key, &value),
+            "leaf hash must match SMT crate"
+        );
 
         let branch = SyncWaveNode::Branch { left: key, right: value };
-        let h = branch.hash();
-        let mut ref_h = Sha3_256::new();
-        ref_h.update(b"SAHYADRI_SMT_BRANCH_V1");
-        ref_h.update(key);
-        ref_h.update(value);
-        let mut expected = [0u8; 32];
-        expected.copy_from_slice(&ref_h.finalize());
-        assert_eq!(h, expected, "branch hash must match SMT domain separation");
+        assert_eq!(
+            branch.hash(),
+            sahyadri_smt::hash_branch(&key, &value),
+            "branch hash must match SMT crate"
+        );
     }
 }
 

@@ -10,9 +10,8 @@
 //!   2: is_negative - 1 if c[i] > Q/2, else 0
 //!   3: abs_val     - |c[i]|
 
-use p3_air::{Air, AirBuilder, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
-use p3_matrix::Matrix;
 
 use super::params::{N, Q};
 use crate::config::F;
@@ -40,12 +39,12 @@ impl<F> BaseAir<F> for RejectionAir {
 
 impl<AB> Air<AB> for RejectionAir
 where
-    AB: p3_air::AirBuilderWithPublicValues<F = F>,
+    AB: p3_air::AirBuilder<F = F>,
 {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local = main.row_slice(0).unwrap();
-        let next = main.row_slice(1).unwrap();
+        let local = main.current_slice();
+        let next = main.next_slice();
 
         let index = local[0].clone();
         let coeff = local[1].clone();

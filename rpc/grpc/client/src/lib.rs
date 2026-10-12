@@ -252,6 +252,7 @@ impl RpcApi for GrpcClient {
     route!(submit_flash_transaction_call, SubmitFlashTransaction);
     route!(get_block_template_call, GetBlockTemplate);
     route!(get_block_call, GetBlock);
+    route!(get_block_proof_call, GetBlockProof);
     route!(get_info_call, GetInfo);
     route!(get_current_network_call, GetCurrentNetwork);
     route!(get_peer_addresses_call, GetPeerAddresses);
@@ -338,7 +339,6 @@ impl RpcApi for GrpcClient {
     async fn submit_did_deactivate(&self, request: SubmitDidDeactivateRequest) -> RpcResult<SubmitDidDeactivateResponse> {
         self.inner.call(SahyadridPayloadOps::SubmitDidDeactivate, request).await?.as_ref().try_into()
     }
-
 
     async fn resolve_did_call(
         &self,

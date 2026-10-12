@@ -19,9 +19,9 @@
 //!   5. verify_bit = 1
 //!   6. acc = pv_init_acc
 
-use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
-use p3_matrix::{dense::RowMajorMatrix, Matrix};
+use p3_matrix::dense::RowMajorMatrix;
 
 use crate::config::F;
 
@@ -44,12 +44,12 @@ impl BaseAir<F> for DilithiumBatchVerifyAir {
 
 impl<AB> Air<AB> for DilithiumBatchVerifyAir
 where
-    AB: AirBuilderWithPublicValues<F = F>,
+    AB: AirBuilder<F = F>,
 {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local = main.row_slice(0).expect("trace must have >= 1 row");
-        let next = main.row_slice(1).expect("trace must have >= 2 rows");
+        let local = main.current_slice();
+        let next = main.next_slice();
 
         let local_fp0 = &local[COL_FP0];
         let local_fp1 = &local[COL_FP1];

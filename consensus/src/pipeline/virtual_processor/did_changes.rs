@@ -354,7 +354,7 @@ mod tests {
         let ok = |_: &[u8], _: &[u8], _: &[u8]| true;
         let ops = vec![create_op("csm1a"), create_op("csm1a")];
         let (root, changed) =
-            compute_block_did_changes(EMPTY, &mut smt, &MockStates::default(), &ops, 10, &ok).unwrap();
+            compute_block_did_changes(EMPTY, &mut smt, &MockStates::default(), &ops, 10, Prefix::Testnet, &ok).unwrap();
         assert_eq!(changed.len(), 1);
         assert_ne!(root, EMPTY);
     }
@@ -364,7 +364,7 @@ mod tests {
         let mut smt = MemStore::default();
         let bad = |_: &[u8], _: &[u8], _: &[u8]| false;
         let (root, changed) =
-            compute_block_did_changes(EMPTY, &mut smt, &MockStates::default(), &[create_op("csm1a")], 10, &bad)
+            compute_block_did_changes(EMPTY, &mut smt, &MockStates::default(), &[create_op("csm1a")], 10, Prefix::Testnet, &bad)
                 .unwrap();
         assert!(changed.is_empty());
         assert_eq!(root, EMPTY);
@@ -376,11 +376,11 @@ mod tests {
         let mut s1 = MemStore::default();
         let mut s2 = MemStore::default();
         let (r1, _) = compute_block_did_changes(
-            EMPTY, &mut s1, &MockStates::default(), &[create_op("csm1a"), create_op("csm1b")], 5, &ok,
+                EMPTY, &mut s1, &MockStates::default(), &[create_op("csm1a"), create_op("csm1b")], 5, Prefix::Testnet, &ok,
         )
         .unwrap();
         let (r2, _) = compute_block_did_changes(
-            EMPTY, &mut s2, &MockStates::default(), &[create_op("csm1b"), create_op("csm1a")], 5, &ok,
+                EMPTY, &mut s2, &MockStates::default(), &[create_op("csm1b"), create_op("csm1a")], 5, Prefix::Testnet, &ok,
         )
         .unwrap();
         assert_eq!(r1, r2);

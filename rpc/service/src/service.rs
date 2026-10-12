@@ -767,6 +767,34 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         }
     }
 
+    async fn get_block_proof_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: GetBlockProofRequest,
+    ) -> RpcResult<GetBlockProofResponse> {
+        let session = self.consensus_manager.consensus().session().await;
+
+        let result = session
+            .async_get_block_proof(request.block_hash)
+            .await
+            .map_err(|e| RpcError::General(format!("{e:?}")))?;
+
+        Ok(match result {
+            Some(bp) => GetBlockProofResponse {
+                block_hash: request.block_hash,
+                blue_score: Some(bp.blue_score),
+                aggregated_count: Some(bp.aggregated_count),
+                proof_bytes: Some(bp.proof_bytes),
+            },
+            None => GetBlockProofResponse {
+                block_hash: request.block_hash,
+                blue_score: None,
+                aggregated_count: None,
+                proof_bytes: None,
+            },
+        })
+    }
+
     async fn get_block_template_call(
         &self,
         _connection: Option<&DynRpcConnection>,

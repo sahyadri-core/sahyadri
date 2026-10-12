@@ -47,6 +47,7 @@ message SahyadridMessage {
     PruningPointProofMessage pruningPointProof = 49;
     ReadyMessage ready = 50;
     BlockWithTrustedDataV4Message blockWithTrustedDataV4 = 51;
+    BlockRootProofMessage blockRootProof = 59;
     TrustedDataMessage trustedData = 52;
     RequestIBDChainBlockLocatorMessage requestIBDChainBlockLocator = 53;
     IbdChainBlockLocatorMessage ibdChainBlockLocator = 54;

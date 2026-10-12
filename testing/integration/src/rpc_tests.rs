@@ -225,6 +225,34 @@ async fn sanity_test() {
                 })
             }
 
+            SahyadridPayloadOps::GetBlockProof => {
+                let rpc_client = client.clone();
+                tst!(op, {
+                    // Query genesis block hash — should return response
+                    // (proof likely absent since genesis has no txs)
+                    let response = rpc_client
+                        .get_block_proof(SIMNET_GENESIS.hash)
+                        .await
+                        .expect("get_block_proof call must succeed");
+
+                    assert_eq!(response.block_hash, SIMNET_GENESIS.hash);
+                    info!(
+                        "get_block_proof(genesis): has_proof={}, N={:?}",
+                        response.proof_bytes.is_some(),
+                        response.aggregated_count
+                    );
+
+                    // Query unknown hash — expect None
+                    let unknown = Hash::from_bytes([0xAB; 32]);
+                    let response = rpc_client
+                        .get_block_proof(unknown)
+                        .await
+                        .expect("get_block_proof call must succeed");
+                    assert!(response.proof_bytes.is_none());
+                    info!("get_block_proof(unknown): returned None as expected");
+                })
+            }
+
             SahyadridPayloadOps::GetBlocks => {
                 let rpc_client = client.clone();
                 tst!(op, {

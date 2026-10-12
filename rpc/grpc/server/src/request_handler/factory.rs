@@ -45,6 +45,7 @@ impl Factory {
                 GetBlockTemplate,
                 GetCurrentNetwork,
                 GetBlock,
+                GetBlockProof,
                 GetBlocks,
                 GetInfo,
                 Shutdown,
@@ -146,18 +147,17 @@ impl Factory {
         });
         interface.replace_method(SahyadridPayloadOps::NotifyFinalityConflict, method);
 
-        // SubmitAccountTransaction custom handler
+        // GetBlockProof custom handler
         let method: SahyadridMethod = Method::new(|server_ctx: ServerContext, _connection: Connection, request: SahyadridRequest| {
             Box::pin(async move {
                 let mut response: SahyadridResponse = match request.payload {
-                    Some(Payload::SubmitAccountTransactionRequest(ref req)) => {
-                        eprintln!("[FACTORY] SubmitAccountTransaction handler REACHED, sender_len={} receiver_len={} sig_len={}", req.sender.len(), req.receiver.len(), req.signature.len());
-                        match sahyadri_rpc_core::SubmitAccountTransactionRequest::try_from(req) {
-                            Ok(rpc_req) => match server_ctx.core_service.submit_account_transaction(rpc_req).await {
-                                Ok(res) => SubmitAccountTransactionResponseMessage::from(res).into(),
-                                Err(e) => SubmitAccountTransactionResponseMessage::from(e).into(),
+                    Some(Payload::GetBlockProofRequest(ref req)) => {
+                        match sahyadri_rpc_core::GetBlockProofRequest::try_from(req) {
+                            Ok(rpc_req) => match server_ctx.core_service.get_block_proof_call(None, rpc_req).await {
+                                Ok(res) => GetBlockProofResponseMessage::from(Ok::<&sahyadri_rpc_core::GetBlockProofResponse, sahyadri_rpc_core::RpcError>(&res)).into(),
+                                Err(e) => GetBlockProofResponseMessage::from(Err::<&sahyadri_rpc_core::GetBlockProofResponse, sahyadri_rpc_core::RpcError>(e)).into(),
                             },
-                            Err(e) => SubmitAccountTransactionResponseMessage::from(e).into(),
+                            Err(e) => GetBlockProofResponseMessage::from(e).into(),
                         }
                     }
                     _ => return Err(GrpcServerError::InvalidRequestPayload),
@@ -166,7 +166,7 @@ impl Factory {
                 Ok(response)
             })
         });
-        interface.replace_method(SahyadridPayloadOps::SubmitAccountTransaction, method);
+        interface.replace_method(SahyadridPayloadOps::GetBlockProof, method);
 
         // DID custom handlers
         let _did_create_method: SahyadridMethod = Method::new(|server_ctx: ServerContext, _connection: Connection, request: SahyadridRequest| {

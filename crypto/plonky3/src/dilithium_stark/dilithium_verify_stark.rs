@@ -2,9 +2,8 @@
 //!
 //! Chains sub-STARKs: MatrixVec → NTT(fwd) → PolyMult → NTT(inv) → NormBound → Rejection
 
-use p3_air::{Air, AirBuilder, BaseAir};
+use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_field::PrimeCharacteristicRing;
-use p3_matrix::Matrix;
 
 use super::field_zq::{self, build_ntt_trace};
 use super::matrix_vec_stark::build_matrix_vec_trace;
@@ -106,12 +105,12 @@ impl<Fld> BaseAir<Fld> for DilithiumVerifyAir {
 
 impl<AB> Air<AB> for DilithiumVerifyAir
 where
-    AB: p3_air::AirBuilderWithPublicValues<F = F>,
+    AB: p3_air::AirBuilder<F = F>,
 {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local = main.row_slice(0).unwrap();
-        let next = main.row_slice(1).unwrap();
+        let local = main.current_slice();
+        let next = main.next_slice();
 
         let index = local[0].clone();
         let w1p = local[1].clone();

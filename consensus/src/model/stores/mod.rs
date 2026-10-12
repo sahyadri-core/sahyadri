@@ -1,5 +1,6 @@
 pub mod acceptance_data;
 pub mod account_roots;
+pub mod proof_roots;
 pub mod account_states;
 pub mod account_store;
 pub mod did_store;

@@ -1,3 +1,4 @@
+use crate::core::payload::BlockRootProof;
 use super::{
     error::ConversionError,
     header::Versioned,
@@ -249,5 +250,47 @@ impl TryFrom<protowire::RequestAntipastMessage> for (Hash, Hash) {
     type Error = ConversionError;
     fn try_from(msg: protowire::RequestAntipastMessage) -> Result<Self, Self::Error> {
         Ok((msg.block_hash.try_into_ex()?, msg.context_hash.try_into_ex()?))
+    }
+}
+
+// ─── BlockRootProof conversions ───
+
+impl From<BlockRootProof> for protowire::BlockRootProofMessage {
+    fn from(item: BlockRootProof) -> Self {
+        Self {
+            block_hash: Some(item.block_hash.into()),
+            blue_score: item.blue_score,
+            aggregated_count: item.aggregated_count,
+            proof_bytes: item.proof_bytes,
+        }
+    }
+}
+
+impl TryFrom<protowire::BlockRootProofMessage> for BlockRootProof {
+    type Error = ConversionError;
+    fn try_from(msg: protowire::BlockRootProofMessage) -> Result<Self, Self::Error> {
+        Ok(Self {
+            block_hash: msg.block_hash.try_into_ex()?,
+            blue_score: msg.blue_score,
+            aggregated_count: msg.aggregated_count,
+            proof_bytes: msg.proof_bytes,
+        })
+    }
+}
+
+/// Helper: build a broadcastable `SahyadridMessage` from a `BlockProof`.
+pub fn block_root_proof_to_message(
+    proof: &sahyadri_consensus_core::api::BlockProof,
+) -> crate::pb::SahyadridMessage {
+    let msg = BlockRootProof {
+        block_hash: proof.block_hash,
+        blue_score: proof.blue_score,
+        aggregated_count: proof.aggregated_count,
+        proof_bytes: proof.proof_bytes.clone(),
+    };
+    crate::pb::SahyadridMessage {
+        request_id: 0,
+        response_id: 0,
+        payload: Some(crate::pb::sahyadrid_message::Payload::BlockRootProof(msg.into())),
     }
 }

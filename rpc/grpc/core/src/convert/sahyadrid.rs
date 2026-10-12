@@ -43,6 +43,7 @@ pub mod sahyadrid_request_convert {
     impl_into_sahyadrid_request!(SubmitDidUpdate);
     impl_into_sahyadrid_request!(SubmitDidDeactivate);
     impl_into_sahyadrid_request!(GetSubnetwork);
+    impl_into_sahyadrid_request!(GetBlockProof);
     impl_into_sahyadrid_request!(GetVirtualChainFromBlock);
     impl_into_sahyadrid_request!(GetBlocks);
     impl_into_sahyadrid_request!(GetBlockCount);
@@ -174,6 +175,7 @@ pub mod sahyadrid_response_convert {
     impl_into_sahyadrid_response!(SubmitBlock);
     impl_into_sahyadrid_response!(GetBlockTemplate);
     impl_into_sahyadrid_response!(GetBlock);
+    impl_into_sahyadrid_response!(GetBlockProof);
     impl_into_sahyadrid_response!(GetInfo);
     impl_into_sahyadrid_response!(GetCurrentNetwork);
 

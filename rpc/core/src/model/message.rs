@@ -224,6 +224,80 @@ pub struct GetBlockResponse {
     pub block: RpcBlock,
 }
 
+/// Request for a block's recursively-aggregated root STARK proof.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetBlockProofRequest {
+    /// Hash of the block whose proof is requested.
+    pub block_hash: RpcHash,
+}
+
+impl GetBlockProofRequest {
+    pub fn new(block_hash: RpcHash) -> Self {
+        Self { block_hash }
+    }
+}
+
+impl Serializer for GetBlockProofRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(RpcHash, &self.block_hash, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetBlockProofRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let block_hash = load!(RpcHash, reader)?;
+        Ok(Self { block_hash })
+    }
+}
+
+/// Response containing a block's root proof, if generated.
+///
+/// The proof is produced asynchronously after block commit; a freshly
+/// committed block may not yet have a proof — callers should retry.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetBlockProofResponse {
+    /// Block this proof attests to.
+    pub block_hash: RpcHash,
+    /// Sahyadri Score at proof generation time.
+    pub blue_score: Option<u64>,
+    /// Number of child proofs aggregated (N in N→1).
+    pub aggregated_count: Option<u32>,
+    /// Serialized `RecursionOutput` (bincode). `None` if not yet generated.
+    pub proof_bytes: Option<Vec<u8>>,
+}
+
+impl GetBlockProofResponse {
+    pub fn new(
+        block_hash: RpcHash,
+        blue_score: Option<u64>,
+        aggregated_count: Option<u32>,
+        proof_bytes: Option<Vec<u8>>,
+    ) -> Self {
+        Self { block_hash, blue_score, aggregated_count, proof_bytes }
+    }
+}
+
+impl Serializer for GetBlockProofResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(RpcHash, &self.block_hash, writer)?;
+        store!(Option<u64>, &self.blue_score, writer)?;
+        store!(Option<u32>, &self.aggregated_count, writer)?;
+        store!(Option<Vec<u8>>, &self.proof_bytes, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetBlockProofResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let block_hash = load!(RpcHash, reader)?;
+        let blue_score = load!(Option<u64>, reader)?;
+        let aggregated_count = load!(Option<u32>, reader)?;
+        let proof_bytes = load!(Option<Vec<u8>>, reader)?;
+        Ok(Self { block_hash, blue_score, aggregated_count, proof_bytes })
+    }
+}
+
 impl Serializer for GetBlockResponse {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u16, &1, writer)?;

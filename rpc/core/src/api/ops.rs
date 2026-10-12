@@ -140,6 +140,7 @@ pub enum RpcApiOps {
     /// Get REGISTRY_UNIT Return Addresses
     GetRegistryUnitReturnAddress = 150,
     GetAccountProof = 151,
+    GetBlockProof = 195,
     GetSyncWaveMetadata = 164,
     DownloadSyncWaveChunk = 165,
     /// Get Virtual Chain from Block V2

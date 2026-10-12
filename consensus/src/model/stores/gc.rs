@@ -196,6 +196,7 @@ mod tests {
     use super::*;
     use crate::model::stores::account_states::DbAccountStatesStore;
     use crate::model::stores::account_roots::DbAccountRootsStore;
+    use crate::model::stores::did_states::DbDidStatesStore;
     use crate::model::stores::headers::DbHeadersStore;
     use crate::model::stores::smt_nodes::DbSmtNodeStore;
     use sahyadri_database::prelude::CachePolicy;
@@ -206,9 +207,10 @@ mod tests {
         let (lifetime, db) = test_db();
         let smt = DbSmtNodeStore::new(db.clone(), 100);
         let states = DbAccountStatesStore::new(db.clone(), 100);
+        let did_states = DbDidStatesStore::new(db.clone(), 100);
         let roots = DbAccountRootsStore::new(db.clone(), 100);
         let headers = DbHeadersStore::new(db.clone(), CachePolicy::Count(100), CachePolicy::Count(100));
-        let stats = mark_and_sweep(&smt, &states, &roots, &headers);
+        let stats = mark_and_sweep(&smt, &states, &did_states, &roots, &headers);
         assert_eq!(stats.deleted_nodes, 0);
         assert_eq!(stats.deleted_states, 0);
         assert_eq!(stats.deleted_roots, 0);

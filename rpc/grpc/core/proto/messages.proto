@@ -22,6 +22,7 @@ message SahyadridRequest {
     NotifyVirtualChainChangedRequestMessage notifyVirtualChainChangedRequest = 1022;
     // VirtualChainChangedNotificationMessage virtualChainChangedNotification = 1024;
     GetBlockRequestMessage getBlockRequest = 1025;
+    GetBlockProofRequestMessage getBlockProofRequest = 1098;
     GetSubnetworkRequestMessage getSubnetworkRequest = 1027;
     GetVirtualChainFromBlockRequestMessage getVirtualChainFromBlockRequest = 1029;
     GetBlocksRequestMessage getBlocksRequest = 1031;
@@ -84,6 +85,7 @@ message SahyadridResponse {
   oneof payload {
     GetCurrentNetworkResponseMessage getCurrentNetworkResponse = 1002;
     SubmitBlockResponseMessage submitBlockResponse = 1004;
+    GetBlockProofResponseMessage getBlockProofResponse = 1099;
     GetBlockTemplateResponseMessage getBlockTemplateResponse = 1006;
     NotifyBlockAddedResponseMessage notifyBlockAddedResponse = 1008;
     BlockAddedNotificationMessage blockAddedNotification = 1009;

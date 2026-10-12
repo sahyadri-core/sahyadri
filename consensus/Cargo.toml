@@ -48,8 +48,9 @@ serde_json.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-
+sahyadri-plonky3 = { path = "../crypto/plonky3" }
 rand = { workspace = true, features = ["small_rng"] }
+p3-uni-stark = "0.8.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }

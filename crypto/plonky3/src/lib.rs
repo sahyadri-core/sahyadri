@@ -21,6 +21,7 @@
 //! Compression: 33 MB → 30 KB = ~1,100x
 //! Security: ~116 bits (FRI 50 queries + 16-bit PoW, BabyBear + Keccak)
 
+pub mod aggregate;
 pub mod air;
 pub mod batch;
 pub mod config;

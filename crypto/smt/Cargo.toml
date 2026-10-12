@@ -10,10 +10,10 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-p3-field = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
-p3-goldilocks = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
-p3-symmetric = { git = "https://github.com/0xPolygonZero/plonky3", branch = "main" }
-rand = "0.9"
+p3-field = "0.8.0"
+p3-goldilocks = "0.8.0"
+p3-symmetric = "0.8.0"
+rand = "0.10"
 
 [lints]
 workspace = true
