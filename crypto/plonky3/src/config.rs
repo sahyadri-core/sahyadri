@@ -48,8 +48,12 @@ pub type Challenger = DuplexChallenger<F, Perm, 8, 4>;
 // ── PCS ──────────────────────────────────────────────────────
 pub type Pcs = TwoAdicFriPcs<F, Dft, ValMmcs, ChallengeMmcs>;
 
+/// Generic Sahyadri STARK config, shared by all sub-STARKs.
+/// The name is generic even though the parameter list is fixed.
+pub type SahyadriStarkConfig = StarkConfig<Pcs, EF, Challenger>;
+
 // ── Config ───────────────────────────────────────────────────
-pub type DilithiumStarkConfig = StarkConfig<Pcs, EF, Challenger>;
+pub type DilithiumStarkConfig = SahyadriStarkConfig;
 
 // ── Constants ────────────────────────────────────────────────
 pub const LOG_BLOWUP: usize = 2;

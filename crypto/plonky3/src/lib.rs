@@ -25,6 +25,8 @@ pub mod aggregate;
 pub mod air;
 pub mod batch;
 pub mod config;
+pub mod aggregate_cross;
+pub mod smt_stark;
 pub mod dilithium_stark;
 pub mod node;
 pub mod prover;
