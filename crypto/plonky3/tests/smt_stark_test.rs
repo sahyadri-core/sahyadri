@@ -8,7 +8,7 @@ use sahyadri_smt::{hash_branch, hash_leaf, Terminal};
 use sahyadri_plonky3::config::{build_stark_config, SahyadriStarkConfig};
 use sahyadri_plonky3::smt_stark::{
     generate_smt_trace, h256_to_limbs, prove_smt_state, verify_smt_state,
-    SmtTraceInput, HASH_LIMBS, NUM_ROWS, NUM_TRACE_COLS,
+    SmtTraceInput, HASH_LIMBS, NUM_TRACE_COLS,
 };
 
 type F = Goldilocks;
@@ -22,9 +22,9 @@ fn trace_has_correct_shape() {
         is_absent: false,
     };
     let trace = generate_smt_trace(&input);
-    let mat = trace;
-    assert_eq!(mat.height(), NUM_ROWS);
-    assert_eq!(mat.width(), NUM_TRACE_COLS);
+    // Dynamic height: (siblings.len() + 1).next_power_of_two().max(2)
+    assert_eq!(trace.height(), 2);   // was 512
+    assert_eq!(trace.width(), NUM_TRACE_COLS);
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn absent_trace_shape() {
         is_absent: true,
     };
     let trace = generate_smt_trace(&input);
-    assert_eq!(trace.height(), NUM_ROWS);
+    assert_eq!(trace.height(), 2);   // was 512
     assert_eq!(trace.width(), NUM_TRACE_COLS);
 }
 

@@ -1,12 +1,13 @@
 // Prove and verify entry points for SMT STARK.
 
 use p3_field::PrimeCharacteristicRing;
+use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{prove, verify, Proof};
 
 use crate::config::{SahyadriStarkConfig, F};
 use crate::smt_stark::air::{
-    SmtAir, COL_FOLD, HASH_LIMBS, NUM_PUBLIC_VALUES, NUM_ROWS, NUM_TRACE_COLS,
+    SmtAir, COL_FOLD, HASH_LIMBS, NUM_PUBLIC_VALUES, NUM_TRACE_COLS,
 };
 use crate::smt_stark::trace::{generate_smt_trace, h256_to_limbs, SmtTraceInput};
 
@@ -37,7 +38,8 @@ pub struct SmtStateProof {
 }
 
 fn compute_fold_from_trace(trace: &RowMajorMatrix<F>) -> [F; HASH_LIMBS] {
-    let last_off = (NUM_ROWS - 1) * NUM_TRACE_COLS;
+    let num_rows = trace.height();
+    let last_off = (num_rows - 1) * NUM_TRACE_COLS;
     let mut out = [F::ZERO; HASH_LIMBS];
     for k in 0..HASH_LIMBS {
         out[k] = trace.values[last_off + COL_FOLD + k];

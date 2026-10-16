@@ -9,7 +9,7 @@ use crate::config::F;
 use crate::smt_stark::air::{
     ALPHA_U64, COL_CURRENT_HASH, COL_DIRECTION, COL_FOLD, COL_HASH,
     COL_IS_ABSENT, COL_IS_BRANCH, COL_IS_LEAF, COL_IS_PADDING, COL_KEY,
-    COL_SIBLING_HASH, COL_VALUE, HASH_LIMBS, NUM_ROWS, NUM_TRACE_COLS,
+    COL_SIBLING_HASH, COL_VALUE, HASH_LIMBS, NUM_TRACE_COLS,
     SMT_DEPTH,
 };
 
@@ -72,7 +72,9 @@ pub fn generate_smt_trace(input: &SmtTraceInput) -> RowMajorMatrix<F> {
         SMT_DEPTH,
     );
 
-    let mut data = vec![F::ZERO; NUM_ROWS * NUM_TRACE_COLS];
+    let required_rows = num_siblings + 1;
+    let trace_rows = required_rows.next_power_of_two().max(2);
+    let mut data = vec![F::ZERO; trace_rows * NUM_TRACE_COLS];
 
     // Row 0: leaf row
     let leaf_hash: H256 = if input.is_absent {
@@ -134,7 +136,7 @@ pub fn generate_smt_trace(input: &SmtTraceInput) -> RowMajorMatrix<F> {
     }
 
     // Rows num_siblings+1..NUM_ROWS: padding rows
-    for row_idx in (num_siblings + 1)..NUM_ROWS {
+    for row_idx in (num_siblings + 1)..trace_rows {
         let off = row_idx * NUM_TRACE_COLS;
         let row = &mut data[off..off + NUM_TRACE_COLS];
         row[COL_IS_LEAF] = F::ZERO;
@@ -152,7 +154,7 @@ pub fn generate_smt_trace(input: &SmtTraceInput) -> RowMajorMatrix<F> {
     // Compute algebraic fold of the hash column, skipping padding rows.
     let alpha = F::from_u64(ALPHA_U64);
     let mut fold = [F::ZERO; HASH_LIMBS];
-    for row_idx in 0..NUM_ROWS {
+    for row_idx in 0..trace_rows {
         let off = row_idx * NUM_TRACE_COLS;
         let is_pad = data[off + COL_IS_PADDING] == F::ONE;
         for k in 0..HASH_LIMBS {
