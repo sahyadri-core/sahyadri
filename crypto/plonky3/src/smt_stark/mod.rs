@@ -24,6 +24,7 @@ pub mod poseidon2_batch;
 pub mod poseidon2_bound;
 pub mod sponge_bound;
 pub mod trace;
+pub mod batch;
 
 pub use air::{
     SmtAir, COL_CURRENT_HASH, COL_DIRECTION, COL_HASH, COL_IS_ABSENT,

@@ -29,6 +29,7 @@ pub const COL_FOLD: usize = 25;
 
 pub const NUM_TRACE_COLS: usize = 29;
 
+#[derive(Clone, Copy, Debug)]
 pub struct SmtAir;
 
 impl BaseAir<F> for SmtAir {

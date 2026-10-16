@@ -49,17 +49,7 @@ pub fn prove_smt_state(
     config: &SahyadriStarkConfig,
     input: &SmtTraceInput,
 ) -> SmtStateProof {
-    let trace = generate_smt_trace(input);
-    let root = compute_root_from_input(input);
-    let hash_fold = compute_fold_from_trace(&trace);
-
-    let public = SmtPublicInputs {
-        root,
-        key: h256_to_limbs(&input.key),
-        value: h256_to_limbs(&input.value),
-        is_absent: input.is_absent,
-        hash_fold,
-    };
+    let (trace, public) = prepare_smt_input(input);
     let pv = public.to_vec();
     let air = SmtAir;
     let proof = prove(config, &air, trace, &pv).expect("SMT STARK proving failed");
@@ -74,6 +64,23 @@ pub fn verify_smt_state(
     let pv = proof.public.to_vec();
     verify(config, &air, &proof.proof, &pv)
         .map_err(|e| format!("SMT STARK verification failed: {:?}", e))
+}
+
+/// Prepare trace + public inputs without proving.
+/// Used by both single-proof and batch-proof paths.
+pub fn prepare_smt_input(input: &SmtTraceInput) -> (RowMajorMatrix<F>, SmtPublicInputs) {
+    let trace = generate_smt_trace(input);
+    let root = compute_root_from_input(input);
+    let hash_fold = compute_fold_from_trace(&trace);
+
+    let public = SmtPublicInputs {
+        root,
+        key: h256_to_limbs(&input.key),
+        value: h256_to_limbs(&input.value),
+        is_absent: input.is_absent,
+        hash_fold,
+    };
+    (trace, public)
 }
 
 fn compute_root_from_input(input: &SmtTraceInput) -> [F; HASH_LIMBS] {
