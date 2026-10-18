@@ -11,7 +11,7 @@ use crate::smt_stark::air::{
 };
 use crate::smt_stark::trace::{generate_smt_trace, h256_to_limbs, SmtTraceInput};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SmtPublicInputs {
     pub root: [F; HASH_LIMBS],
     pub key: [F; HASH_LIMBS],
@@ -32,6 +32,7 @@ impl SmtPublicInputs {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct SmtStateProof {
     pub proof: Proof<SahyadriStarkConfig>,
     pub public: SmtPublicInputs,

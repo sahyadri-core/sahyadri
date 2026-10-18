@@ -20,3 +20,4 @@ rustbridge_*.log
 target/
 sahyadri-miner/target/
 sahyadri-b.sh
+wasm/pkg/

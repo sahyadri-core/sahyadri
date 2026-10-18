@@ -32,6 +32,12 @@ sahyadri-wallet-core.workspace = true
 sahyadri-wallet-keys.workspace = true
 sahyadri-wrpc-client.workspace = true
 sahyadri-wrpc-wasm.workspace = true
+sahyadri-plonky3 = { path = "../crypto/plonky3" }
+sahyadri-smt = { path = "../crypto/smt" }
+bincode.workspace = true
+hex.workspace = true
+p3-field = "0.8.0"
+p3-goldilocks = "0.8.0"
 num.workspace = true
 wasm-bindgen.workspace = true
 workflow-log.workspace = true

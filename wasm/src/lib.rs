@@ -1,232 +1,70 @@
-/*!
-# Sahyadri WASM32 bindings
+// WASM verify module — trustless SMT proof verification in the browser.
 
-[<img alt="github" src="https://img.shields.io/badge/github-sahyadrinet/sahyadri-8da0cb?style=for-the-badge&labelColor=555555&color=8da0cb&logo=github" height="20">](https://github.com/sahyadrinet/sahyadri/tree/master/wasm)
-[<img alt="crates.io" src="https://img.shields.io/crates/v/sahyadri-wasm.svg?maxAge=2592000&style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/sahyadri-wasm)
-[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-sahyadri--wasm-56c2a5?maxAge=2592000&style=for-the-badge&logo=docs.rs" height="20">](https://docs.rs/sahyadri-wasm)
-<img alt="license" src="https://img.shields.io/crates/l/sahyadri-wasm.svg?maxAge=2592000&color=6ac&style=for-the-badge&logoColor=fff" height="20">
+use wasm_bindgen::prelude::*;
+use p3_field::{PrimeCharacteristicRing, PrimeField64};
+use p3_goldilocks::Goldilocks;
 
-<br>
+use sahyadri_plonky3::config::build_stark_config;
+use sahyadri_plonky3::smt_stark::{
+    verify_smt_state,
+    prove::SmtStateProof,
+};
 
-Sahyadri WASM32 bindings offer direct integration of Rust code and Sahyadri
-codebase within JavaScript environments such as Node.js and Web Browsers.
-
-## Documentation
-
-- [**Integrating with Sahyadri** guide](https://sahyadri.aspectron.org/)
-- [Rust SDK documentation (**Rustdoc**)](https://docs.rs/sahyadri-wasm/)
-- [TypeScript documentation (**JSDoc**)](https://sahyadri.aspectron.org/docs/)
-
-Please note that while WASM directly binds JavaScript and Rust resources, their names on JavaScript side
-are different from their name in Rust as they conform to the 'camelCase' convention in JavaScript and
-to the 'snake_case' convention in Rust.
-
-## Interfaces
-
-The APIs are currently separated into the following groups (this will be expanded in the future):
-
-- **Consensus Client API** — Bindings for primitives related to transactions.
-- **RPC API** — [RPC interface bindings](sahyadri_wrpc_wasm::client) for the Sahyadri node using WebSocket (wRPC) connections.
-- **Wallet SDK** — API for async core wallet processing tasks.
-- **Wallet API** — A rust implementation of the fully-featured wallet usable in the native Rust, Browser or NodeJs and Bun environments.
-
-## NPM Modules
-
-For JavaScript / TypeScript environments, there are two
-available NPM modules:
-
-
-The `sahyadri-wasm` module is a pure WASM32 module that includes
-the entire wallet framework, but does not support RPC due to an absence
-of a native WebSocket in NodeJs environment, while
-the `sahyadri` module includes `websocket` package dependency simulating
-the W3C WebSocket and due to this supports RPC.
-
-NOTE: for security reasons it is always recommended to build WASM SDK from source or
-download pre-built redistributables from releases or development builds.
-
-## Examples
-
-JavaScript examples for using this framework can be found at:
-<https://github.com/sahyadrinet/sahyadri/tree/master/wasm/nodejs>
-
-## WASM32 Binaries
-
-For pre-built browser-compatible WASM32 redistributables of this
-framework please see the releases section of the Sahyadri
-repository at <https://github.com/sahyadrinet/sahyadri/releases>.
-
-## Development Builds
-
-The latest development builds from <https://sahyadri.aspectron.org/nightly/downloads/>.
-Development builds typically contain fixes and improvements that are not yet available in
-stable releases. Additional information can be found at
-<https://aspectron.org/en/projects/sahyadri-wasm.html>.
-
-## Using RPC
-
-No special handling is required to use the RPC client
-in **Browser** or **Bun** environments due to the fact that
-these environments provide native WebSocket support.
-
-**NODEJS:** If you are building from source, to use WASM RPC client
-in the NodeJS environment, you need to introduce a global W3C WebSocket
-object before loading the WASM32 library (to simulate the browser behavior).
-You can the [WebSocket](https://www.npmjs.com/package/websocket)
-module that offers W3C WebSocket compatibility and is compatible
-with Sahyadri RPC implementation.
-
-You can use the following shims:
-
-```js
-// WebSocket
-globalThis.WebSocket = require('websocket').w3cwebsocket;
-```
-
-## Loading in a Web App
-
-```html
-<html>
-    <head>
-        <script type="module">
-            import * as sahyadri_wasm from './sahyadri/sahyadri-wasm.js';
-            (async () => {
-                const sahyadri = await sahyadri_wasm.default('./sahyadri/sahyadri-wasm_bg.wasm');
-                // ...
-            })();
-        </script>
-    </head>
-    <body></body>
-</html>
-```
-
-## Loading in a Node.js App
-
-```javascript
-// W3C WebSocket module shim
-// this is provided by NPM `sahyadri` module and is only needed
-// if you are building WASM libraries for NodeJS from source
-// globalThis.WebSocket = require('websocket').w3cwebsocket;
-
-let {RpcClient,Encoding,initConsolePanicHook} = require('./sahyadri-rpc');
-
-// enabling console panic hooks allows WASM to print panic details to console
-// initConsolePanicHook();
-// enabling browser panic hooks will create a full-page DIV with panic details
-// this is useful for mobile devices where console is not available
-// initBrowserPanicHook();
-
-// if port is not specified, it will use the default port for the specified network
-const rpc = new RpcClient("127.0.0.1", Encoding.Borsh, "testnet-10");
-const rpc = new RpcClient({
-    url : "127.0.0.1",
-    encoding : Encoding.Borsh,
-    networkId : "testnet-10"
-});
-
-
-(async () => {
-    try {
-        await rpc.connect();
-        let info = await rpc.getInfo();
-        console.log(info);
-    } finally {
-        await rpc.disconnect();
+/// Verify an SMT inclusion proof against a trusted state root.
+/// Returns account value (first limb as decimal string) on success.
+#[wasm_bindgen]
+pub fn verify_smt_proof(
+    state_root_hex: &str,
+    account_key_hex: &str,
+    proof_bytes: &[u8],
+) -> Result<String, JsValue> {
+    let root_bytes = hex::decode(state_root_hex)
+        .map_err(|e| JsValue::from_str(&format!("invalid root hex: {}", e)))?;
+    if root_bytes.len() != 32 {
+        return Err(JsValue::from_str("root must be 32 bytes"));
     }
-})();
-```
+    let root_limbs = bytes_to_limbs(&root_bytes);
 
-For more details, please follow the [**Integrating with Sahyadri**](https://sahyadri.aspectron.org/) guide.
-
-*/
-
-#![allow(unused_imports)]
-
-#[cfg(all(
-    any(feature = "wasm32-sdk", feature = "wasm32-rpc", feature = "wasm32-core", feature = "wasm32-keygen"),
-    not(target_arch = "wasm32")
-))]
-compile_error!(
-    "`sahyadri-wasm` crate for WASM32 target must be built with `--features wasm32-sdk|wasm32-rpc|wasm32-core|wasm32-keygen`"
-);
-
-mod version;
-pub use version::*;
-
-cfg_if::cfg_if! {
-
-    if #[cfg(feature = "wasm32-sdk")] {
-
-        pub use sahyadri_addresses::{Address, Version as AddressVersion};
-        pub use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput};
-        pub use sahyadri_pow::wasm::*;
-        pub use sahyadri_txscript::wasm::*;
-
-        pub mod rpc {
-            //! Sahyadri RPC interface
-            //!
-
-            pub mod messages {
-                //! Sahyadri RPC messages
-                pub use sahyadri_rpc_core::model::message::*;
-            }
-            pub use sahyadri_rpc_core::api::rpc::RpcApi;
-            pub use sahyadri_rpc_core::wasm::message::*;
-
-            pub use sahyadri_wrpc_wasm::client::*;
-            pub use sahyadri_wrpc_wasm::resolver::*;
-            pub use sahyadri_wrpc_wasm::notify::*;
-        }
-
-        pub use sahyadri_consensus_wasm::*;
-        pub use sahyadri_wallet_core::wasm::*;
-        pub use sahyadri_wallet_keys::prelude::*;
-        pub use sahyadri_bip32::wasm::*;
-
-    } else if #[cfg(feature = "wasm32-core")] {
-
-        pub use sahyadri_addresses::{Address, Version as AddressVersion};
-        pub use sahyadri_consensus_core::tx::{ScriptPublicKey, Transaction, TransactionInput, RegistryRef, TransactionOutput};
-        pub use sahyadri_pow::wasm::*;
-        pub use sahyadri_txscript::wasm::*;
-
-        pub mod rpc {
-            //! Sahyadri RPC interface
-            //!
-
-            pub mod messages {
-                //! Sahyadri RPC messages
-                pub use sahyadri_rpc_core::model::message::*;
-            }
-            pub use sahyadri_rpc_core::api::rpc::RpcApi;
-            pub use sahyadri_rpc_core::wasm::message::*;
-
-            pub use sahyadri_wrpc_wasm::client::*;
-            pub use sahyadri_wrpc_wasm::resolver::*;
-            pub use sahyadri_wrpc_wasm::notify::*;
-        }
-
-        pub use sahyadri_consensus_wasm::*;
-        pub use sahyadri_wallet_keys::prelude::*;
-        pub use sahyadri_wallet_core::wasm::*;
-        pub use sahyadri_bip32::wasm::*;
-
-    } else if #[cfg(feature = "wasm32-rpc")] {
-
-        pub use sahyadri_rpc_core::api::rpc::RpcApi;
-        pub use sahyadri_rpc_core::wasm::message::*;
-        pub use sahyadri_rpc_core::wasm::message::IPingRequest;
-        pub use sahyadri_wrpc_wasm::client::*;
-        pub use sahyadri_wrpc_wasm::resolver::*;
-        pub use sahyadri_wrpc_wasm::notify::*;
-        pub use sahyadri_wasm_core::types::*;
-
-    } else if #[cfg(feature = "wasm32-keygen")] {
-
-        pub use sahyadri_addresses::{Address, Version as AddressVersion};
-        pub use sahyadri_wallet_keys::prelude::*;
-        pub use sahyadri_wasm_core::types::*;
-        pub use sahyadri_bip32::wasm::*;
-
+    let key_bytes = hex::decode(account_key_hex)
+        .map_err(|e| JsValue::from_str(&format!("invalid key hex: {}", e)))?;
+    if key_bytes.len() != 32 {
+        return Err(JsValue::from_str("key must be 32 bytes"));
     }
+    let key_limbs = bytes_to_limbs(&key_bytes);
+
+    let proof: SmtStateProof = bincode::deserialize(proof_bytes)
+        .map_err(|e| JsValue::from_str(&format!("invalid proof bytes: {}", e)))?;
+
+    if proof.public.root != root_limbs {
+        return Err(JsValue::from_str("proof root does not match trusted header"));
+    }
+    if proof.public.key != key_limbs {
+        return Err(JsValue::from_str("proof key does not match requested account"));
+    }
+
+    let config = build_stark_config();
+    verify_smt_state(&config, &proof)
+        .map_err(|e| JsValue::from_str(&format!("verification failed: {}", e)))?;
+
+    Ok(format!("{}", proof.public.value[0].as_canonical_u64()))
+}
+
+/// Fast boolean check — no data extraction.
+#[wasm_bindgen]
+pub fn is_smt_proof_valid(
+    state_root_hex: &str,
+    account_key_hex: &str,
+    proof_bytes: &[u8],
+) -> bool {
+    verify_smt_proof(state_root_hex, account_key_hex, proof_bytes).is_ok()
+}
+
+fn bytes_to_limbs(bytes: &[u8]) -> [Goldilocks; 4] {
+    let mut out = [Goldilocks::ZERO; 4];
+    for i in 0..4 {
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(&bytes[i * 8..(i + 1) * 8]);
+        out[i] = Goldilocks::from_u64(u64::from_le_bytes(buf));
+    }
+    out
 }
