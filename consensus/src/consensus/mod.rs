@@ -745,6 +745,9 @@ impl ConsensusApi for Consensus {
             proof: proof_bytes,
             blue_score,
             aggregated_count,
+            chain_commitment: [0u8; 32],
+            chain_depth: 0,
+            chain_proof: Vec::new(),
         };
         self.proof_roots_store
             .insert_sync(block_hash, &entry)

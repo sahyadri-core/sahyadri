@@ -4,6 +4,8 @@ mod block_validation;
 mod chain_inquirer;
 pub use processor::*;
 pub mod test_block_builder;
+pub mod chain_proof;
+
 #[cfg(test)]
 mod tests;
 pub mod flash_tx;

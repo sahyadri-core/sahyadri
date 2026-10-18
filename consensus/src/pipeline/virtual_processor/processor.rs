@@ -4,6 +4,7 @@ use sahyadri_addresses::Prefix;
 use sahyadri_consensus_core::network::NetworkType;
 use sahyadri_dilithium::{PUBKEY_SIZE, SIG_SIZE};
 use crate::model::stores::did_states::{DbDidStatesStore, DidStatesStore};
+use crate::model::stores::proof_roots::ProofRootsStoreReader;
 use crate::{
     consensus::{
         services::{
@@ -2032,21 +2033,49 @@ fn generate_root_proof_for_block(
             .get_header(block_hash)
             .map(|h| h.blue_score)
             .unwrap_or(0);
+
+        // Phase E: compute chain commitment.
+        let parent_hash: Option<sahyadri_hashes::Hash> =
+            match headers_store.get_header(block_hash) {
+                Ok(h) => h.parents_by_level.get(0).and_then(|p| p.first().copied()),
+                Err(_) => None,
+            };
+
+        let (parent_chain_commitment, parent_chain_depth) = match parent_hash {
+            Some(ph) => match proof_roots_store.get(ph) {
+                Ok(Some(pe)) if pe.chain_depth > 0 => {
+                    (Some(pe.chain_commitment), pe.chain_depth)
+                }
+                _ => (None, 0),
+            },
+            None => (None, 0),
+        };
+
+        let (chain_commitment, chain_depth) =
+            crate::pipeline::virtual_processor::chain_proof::compute_chain_commitment(
+                &proof_bytes,
+                parent_chain_commitment,
+                parent_chain_depth,
+            )
+            .map_err(|e| format!("chain commitment: {e}"))?;
+
         let entry = crate::model::stores::proof_roots::ProofRootEntry {
             proof: proof_bytes,
             blue_score,
             aggregated_count: 1,
+            chain_commitment,
+            chain_depth,
+            chain_proof: Vec::new(),
         };
         proof_roots_store
             .insert_sync(block_hash, &entry)
             .map_err(|e| format!("store N=1: {e:?}"))?;
         let _ = crate::PROOF_BROADCAST.0.try_send(block_hash);
-        log::info!("SAHYADRI: N=1 batch proof stored for block {block_hash}");
+        log::info!(
+            "SAHYADRI: N=1 batch proof stored for block {block_hash} (chain_depth={chain_depth})"
+        );
         return Ok(());
     }
-
-    // ── 4. Extract per-sig mv_proofs ───────────────────────
-
 
     // ── 4. Extract per-sig mv_proofs ───────────────────────
     let sig_proofs: Vec<DilithiumSigProof> =
@@ -2087,10 +2116,38 @@ fn generate_root_proof_for_block(
     let proof_bytes = bincode::serialize(&root.0)
         .map_err(|e| format!("serialize root: {e:?}"))?;
 
+    // Phase E: compute chain commitment.
+    let parent_hash: Option<sahyadri_hashes::Hash> =
+        match headers_store.get_header(block_hash) {
+            Ok(h) => h.parents_by_level.get(0).and_then(|p| p.first().copied()),
+            Err(_) => None,
+        };
+
+    let (parent_chain_commitment, parent_chain_depth) = match parent_hash {
+        Some(ph) => match proof_roots_store.get(ph) {
+            Ok(Some(pe)) if pe.chain_depth > 0 => {
+                (Some(pe.chain_commitment), pe.chain_depth)
+            }
+            _ => (None, 0),
+        },
+        None => (None, 0),
+    };
+
+    let (chain_commitment, chain_depth) =
+        crate::pipeline::virtual_processor::chain_proof::compute_chain_commitment(
+            &proof_bytes,
+            parent_chain_commitment,
+            parent_chain_depth,
+        )
+        .map_err(|e| format!("chain commitment: {e}"))?;
+
     let entry = crate::model::stores::proof_roots::ProofRootEntry {
         proof: proof_bytes,
         blue_score,
         aggregated_count: n as u32,
+        chain_commitment,
+        chain_depth,
+        chain_proof: Vec::new(),
     };
 
     proof_roots_store
@@ -2101,7 +2158,7 @@ fn generate_root_proof_for_block(
     let _ = crate::PROOF_BROADCAST.0.try_send(block_hash);
 
     log::info!(
-        "SAHYADRI: root proof stored for block {block_hash} (N={n}, {} bytes)",
+        "SAHYADRI: root proof stored for block {block_hash} (N={n}, {} bytes, chain_depth={chain_depth})",
         entry.proof.len()
     );
     Ok(())
