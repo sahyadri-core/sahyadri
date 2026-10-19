@@ -15,29 +15,18 @@ use std::sync::Arc;
 /// Metadata + serialized proof stored per block.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProofRootEntry {
-    /// Serialized txs proof (Proof or RecursionOutput, bincode).
     pub proof: Vec<u8>,
-    /// Blue score at which the proof was generated.
     pub blue_score: u64,
-    /// Number of child proofs aggregated (N in N→1).
     pub aggregated_count: u32,
-
-    /// Cryptographic chain commitment: hash(prev_chain_commitment || hash(this_proof)).
-    /// Genesis = hash(this_proof). One per block, always present.
     #[serde(default)]
     pub chain_commitment: [u8; 32],
-
-    /// Chain depth (number of ancestors, inclusive).
-    /// 1 = genesis. Incremented by 1 for every child block.
     #[serde(default)]
     pub chain_depth: u32,
-
-    /// Full recursive chain proof (RecursionOutput), only at checkpoints.
-    /// Empty for non-checkpoint blocks.
     #[serde(default)]
     pub chain_proof: Vec<u8>,
+    #[serde(default)]
+    pub nearest_checkpoint: Option<Hash>,
 }
-
 pub trait ProofRootsStoreReader {
     fn get(&self, block_hash: Hash) -> StoreResult<Option<ProofRootEntry>>;
     fn has(&self, block_hash: Hash) -> StoreResult<bool>;
@@ -163,6 +152,7 @@ mod tests {
             chain_commitment: [0u8; 32],
             chain_depth: 0,
             chain_proof: Vec::new(),
+            nearest_checkpoint: None,
         };
 
         // ── 1. Insert ───────────────────────────────────────
@@ -190,6 +180,7 @@ mod tests {
             chain_commitment: [1u8; 32],
             chain_depth: 5,
             chain_proof: Vec::new(),
+            nearest_checkpoint: None,
         };
         store.insert_sync(block_hash, &updated).expect("re-insert");
         let read2 = store.get(block_hash).expect("get").expect("some");

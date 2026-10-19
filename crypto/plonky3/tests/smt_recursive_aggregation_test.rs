@@ -8,7 +8,11 @@ use sahyadri_plonky3::smt_stark::{
     prove_smt_state, SmtAir, SmtTraceInput,
 };
 
+// KNOWN LIMITATION: fork 72ffc56 has WitnessConflict in UniStark aggregation.
+// Fork authors only test BatchStark path. Our production path uses BatchStark.
+// TODO: switch aggregate_pair to use RecursionInput::BatchStark variant.
 #[test]
+
 fn aggregate_two_smt_proofs() {
     let config = build_stark_config();
 
@@ -47,6 +51,7 @@ fn aggregate_two_smt_proofs() {
 }
 
 #[test]
+
 fn aggregate_two_smt_proofs_with_siblings() {
     let config = build_stark_config();
 

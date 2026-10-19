@@ -294,6 +294,23 @@ mod tests {
     }
 
     impl ConsensusApi for MockProcessor {
+    fn get_block_proof(
+        &self,
+        _block_hash: sahyadri_hashes::Hash,
+    ) -> Result<Option<BlockProof>, sahyadri_consensus_core::errors::consensus::ConsensusError> {
+        Ok(None)
+    }
+
+    fn verify_and_insert_block_proof(
+        &self,
+        _block_hash: sahyadri_hashes::Hash,
+        _blue_score: u64,
+        _aggregated_count: u32,
+        _proof_bytes: Vec<u8>,
+    ) -> Result<(), sahyadri_consensus_core::errors::consensus::ConsensusError> {
+        Ok(())
+    }
+
         fn get_did_document(&self, _did: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> { None }
         fn get_did_by_address(&self, _address: &str) -> Option<sahyadri_consensus_core::api::DidDocumentDto> { None }
         fn validate_and_insert_block(&self, block: Block) -> BlockValidationFutures {

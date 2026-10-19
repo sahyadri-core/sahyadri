@@ -2027,14 +2027,26 @@ fn generate_root_proof_for_block(
         .map_err(|e| format!("batch stark: {e:?}"))?;
     // ── N=1: store batch proof directly (no aggregation needed) ──
     if n == 1 {
-        let proof_bytes = bincode::serialize(&batch_proof)
-            .map_err(|e| format!("serialize batch: {e:?}"))?;
+        // Force RecursionOutput for consistent chain_proof format.
+        let sig_proofs: Vec<DilithiumSigProof> =
+            bincode::deserialize(&batch_proof.proof_bytes)
+                .map_err(|e| format!("deser N=1: {e:?}"))?;
+        let mv_proof: Proof<DilithiumStarkConfig> =
+            bincode::deserialize(&sig_proofs[0].mv_proof)
+                .map_err(|e| format!("deser mv: {e:?}"))?;
+
+        let root = sahyadri_plonky3::aggregate::aggregate_pair(
+            &mv_proof, &[], &mv_proof, &[], &MatrixVecAir,
+        ).map_err(|e| format!("N=1 aggregate: {e:?}"))?;
+
+        let proof_bytes = bincode::serialize(&root.0)
+            .map_err(|e| format!("serialize: {e:?}"))?;
+
         let blue_score = headers_store
             .get_header(block_hash)
             .map(|h| h.blue_score)
             .unwrap_or(0);
 
-        // Phase E: compute chain commitment.
         let parent_hash: Option<sahyadri_hashes::Hash> =
             match headers_store.get_header(block_hash) {
                 Ok(h) => h.parents_by_level.get(0).and_then(|p| p.first().copied()),
@@ -2056,8 +2068,16 @@ fn generate_root_proof_for_block(
                 &proof_bytes,
                 parent_chain_commitment,
                 parent_chain_depth,
-            )
-            .map_err(|e| format!("chain commitment: {e}"))?;
+            ).map_err(|e| format!("chain commitment: {e}"))?;
+
+        let (chain_proof_bytes, nearest_checkpoint) =
+            crate::pipeline::virtual_processor::chain_proof::maybe_produce_checkpoint_proof(
+                block_hash,
+                parent_hash,
+                &proof_bytes,
+                chain_depth,
+                proof_roots_store,
+            ).map_err(|e| format!("checkpoint: {e}"))?;
 
         let entry = crate::model::stores::proof_roots::ProofRootEntry {
             proof: proof_bytes,
@@ -2065,14 +2085,15 @@ fn generate_root_proof_for_block(
             aggregated_count: 1,
             chain_commitment,
             chain_depth,
-            chain_proof: Vec::new(),
+            chain_proof: chain_proof_bytes,
+            nearest_checkpoint,
         };
         proof_roots_store
             .insert_sync(block_hash, &entry)
             .map_err(|e| format!("store N=1: {e:?}"))?;
         let _ = crate::PROOF_BROADCAST.0.try_send(block_hash);
         log::info!(
-            "SAHYADRI: N=1 batch proof stored for block {block_hash} (chain_depth={chain_depth})"
+            "SAHYADRI: N=1 proof stored for {block_hash} (depth={chain_depth})"
         );
         return Ok(());
     }
@@ -2141,13 +2162,25 @@ fn generate_root_proof_for_block(
         )
         .map_err(|e| format!("chain commitment: {e}"))?;
 
+    // Phase E v2: checkpoint chain proof (must be before entry construction).
+    let (chain_proof_bytes, nearest_checkpoint) =
+        crate::pipeline::virtual_processor::chain_proof::maybe_produce_checkpoint_proof(
+            block_hash,
+            parent_hash,
+            &proof_bytes,
+            chain_depth,
+            proof_roots_store,
+        )
+        .map_err(|e| format!("checkpoint: {e}"))?;
+
     let entry = crate::model::stores::proof_roots::ProofRootEntry {
         proof: proof_bytes,
         blue_score,
         aggregated_count: n as u32,
         chain_commitment,
         chain_depth,
-        chain_proof: Vec::new(),
+        chain_proof: chain_proof_bytes,
+        nearest_checkpoint,
     };
 
     proof_roots_store
