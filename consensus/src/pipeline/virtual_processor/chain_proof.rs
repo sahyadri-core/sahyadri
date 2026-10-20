@@ -1,17 +1,13 @@
-//! checkpoint chain proofs (sequential, serialize-safe).
-//!
-//! Every CHECKPOINT_INTERVAL blocks, we store a full `BatchStarkProof`
-//! covering the last INTERVAL blocks' txs proofs. Verification of that
-//! checkpoint is O(1) via `verify_all_tables`. Full-chain trust comes
-//! from walking the chain_commitment chain (v1) + verifying each
-//! checkpoint proof (v2).
+//! chain commitment + recursive chain proofs (E v2).
 
 use sha2::{Digest, Sha256};
 use sahyadri_hashes::Hash;
 
-use crate::model::stores::proof_roots::{
-    DbProofRootsStore, ProofRootsStoreReader,
+use sahyadri_plonky3::smt_stark::chain_blob::{
+    BatchStarkProof, ChainProofBlob, RecursionConfig,
 };
+
+use crate::model::stores::proof_roots::{DbProofRootsStore, ProofRootsStoreReader};
 
 pub const CHECKPOINT_INTERVAL: u32 = 500;
 
@@ -59,43 +55,53 @@ pub fn is_checkpoint(chain_depth: u32) -> bool {
     chain_depth == 1 || chain_depth % CHECKPOINT_INTERVAL == 0
 }
 
-/// Produce a checkpoint chain proof if this block is at a checkpoint.
+/// E v2: produce recursive chain proof for this block.
 ///
-/// Storage strategy:
-///   - Non-checkpoint: empty bytes, inherit parent's nearest_checkpoint
-///   - Checkpoint: bincode(BatchStarkProof) = aggregated proof covering
-///                 this block's chain segment
-///
-/// Note: full recursive aggregation across checkpoints is not possible
-/// due to `CircuitProverData` being non-serializable. Checkpoint proofs
-/// are independently verifiable; full-chain trust comes from chain_commitment.
-pub fn maybe_produce_checkpoint_proof(
+/// Skips gracefully for N=1 blocks (proof is not a BatchStarkProof).
+pub fn maybe_produce_chain_proof(
     block_hash: Hash,
     parent_hash: Option<Hash>,
     this_txs_proof_bytes: &[u8],
     chain_depth: u32,
+    chain_commitment: [u8; 32],
     store: &DbProofRootsStore,
 ) -> Result<(Vec<u8>, Option<Hash>), ChainProofError> {
-    // Fetch parent's checkpoint pointer
-    let parent_cp_hash = match parent_hash {
+    use sahyadri_plonky3::aggregate_cross::aggregate_two_chain_blobs;
+
+    // Deserialize this block's txs proof. If it's not a BatchStarkProof
+    // (e.g. N=1 case), skip chain proof silently — v1 chain_commitment
+    // still provides tamper protection.
+    let this_proof: BatchStarkProof<RecursionConfig> =
+        match bincode::deserialize(this_txs_proof_bytes) {
+            Ok(p) => p,
+            Err(_) => return Ok((Vec::new(), None)),
+        };
+
+    let this_blob = ChainProofBlob {
+        proof: this_proof,
+        chain_depth,
+        chain_commitment,
+    };
+
+    // Fetch parent chain proof if it exists
+    let parent_blob = match parent_hash {
         Some(ph) => match store.get(ph).ok().flatten() {
-            Some(pe) => pe.nearest_checkpoint,
-            None => None,
+            Some(pe) if !pe.chain_proof.is_empty() => Some(
+                ChainProofBlob::from_bytes(&pe.chain_proof)
+                    .map_err(|e| ChainProofError::Serialize(format!("parent blob: {e}")))?,
+            ),
+            _ => None,
         },
         None => None,
     };
 
-    if !is_checkpoint(chain_depth) {
-        return Ok((Vec::new(), parent_cp_hash));
-    }
+    let combined = match parent_blob {
+        Some(parent) => aggregate_two_chain_blobs(&parent, &this_blob)
+            .map_err(|e| ChainProofError::Serialize(format!("aggregate: {e}")))?,
+        None => this_blob, // Genesis
+    };
 
-    // This IS a checkpoint.
-    // For v2 simplicity: store this block's txs proof AS the checkpoint proof.
-    // The txs proof covers this block's txs only. Future blocks will need
-    // to walk the commitment chain for full trust, or we add a range
-    // aggregation later.
-    let checkpoint_proof_bytes = this_txs_proof_bytes.to_vec();
-    Ok((checkpoint_proof_bytes, Some(block_hash)))
+    Ok((combined.to_bytes(), Some(block_hash)))
 }
 
 #[cfg(test)]
@@ -104,8 +110,9 @@ mod tests {
 
     #[test]
     fn genesis_commitment() {
-        let (_c, d) = compute_chain_commitment(b"genesis", None, 0).unwrap();
+        let (c, d) = compute_chain_commitment(b"genesis", None, 0).unwrap();
         assert_eq!(d, 1);
+        let _ = c;
     }
 
     #[test]

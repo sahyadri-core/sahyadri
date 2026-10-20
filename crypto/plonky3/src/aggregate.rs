@@ -364,3 +364,34 @@ pub fn verify_root_proof(
         .map_err(|e| AggregateError::Recursion(format!("verify_all_tables: {e:?}")))?;
     Ok(())
 }
+
+/// Verify a BatchStarkProof directly (used by ChainProofBlob).
+pub fn verify_batch_stark_proof(
+    proof: &p3_circuit_prover::BatchStarkProof<RecursionConfig>,
+) -> Result<(), AggregateError> {
+    use p3_circuit_prover::BatchStarkProver;
+
+    let config = build_config()?;
+    let params = ProveNextLayerParams::default();
+    let poseidon2 = Poseidon2Config::GOLDILOCKS_D2_W8;
+
+    let mut verifier = BatchStarkProver::new(config).with_table_packing(params.table_packing);
+
+    let table_configs = if poseidon2.d() >= 2 && !poseidon2.is_arity4_shape() {
+        vec![poseidon2.for_shared_challenger_table()]
+    } else if poseidon2.d() >= 2 {
+        vec![poseidon2.for_challenger(), poseidon2]
+    } else {
+        vec![poseidon2]
+    };
+
+    for table_config in table_configs {
+        verifier.register_poseidon2_table::<2>(table_config);
+    }
+    verifier.register_recompose_table::<2>(true);
+
+    verifier
+        .verify_all_tables::<EF>(proof)
+        .map_err(|e| AggregateError::Recursion(format!("verify_all_tables: {e:?}")))?;
+    Ok(())
+}

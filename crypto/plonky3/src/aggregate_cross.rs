@@ -8,6 +8,7 @@
 // Both step 2 operations use PreparedSource::batch, which is AIR-agnostic,
 // so different AIRs on each side is fine.
 
+use p3_recursion::{build_and_prove_aggregation_layer, RecursionInput};
 use p3_lookup::logup::LogUpGadget;
 use p3_recursion::builtin_config::{
     goldilocks_d2_poseidon2_binary, FriConfigV1, SuiteIdV1,
@@ -153,4 +154,53 @@ where
     let b_batch = aggregate_batch(b_proofs, b_pubs, b_air, threads)?;
     let c_batch = aggregate_batch(c_proofs, c_pubs, c_air, threads)?;
     aggregate_three_batches(&a_batch, &b_batch, &c_batch)
+}
+
+use crate::smt_stark::chain_blob::ChainProofBlob;
+
+/// Convert a ChainProofBlob into a RecursionInput::BatchStark for aggregation.
+pub fn chain_blob_to_recursion_input<'a>(
+    blob: &'a ChainProofBlob,
+) -> RecursionInput<'a, RecursionConfig, BatchOnly> {
+    use p3_circuit_prover::batch_stark_prover::NUM_PRIMITIVE_TABLES;
+
+    let mut table_public_inputs =
+        Vec::with_capacity(NUM_PRIMITIVE_TABLES + blob.proof.non_primitives.len());
+    table_public_inputs.resize_with(NUM_PRIMITIVE_TABLES, Vec::new);
+    table_public_inputs.extend(
+        blob.proof
+            .non_primitives
+            .iter()
+            .map(|e| e.public_values.clone()),
+    );
+
+    RecursionInput::BatchStark {
+        proof: &blob.proof,
+        common_data: &blob.proof.stark_common,
+        table_public_inputs,
+    }
+}
+
+/// Aggregate parent chain proof + current block's proof into new chain proof.
+/// This is the core of E v2 — one recursion per block.
+pub fn aggregate_two_chain_blobs(
+    parent: &ChainProofBlob,
+    current: &ChainProofBlob,
+) -> Result<ChainProofBlob, AggregateError> {
+    let config = build_config()?;
+    let backend = FriRecursionBackend::<8, 4, _>::new(Poseidon2Config::GOLDILOCKS_D2_W8)
+        .for_extension_degree::<2>();
+    let params = ProveNextLayerParams::default();
+
+    let left = chain_blob_to_recursion_input(parent);
+    let right = chain_blob_to_recursion_input(current);
+
+    let combined = build_and_prove_aggregation_layer(&left, &right, &config, &backend, &params)
+        .map_err(|e| AggregateError::Recursion(format!("chain aggregate: {e:?}")))?;
+
+    Ok(ChainProofBlob {
+        proof: combined.0,
+        chain_depth: current.chain_depth,
+        chain_commitment: current.chain_commitment,
+    })
 }

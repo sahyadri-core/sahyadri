@@ -19,6 +19,7 @@
 //!   [12]    is_absent  (1 if the key is absent, else 0)
 
 pub mod air;
+pub mod chain_blob;
 pub mod prove;
 pub mod poseidon2_batch;
 pub mod poseidon2_bound;

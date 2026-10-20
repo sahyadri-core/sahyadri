@@ -2071,11 +2071,12 @@ fn generate_root_proof_for_block(
             ).map_err(|e| format!("chain commitment: {e}"))?;
 
         let (chain_proof_bytes, nearest_checkpoint) =
-            crate::pipeline::virtual_processor::chain_proof::maybe_produce_checkpoint_proof(
+            crate::pipeline::virtual_processor::chain_proof::maybe_produce_chain_proof(
                 block_hash,
                 parent_hash,
                 &proof_bytes,
                 chain_depth,
+                chain_commitment,
                 proof_roots_store,
             ).map_err(|e| format!("checkpoint: {e}"))?;
 
@@ -2164,11 +2165,12 @@ fn generate_root_proof_for_block(
 
     // Phase E v2: checkpoint chain proof (must be before entry construction).
     let (chain_proof_bytes, nearest_checkpoint) =
-        crate::pipeline::virtual_processor::chain_proof::maybe_produce_checkpoint_proof(
+        crate::pipeline::virtual_processor::chain_proof::maybe_produce_chain_proof(
             block_hash,
             parent_hash,
             &proof_bytes,
             chain_depth,
+            chain_commitment,
             proof_roots_store,
         )
         .map_err(|e| format!("checkpoint: {e}"))?;

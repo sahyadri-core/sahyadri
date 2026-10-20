@@ -1,20 +1,21 @@
-// Serializable chain proof blob.
-//
-// Wraps the serializable parts of RecursionOutput:
-//   - BatchStarkProof (serializable in emberian fork rev 72ffc56)
-//   - CommonData
-// CircuitProverData is NOT included (needed only for proving, not verifying).
+//! Serializable chain proof blob.
+//!
+//! `BatchStarkProof` from `p3_circuit_prover` already implements
+//! Serialize/Deserialize in 485455c — no fork needed.
+//!
+//! `RecursionOutput.0` = BatchStarkProof (serializable)
+//! `RecursionOutput.1` = Arc<CircuitProverData> (proving-only, not serializable)
 
-use p3_batch_stark::{BatchProof, CommonData};
+pub use p3_circuit_prover::BatchStarkProof;
+
+use p3_recursion::builtin_config::GoldilocksD2Poseidon2BinaryConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::aggregate::RecursionConfig;
+pub type RecursionConfig = GoldilocksD2Poseidon2BinaryConfig;
 
-/// Serializable chain proof: everything to verify, nothing to prove.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ChainProofBlob {
-    pub proof: BatchProof<RecursionConfig>,
-    pub common_data: CommonData<RecursionConfig>,
+    pub proof: BatchStarkProof<RecursionConfig>,
     pub chain_depth: u32,
     pub chain_commitment: [u8; 32],
 }
@@ -26,5 +27,10 @@ impl ChainProofBlob {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
         bincode::deserialize(bytes).map_err(|e| format!("chain blob deser: {e}"))
+    }
+
+    pub fn verify(&self) -> Result<(), String> {
+        crate::aggregate::verify_batch_stark_proof(&self.proof)
+            .map_err(|e| format!("verify: {e}"))
     }
 }
