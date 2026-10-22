@@ -200,7 +200,7 @@ pub fn aggregate_two_chain_blobs(
 
     Ok(ChainProofBlob {
         proof: combined.0,
-        chain_depth: current.chain_depth,
+        chain_depth: parent.chain_depth + 1,
         chain_commitment: current.chain_commitment,
     })
 }

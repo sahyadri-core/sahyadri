@@ -344,6 +344,25 @@ codegen-units = 1           # ← Single unit for better inlining
                             #   Use "native" for max performance on build machine
 panic = "abort"             # ← Faster panics (no unwinding)
 
+# p3-recursion is monomorphization-heavy. Reduce opt-level and
+# increase parallel codegen units for this package only. Other
+# crates stay at opt-level=3 codegen-units=1.
+[profile.release.package.p3-recursion]
+opt-level = 1
+codegen-units = 256
+
+[profile.release.package.p3-circuit]
+opt-level = 1
+codegen-units = 256
+
+[profile.release.package.p3-circuit-prover]
+opt-level = 1
+codegen-units = 256
+
+[profile.release.package.p3-poseidon2-circuit-air]
+opt-level = 1
+codegen-units = 256
+
 [profile.heap]
 inherits = "release"
 debug = true
