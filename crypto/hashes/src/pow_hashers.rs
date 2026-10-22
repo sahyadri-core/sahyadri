@@ -1,6 +1,11 @@
 use crate::Hash;
 use std::cell::RefCell;
 
+// Poseidon2 for SahyadriX finalization
+use p3_symmetric::Permutation;
+use p3_field::PrimeField64;
+use p3_goldilocks::{default_goldilocks_poseidon2_12, Goldilocks};
+
 // ═══════════════════════════════════════════════════════════════
 // SahyadriX — Memory-hard Proof-of-Work
 //
@@ -36,6 +41,48 @@ impl PowHash {
         // Start the 16 MB SahyadriX engine.
         SahyadriX::hash(&data)
     }
+}
+
+/// Poseidon2 finalization: compress the 64-byte tail of the memory pad
+/// plus the BLAKE3 state into a 32-byte output.
+///
+/// This is the STARK-friendly stage: Poseidon2 permutation over
+/// Goldilocks field has ~300 constraints, versus ~30,000 for BLAKE3.
+#[inline]
+fn poseidon2_output(buffer: &[u8], state: &blake3::Hash) -> [u8; 32] {
+    // 12 Goldilocks field elements = 96 bytes input
+    let mut inputs = [Goldilocks::default(); 12];
+
+    // Last 64 bytes of 16 MB buffer -> first 8 field elements
+    let tail = &buffer[buffer.len() - 64..];
+    for i in 0..8 {
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&tail[i * 8..(i + 1) * 8]);
+        inputs[i] = Goldilocks::new(u64::from_le_bytes(bytes));
+    }
+
+    // BLAKE3 state (32 bytes) -> last 4 field elements
+    let state_bytes = state.as_bytes();
+    for i in 0..4 {
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&state_bytes[i * 8..(i + 1) * 8]);
+        inputs[8 + i] = Goldilocks::new(u64::from_le_bytes(bytes));
+    }
+
+    // Apply Poseidon2 permutation (width 12, Goldilocks)
+    let perm = default_goldilocks_poseidon2_12();
+    perm.permute_mut(&mut inputs);
+
+    // Compress 12 field elements to 32 bytes via XOR-fold
+    let mut out = [0u8; 32];
+    for i in 0..4 {
+        let lo = inputs[i].as_canonical_u64().to_le_bytes();
+        let hi = inputs[i + 4].as_canonical_u64().to_le_bytes();
+        for j in 0..8 {
+            out[i * 8 + j] = lo[j] ^ hi[j];
+        }
+    }
+    out
 }
 
 thread_local! {
@@ -82,7 +129,8 @@ impl SahyadriX {
                 state = blake3::hash(&mix);
             }
 
-            Hash::from_bytes(*state.as_bytes())
+            Hash::from_bytes(poseidon2_output(&buffer, &state))
         })
     }
 }
+

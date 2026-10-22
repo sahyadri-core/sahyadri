@@ -31,6 +31,7 @@ pub mod dilithium_stark;
 pub mod node;
 pub mod prover;
 pub mod verifier;
+pub mod sahyadrix_pow;
 
 pub use air::*;
 pub use batch::*;

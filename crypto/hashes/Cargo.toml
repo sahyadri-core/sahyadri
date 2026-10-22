@@ -26,6 +26,10 @@ sha2.workspace = true
 sha3.workspace = true
 wasm-bindgen.workspace = true
 workflow-wasm.workspace = true
+p3-field = "0.8.0"
+p3-goldilocks = "0.8.0"
+p3-poseidon2 = "0.8.0"
+p3-symmetric = "0.8.0"
 
 [target.'cfg(not(target_arch = "x86_64"))'.dependencies]
 keccak.workspace = true
