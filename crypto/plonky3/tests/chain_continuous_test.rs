@@ -163,3 +163,65 @@ fn chain_commitments_differ_across_blocks() {
         "each block should have distinct chain_commitment"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Scale tests — N = 10, 20
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn continuous_chain_n10() {
+    let (_chain, size, verify_ms) = run_continuous_chain(10);
+    println!("\n  N=10: size={} bytes, verify={:.2}ms", size, verify_ms);
+    assert!(verify_ms < 100.0);
+}
+
+#[test]
+fn continuous_chain_n20() {
+    let (_chain, size, verify_ms) = run_continuous_chain(20);
+    println!("\n  N=20: size={} bytes, verify={:.2}ms", size, verify_ms);
+    assert!(verify_ms < 100.0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Security tests
+// ═══════════════════════════════════════════════════════════════
+
+/// Different blocks produce different chain commitments.
+#[test]
+fn distinct_commitments_across_chain() {
+    let block1 = produce_block_proof(1, 2).expect("block 1");
+    let block2 = produce_block_proof(3, 4).expect("block 2");
+    let block3 = produce_block_proof(5, 6).expect("block 3");
+
+    assert_ne!(block1.chain_commitment, block2.chain_commitment);
+    assert_ne!(block2.chain_commitment, block3.chain_commitment);
+    assert_ne!(block1.chain_commitment, block3.chain_commitment);
+}
+
+/// Serialization is stable: same blob serialized twice → same bytes.
+#[test]
+fn serialization_deterministic() {
+    let chain = produce_block_proof(1, 2).expect("block 1");
+    let bytes_a = chain.to_bytes();
+    let bytes_b = chain.to_bytes();
+    assert_eq!(bytes_a, bytes_b, "serialization must be deterministic");
+}
+
+/// Deserialized blob verifies correctly (roundtrip preserves proof validity).
+#[test]
+fn deserialized_blob_verifies() {
+    use sahyadri_plonky3::smt_stark::chain_blob::ChainProofBlob;
+
+    let chain = produce_block_proof(1, 2).expect("block 1");
+    let bytes = chain.to_bytes();
+    let restored = ChainProofBlob::from_bytes(&bytes).expect("deserialize");
+    restored.verify().expect("restored must verify");
+}
+
+/// Verifying the same blob twice produces consistent results.
+#[test]
+fn verify_idempotent() {
+    let chain = produce_block_proof(1, 2).expect("block 1");
+    chain.verify().expect("first verify");
+    chain.verify().expect("second verify");
+}

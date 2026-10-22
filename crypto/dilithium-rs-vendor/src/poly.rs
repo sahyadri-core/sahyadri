@@ -5,6 +5,7 @@
 
 use alloc::vec;
 
+#[cfg(not(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64"))))]
 use crate::ntt;
 use crate::params::*;
 use crate::reduce::{caddq, montgomery_reduce, reduce32};
@@ -74,13 +75,41 @@ impl Poly {
     }
 
     /// In-place forward NTT.
+    ///
+    /// Dispatches to AVX2 (x86_64) or NEON (aarch64) when available,
+    /// otherwise falls back to scalar. The SIMD paths have runtime
+    /// feature detection and scalar fallback internally.
     pub fn ntt(&mut self) {
-        ntt::ntt(&mut self.coeffs);
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        {
+            crate::ntt_avx2::ntt_simd(&mut self.coeffs);
+        }
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+        {
+            crate::ntt_neon::ntt_simd(&mut self.coeffs);
+        }
+        #[cfg(not(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64"))))]
+        {
+            ntt::ntt(&mut self.coeffs);
+        }
     }
 
     /// In-place inverse NTT with Montgomery factor.
+    ///
+    /// Dispatches to AVX2 / NEON when available, else scalar.
     pub fn invntt_tomont(&mut self) {
-        ntt::invntt_tomont(&mut self.coeffs);
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        {
+            crate::ntt_avx2::invntt_simd(&mut self.coeffs);
+        }
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+        {
+            crate::ntt_neon::invntt_simd(&mut self.coeffs);
+        }
+        #[cfg(not(all(feature = "simd", any(target_arch = "x86_64", target_arch = "aarch64"))))]
+        {
+            ntt::invntt_tomont(&mut self.coeffs);
+        }
     }
 
     /// Pointwise multiplication in NTT domain with Montgomery reduction.

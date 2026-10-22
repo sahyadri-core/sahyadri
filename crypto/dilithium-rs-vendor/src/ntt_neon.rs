@@ -185,6 +185,7 @@ pub fn invntt_simd(a: &mut [i32; N]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::params::Q;
 
     #[test]
     fn test_ntt_neon_matches_scalar() {

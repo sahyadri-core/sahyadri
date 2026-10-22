@@ -12,7 +12,6 @@ use sahyadri_hashes::Hash;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// Metadata + serialized proof stored per block.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProofRootEntry {
     pub proof: Vec<u8>,
@@ -26,7 +25,10 @@ pub struct ProofRootEntry {
     pub chain_proof: Vec<u8>,
     #[serde(default)]
     pub nearest_checkpoint: Option<Hash>,
-}
+    #[serde(default)]
+    pub proof_pending: bool,
+}/// Metadata + serialized proof stored per block.
+
 pub trait ProofRootsStoreReader {
     fn get(&self, block_hash: Hash) -> StoreResult<Option<ProofRootEntry>>;
     fn has(&self, block_hash: Hash) -> StoreResult<bool>;
@@ -152,6 +154,7 @@ mod tests {
             chain_commitment: [0u8; 32],
             chain_depth: 0,
             chain_proof: Vec::new(),
+            proof_pending: false,
             nearest_checkpoint: None,
         };
 
@@ -180,6 +183,7 @@ mod tests {
             chain_commitment: [1u8; 32],
             chain_depth: 5,
             chain_proof: Vec::new(),
+            proof_pending: false,
             nearest_checkpoint: None,
         };
         store.insert_sync(block_hash, &updated).expect("re-insert");

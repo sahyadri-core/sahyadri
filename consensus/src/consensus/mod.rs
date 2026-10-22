@@ -749,6 +749,7 @@ impl ConsensusApi for Consensus {
             chain_depth: 0,
             chain_proof: Vec::new(),
             nearest_checkpoint: None,
+            proof_pending: false,
         };
         self.proof_roots_store
             .insert_sync(block_hash, &entry)

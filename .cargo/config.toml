@@ -1,2 +1,8 @@
-[build]
+# Per-target rustflags. Only x86_64 gets target-cpu=native.
+# wasm32 gets no special cpu flags (x86 features make no sense there).
+
+[target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "target-cpu=native"]
+
+[target.wasm32-unknown-unknown]
+rustflags = []

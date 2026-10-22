@@ -104,6 +104,21 @@ pub fn maybe_produce_chain_proof(
     Ok((combined.to_bytes(), Some(block_hash)))
 }
 
+/// Mark the block's proof as ready (called after async proof lands).
+pub fn mark_proof_ready(
+    block_hash: Hash,
+    store: &DbProofRootsStore,
+) -> Result<(), ChainProofError> {
+    if let Some(mut entry) = store.get(block_hash)
+        .map_err(|e| ChainProofError::Serialize(format!("{e}")))?
+    {
+        entry.proof_pending = false;
+        store.insert_sync(block_hash, &entry)
+            .map_err(|e| ChainProofError::Serialize(format!("{e}")))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
