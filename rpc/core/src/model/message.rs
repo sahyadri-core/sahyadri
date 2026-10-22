@@ -1657,6 +1657,69 @@ GetRegistryByAddressesRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GetChainProofRequest {
+    pub block_hash: RpcHash,
+}
+
+impl Serializer for GetChainProofRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(RpcHash, &self.block_hash, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetChainProofRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let block_hash = load!(RpcHash, reader)?;
+        Ok(Self { block_hash })
+    }
+}
+
+
+impl GetChainProofRequest {
+    pub fn new(block_hash: sahyadri_hashes::Hash) -> Self {
+        Self {
+            block_hash: RpcHash::from(block_hash),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetChainProofResponse {
+    pub block_hash: RpcHash,
+    /// Serialized ChainProofBlob bytes (None if not yet ready).
+    pub proof_bytes: Option<Vec<u8>>,
+    pub chain_depth: u32,
+    pub chain_commitment: RpcHash,
+    pub proof_pending: bool,
+}
+
+impl Serializer for GetChainProofResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(RpcHash, &self.block_hash, writer)?;
+        store!(Option<Vec<u8>>, &self.proof_bytes, writer)?;
+        store!(u32, &self.chain_depth, writer)?;
+        store!(RpcHash, &self.chain_commitment, writer)?;
+        store!(bool, &self.proof_pending, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetChainProofResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let block_hash = load!(RpcHash, reader)?;
+        let proof_bytes = load!(Option<Vec<u8>>, reader)?;
+        let chain_depth = load!(u32, reader)?;
+        let chain_commitment = load!(RpcHash, reader)?;
+        let proof_pending = load!(bool, reader)?;
+        Ok(Self { block_hash, proof_bytes, chain_depth, chain_commitment, proof_pending })
+    }
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetRegistryByAddressesResponse {
     pub entries: Vec<RpcRegistryByAddressesEntry>,
 }

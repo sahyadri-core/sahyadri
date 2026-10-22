@@ -391,6 +391,16 @@ impl RpcApi for GrpcClient {
         Err(sahyadri_rpc_core::RpcError::NotImplemented)
     }
 
+
+    async fn get_chain_proof_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: GetChainProofRequest,
+    ) -> RpcResult<GetChainProofResponse> {
+        // TODO: implement via gRPC proto once GetChainProof message added
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
+
     route!(submit_did_create_call, SubmitDidCreate);
     route!(submit_did_update_call, SubmitDidUpdate);
     route!(submit_did_deactivate_call, SubmitDidDeactivate);

@@ -1,6 +1,7 @@
 use futures_util::future::BoxFuture;
 use sahyadri_muhash::MuHash;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     BlockHashSet, BlueWorkType, ChainPath,
@@ -54,7 +55,7 @@ pub struct BlockValidationFutures {
 #[allow(unused_variables)]
 
 /// Data Transfer Object for DID Document resolution responses
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DidDocumentDto {
     /// Full DID identifier (e.g., "did:sahyadri:abc123...")
@@ -92,6 +93,21 @@ pub struct BlockProof {
     pub proof_bytes: Vec<u8>,
 }
 
+/// Chain proof DTO — proofs the entire chain from genesis to a block.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ChainProofDto {
+    pub block_hash: Hash,
+    /// Serialized `ChainProofBlob` bytes. `None` if proof generation
+    /// has not yet been triggered for this block.
+    pub proof_bytes: Option<Vec<u8>>,
+    /// Number of blocks proven by this chain proof.
+    pub chain_depth: u32,
+    /// 32-byte chain commitment.
+    pub chain_commitment: [u8; 32],
+    /// True if proof generation is in progress asynchronously.
+    pub proof_pending: bool,
+}
+
 pub trait ConsensusApi: Send + Sync {
     fn build_block_template(
         &self,
@@ -101,6 +117,11 @@ pub trait ConsensusApi: Send + Sync {
     ) -> Result<BlockTemplate, RuleError> {
         unimplemented!()
     }
+
+    fn get_chain_proof(
+        &self,
+        block_hash: Hash,
+    ) -> ConsensusResult<Option<ChainProofDto>>;
 
     fn get_account_proof(
         &self,

@@ -5270,6 +5270,8 @@ version = "1.1.0"
 dependencies = [
  "dilithium-rs 0.2.0",
  "hex",
+ "num_cpus",
+ "rayon",
  "serde",
  "sha2",
  "thiserror 1.0.64",

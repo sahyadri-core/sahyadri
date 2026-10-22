@@ -768,10 +768,12 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
     }
 
     async fn get_block_proof_call(
+
         &self,
         _connection: Option<&DynRpcConnection>,
         request: GetBlockProofRequest,
     ) -> RpcResult<GetBlockProofResponse> {
+        eprintln!("[DEBUG-BLOCK] handler entered");
         let session = self.consensus_manager.consensus().session().await;
 
         let result = session
@@ -1108,6 +1110,35 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             .await
             .map_err(|e| RpcError::General(format!("{e:?}")))?;
         Ok(GetAccountProofResponse::new(proof.into()))
+    }
+
+    async fn get_chain_proof_call(
+
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        request: GetChainProofRequest,
+    ) -> RpcResult<GetChainProofResponse> {
+        eprintln!("[DEBUG-CHAIN] handler entered");
+        let block_hash: sahyadri_hashes::Hash = request.block_hash;
+
+        let session = self.consensus_manager.consensus().session().await;
+
+        let proof = session
+            .async_get_chain_proof(block_hash)
+            .await
+            .map_err(|e| RpcError::General(format!("get_chain_proof: {e:?}")))?;
+
+        match proof {
+
+            Some(dto) => Ok(GetChainProofResponse {
+                block_hash: RpcHash::from(dto.block_hash),
+                proof_bytes: dto.proof_bytes,
+                chain_depth: dto.chain_depth,
+                chain_commitment: RpcHash::from(dto.chain_commitment),
+                proof_pending: dto.proof_pending,
+            }),
+            None => Err(RpcError::NotFound),
+        }
     }
 
     async fn submit_account_transaction_call(

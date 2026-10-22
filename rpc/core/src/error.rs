@@ -13,6 +13,10 @@ use crate::{RpcHash, RpcTransactionId, SubmitBlockRejectReason, api::ctl::RpcSta
 
 #[derive(Clone, Debug, Error)]
 pub enum RpcError {
+    /// Requested resource (block, proof, tx) not found.
+    #[error("resource not found")]
+    NotFound,
+
     #[error("Not implemented")]
     NotImplemented,
 
@@ -171,3 +175,20 @@ impl From<serde_wasm_bindgen::Error> for RpcError {
 }
 
 pub type RpcResult<T> = std::result::Result<T, crate::RpcError>;
+
+
+// Manual Serialize impl — needed because some RpcError variant fields
+// (TryFromIntError, faster_hex::Error, etc.) do not implement Serialize.
+// wrpc needs this to emit error responses without panicking.
+impl serde::Serialize for RpcError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("code", &0i32)?;
+        map.serialize_entry("message", &self.to_string())?;
+        map.end()
+    }
+}

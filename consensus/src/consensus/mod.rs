@@ -701,6 +701,28 @@ impl ConsensusApi for Consensus {
         Ok(proof)
     }
 
+    fn get_chain_proof(
+        &self,
+        block_hash: Hash,
+    ) -> ConsensusResult<Option<sahyadri_consensus_core::api::ChainProofDto>> {
+        let entry = self
+            .proof_roots_store
+            .get(block_hash)
+            .map_err(|_| ConsensusError::General("proof_roots_store read failed"))?;
+
+        Ok(entry.map(|e| sahyadri_consensus_core::api::ChainProofDto {
+            block_hash,
+            proof_bytes: if e.chain_proof.is_empty() {
+                None
+            } else {
+                Some(e.chain_proof.clone())
+            },
+            chain_depth: e.chain_depth,
+            chain_commitment: e.chain_commitment,
+            proof_pending: e.proof_pending,
+        }))
+    }
+
     fn get_block_proof(
         &self,
         block_hash: Hash,

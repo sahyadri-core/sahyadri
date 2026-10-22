@@ -46,6 +46,20 @@ pub trait RpcApi: Sync + Send + AnySync {
         self.get_account_proof_call(None, GetAccountProofRequest { address, block_hash }).await
     }
 
+    /// Get the chain proof for a specific block.
+    ///
+    /// The chain proof attests to the validity of every block
+    /// from genesis up to and including the requested block.
+    /// Returns `proof_pending: true` if generation is async and
+    /// not yet complete.
+    async fn get_chain_proof(
+        &self,
+        block_hash: sahyadri_hashes::Hash,
+    ) -> RpcResult<GetChainProofResponse> {
+        self.get_chain_proof_call(None, GetChainProofRequest::new(block_hash))
+            .await
+    }
+
     // ─── SyncWave: bulk state transfer for fast bootstrap ───
 
     async fn get_sync_wave_metadata(
@@ -104,6 +118,12 @@ pub trait RpcApi: Sync + Send + AnySync {
         connection: Option<&DynRpcConnection>,
         request: GetAccountProofRequest,
     ) -> RpcResult<GetAccountProofResponse>;
+
+    async fn get_chain_proof_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: GetChainProofRequest,
+    ) -> RpcResult<GetChainProofResponse>;
 
     async fn submit_flash_transaction_call(
         &self,

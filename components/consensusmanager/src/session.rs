@@ -320,6 +320,14 @@ impl ConsensusSessionOwned {
         self.clone().spawn_blocking(move |c| c.get_block_proof(block_hash)).await
     }
 
+    pub async fn async_get_chain_proof(
+        &self,
+        block_hash: Hash,
+    ) -> ConsensusResult<Option<sahyadri_consensus_core::api::ChainProofDto>> {
+        self.clone().spawn_blocking(move |consensus| consensus.get_chain_proof(block_hash))
+            .await
+    }
+
     pub async fn async_verify_and_insert_block_proof(
         &self,
         block_hash: Hash,
