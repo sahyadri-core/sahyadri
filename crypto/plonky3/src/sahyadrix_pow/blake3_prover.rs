@@ -19,7 +19,7 @@ use crate::sahyadrix_pow::blake3_block::blake3_compress_native;
 const TOTAL_COLS: usize = 1685;
 const PUBLIC_INPUTS_LEN: usize = 144;
 
-fn pack_public_inputs(
+pub fn pack_public_inputs(
     cv: &[u8; 32],
     block: &[u8; 64],
     counter: u64,

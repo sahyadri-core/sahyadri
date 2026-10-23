@@ -186,4 +186,20 @@ mod tests {
         let ok = verify_chain_batch(&batch);
         assert!(ok, "100-block batch should verify");
     }
+
+    #[test]
+    #[ignore]  // Slow test — run with --ignored
+    fn chain_batch_prove_verify_1000() {
+        let cv_init = [0x33u8; 32];
+        let blocks: Vec<[u8; 64]> = (0..1000).map(|i| {
+            let mut b = [0x44u8; 64];
+            b[0] = (i & 0xFF) as u8;
+            b[1] = ((i >> 8) & 0xFF) as u8;
+            b
+        }).collect();
+
+        let batch = prove_chain_batch(&cv_init, &blocks);
+        let ok = verify_chain_batch(&batch);
+        assert!(ok, "1000-block batch should verify");
+    }
 }
