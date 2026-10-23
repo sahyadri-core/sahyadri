@@ -8,6 +8,8 @@ use p3_field::PrimeCharacteristicRing;
 
 use crate::config::F;
 
+pub mod blake3_block;
+
 // ═══════════════════════════════════════════════════════════════
 // Layout
 // ═══════════════════════════════════════════════════════════════
