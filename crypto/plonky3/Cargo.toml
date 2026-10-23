@@ -42,8 +42,12 @@ rayon = "1.12"
 p3-maybe-rayon = "0.8.0"
 sahyadri-smt = { path = "../smt" }
 p3-poseidon2 = "0.8.0"
-
+p3-blake3-air = "0.8.0"
+p3-binary-field = "0.8.0"
+p3-binary-pcs = "0.8.0"
+p3-keccak-air = "0.8.0"
 [dev-dependencies]
+blake3 = "1"
 bincode = "1"
 p3-lookup = "0.8.0"
 
