@@ -17,6 +17,7 @@ use crate::sahyadrix_pow::blake3_prover::{
     prove_blake3_block, pack_public_inputs,
 };
 use crate::smt_stark::chain_blob::ChainProofBlob;
+use rayon::prelude::*;
 
 /// Result of recursively proving an N-block Blake3 chain.
 pub struct Blake3ChainRecursionProof {
@@ -52,56 +53,69 @@ pub fn prove_blake3_chain_recursive(
     }
     let cv_final = cvs[cvs.len() - 1];
 
-    // Phase 1: Prove each block individually
-    let mut proofs = Vec::with_capacity(blocks.len());
-    let mut publics = Vec::with_capacity(blocks.len());
-    for i in 0..blocks.len() {
-        let cv_in = cvs[i];
-        let out = cvs[i + 1];
-        let proof = prove_blake3_block(&cv_in, &blocks[i], 0, 64, 0, &out);
-        let pi = pack_public_inputs(&cv_in, &blocks[i], 0u64, 64u32, 0u32, &out);
-        proofs.push(proof);
-        publics.push(pi);
-    }
+    // Phase 1: Prove each block in parallel
+    let proofs_and_publics: Vec<(_, _)> = (0..blocks.len())
+        .into_par_iter()
+        .map(|i| {
+            let cv_in = cvs[i];
+            let out = cvs[i + 1];
+            let proof = prove_blake3_block(&cv_in, &blocks[i], 0, 64, 0, &out);
+            let pi = pack_public_inputs(&cv_in, &blocks[i], 0u64, 64u32, 0u32, &out);
+            (proof, pi)
+        })
+        .collect();
 
-    // Phase 2: Aggregate pairs into RecursionOutput (level 1)
+    let (proofs, publics): (Vec<_>, Vec<_>) = proofs_and_publics.into_iter().unzip();
+
+    // Phase 2: Aggregate pairs in parallel (level 1)
     let air = Blake3BlockAir;
     let pairs = blocks.len() / 2;
-    let mut level_1: Vec<ChainProofBlob> = Vec::with_capacity(pairs);
 
-    for i in 0..pairs {
-        let left = &proofs[i * 2];
-        let right = &proofs[i * 2 + 1];
-        let left_pi = &publics[i * 2];
-        let right_pi = &publics[i * 2 + 1];
+    let level_1_results: Vec<Result<ChainProofBlob, AggregateError>> = (0..pairs)
+        .into_par_iter()
+        .map(|i| {
+            let left = &proofs[i * 2];
+            let right = &proofs[i * 2 + 1];
+            let left_pi = &publics[i * 2];
+            let right_pi = &publics[i * 2 + 1];
 
-        let rec_output = aggregate_pair(left, left_pi, right, right_pi, &air)?;
+            let rec_output = aggregate_pair(left, left_pi, right, right_pi, &air)?;
 
-        // Extract chain commitment from right block's output
-        let right_block_idx = i * 2 + 1;
-        let right_out_cv = cvs[right_block_idx + 1];
-        let mut chain_commitment = [0u8; 32];
-        chain_commitment.copy_from_slice(&right_out_cv);
+            let right_block_idx = i * 2 + 1;
+            let right_out_cv = cvs[right_block_idx + 1];
+            let mut chain_commitment = [0u8; 32];
+            chain_commitment.copy_from_slice(&right_out_cv);
 
-        level_1.push(ChainProofBlob {
-            proof: rec_output.0,  // BatchStarkProof — owned, no clone
-            chain_depth: 2,
-            chain_commitment,
-        });
-    }
+            Ok(ChainProofBlob {
+                proof: rec_output.0,
+                chain_depth: 2,
+                chain_commitment,
+            })
+        })
+        .collect();
 
-    // Phase 3: Binary tree aggregation of blobs
+    let level_1: Vec<ChainProofBlob> = level_1_results
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // Phase 3: Binary tree aggregation of blobs in parallel
     let mut current_level = level_1;
     while current_level.len() > 1 {
         let pairs = current_level.len() / 2;
-        let mut next_level = Vec::with_capacity(pairs);
+        let level_ref = &current_level;
 
-        for i in 0..pairs {
-            let left = &current_level[i * 2];
-            let right = &current_level[i * 2 + 1];
-            let merged = aggregate_two_chain_blobs(left, right)?;
-            next_level.push(merged);
-        }
+        let next_results: Vec<Result<ChainProofBlob, AggregateError>> = (0..pairs)
+            .into_par_iter()
+            .map(|i| {
+                let left = &level_ref[i * 2];
+                let right = &level_ref[i * 2 + 1];
+                aggregate_two_chain_blobs(left, right)
+            })
+            .collect();
+
+        let next_level: Vec<ChainProofBlob> = next_results
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         current_level = next_level;
     }
