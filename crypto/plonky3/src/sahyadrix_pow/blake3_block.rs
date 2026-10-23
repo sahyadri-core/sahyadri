@@ -41,11 +41,15 @@ pub const COL_ROT_SRC_BIT: usize = 561;  // 128 cols (4 rotations × 4 bytes × 
 pub const COL_ROT_DST_BIT: usize = 689;  // 128 cols (4 rotations × 4 bytes × 8 bits dest)
 pub const COL_NEXT_STATE: usize = 817;   // 64 cols (16 words × 4 bytes) — state after G applied
 pub const COL_OUTPUT_FOLD: usize = 881;  // 32 cols (8 words × 4 bytes) — final folded output
-pub const COL_IS_INPUT: usize = 913;
-pub const COL_IS_OUTPUT: usize = 914;
-pub const COL_IS_ROUND_START: usize = 915;
+pub const COL_FOLD_A_BITS: usize = 913;   // 256 cols (32 bytes × 8 bits) — STATE[i] bits
+pub const COL_FOLD_B_BITS: usize = 1169;  // 256 cols (32 bytes × 8 bits) — STATE[i+8] bits
+pub const COL_FOLD_X_BITS: usize = 1425;  // 256 cols (32 bytes × 8 bits) — OUTPUT_FOLD bits
+pub const COL_IS_INPUT: usize = 1681;
+pub const COL_IS_OUTPUT: usize = 1682;
+pub const COL_IS_ROUND_START: usize = 1683;
+pub const COL_IS_PADDING: usize = 1684;
 
-pub const TOTAL_COLS: usize = 916;
+pub const TOTAL_COLS: usize = 1685;
 
 // ═══════════════════════════════════════════════════════════════
 // Native reference
@@ -141,6 +145,13 @@ where
         let local = main.current_slice();
         let next = main.next_slice();
 
+        // ═══ PADDING FLAG ═══
+        // Row is active iff is_padding == 0. All constraints are guarded by is_active.
+        let is_padding: AB::Expr = local[COL_IS_PADDING].clone().into();
+        // is_padding must be boolean
+        builder.assert_zero(is_padding.clone() * (is_padding.clone() - AB::Expr::ONE));
+        // Note: is_active = 1 - is_padding is used implicitly in is_round_row
+
         let pi_all: Vec<AB::Expr> = {
             let pis = builder.public_values();
             (0..144).map(|i| pis[i].clone().into()).collect()
@@ -149,7 +160,8 @@ where
         let is_input: AB::Expr = local[COL_IS_INPUT].clone().into();
         let is_output: AB::Expr = local[COL_IS_OUTPUT].clone().into();
         let is_round_start: AB::Expr = local[COL_IS_ROUND_START].clone().into();
-        let is_round_row: AB::Expr = AB::Expr::ONE - is_input.clone() - is_output.clone();
+        let is_round_row_raw: AB::Expr = AB::Expr::ONE - is_input.clone() - is_output.clone();
+        let is_round_row: AB::Expr = is_round_row_raw * (AB::Expr::ONE - is_padding.clone());
 
         builder.assert_zero(is_input.clone() * (is_input.clone() - AB::Expr::ONE));
         builder.assert_zero(is_output.clone() * (is_output.clone() - AB::Expr::ONE));
@@ -507,6 +519,70 @@ where
             builder.assert_zero(is_output.clone() * (fold_byte - pi_byte));
         }
 
+        // ═══ FOLD XOR IN-CIRCUIT (3k-2) ═══
+        // For each of 32 output bytes: OUTPUT_FOLD[i] = STATE[i] XOR STATE[i+8]
+        // Bit-level: x_bit = a_bit + b_bit - 2*a_bit*b_bit
+        //
+        // Source word mapping: i = word_idx * 4 + byte_idx
+        //   STATE[i] index = word_idx * 4 + byte_idx (for word_idx 0..8)
+        //   STATE[i+8] index = (word_idx + 8) * 4 + byte_idx
+        //
+        // We use bit-columns: FOLD_A_BITS, FOLD_B_BITS, FOLD_X_BITS.
+        // These are filled by trace builder with the correct bits.
+
+        let two_fold: AB::Expr = AB::F::new(2u64).into();
+
+        // Boolean constraints for fold bits
+        for i in 0..256 {
+            let a_bit: AB::Expr = local[COL_FOLD_A_BITS + i].clone().into();
+            let b_bit: AB::Expr = local[COL_FOLD_B_BITS + i].clone().into();
+            let x_bit: AB::Expr = local[COL_FOLD_X_BITS + i].clone().into();
+            builder.assert_zero(is_output.clone() * a_bit.clone() * (a_bit.clone() - AB::Expr::ONE));
+            builder.assert_zero(is_output.clone() * b_bit.clone() * (b_bit.clone() - AB::Expr::ONE));
+            builder.assert_zero(is_output.clone() * x_bit.clone() * (x_bit.clone() - AB::Expr::ONE));
+            // Bit-level XOR: x = a + b - 2*a*b
+            builder.assert_zero(is_output.clone() * (
+                x_bit.clone() - a_bit.clone() - b_bit.clone() + two_fold.clone() * a_bit.clone() * b_bit
+            ));
+        }
+
+        // Byte recompose: OUTPUT_FOLD[byte] = Σ x_bit[k] * 2^k
+        let two_byte: AB::Expr = AB::F::new(2u64).into();
+        for byte in 0..32 {
+            let mut byte_sum: AB::Expr = AB::Expr::ZERO;
+            let mut pow2: AB::Expr = AB::Expr::ONE;
+            for k in 0..8 {
+                let x_bit: AB::Expr = local[COL_FOLD_X_BITS + byte * 8 + k].clone().into();
+                byte_sum = byte_sum + x_bit * pow2.clone();
+                pow2 = pow2 * two_byte.clone();
+            }
+            let fold_byte: AB::Expr = local[COL_OUTPUT_FOLD + byte].clone().into();
+            builder.assert_zero(is_output.clone() * (fold_byte - byte_sum));
+        }
+
+        // Bind A bits to STATE[i], B bits to STATE[i+8]
+        for byte in 0..32 {
+            let word_idx = byte / 4;
+            let byte_idx = byte % 4;
+            // A = STATE[word_idx][byte_idx]
+            let a_state_byte: AB::Expr = local[COL_STATE + word_idx * 4 + byte_idx].clone().into();
+            // B = STATE[word_idx + 8][byte_idx]
+            let b_state_byte: AB::Expr = local[COL_STATE + (word_idx + 8) * 4 + byte_idx].clone().into();
+            // A byte = Σ a_bit[k] * 2^k
+            let mut a_sum: AB::Expr = AB::Expr::ZERO;
+            let mut b_sum: AB::Expr = AB::Expr::ZERO;
+            let mut pow2: AB::Expr = AB::Expr::ONE;
+            for k in 0..8 {
+                let a_bit: AB::Expr = local[COL_FOLD_A_BITS + byte * 8 + k].clone().into();
+                let b_bit: AB::Expr = local[COL_FOLD_B_BITS + byte * 8 + k].clone().into();
+                a_sum = a_sum + a_bit * pow2.clone();
+                b_sum = b_sum + b_bit * pow2.clone();
+                pow2 = pow2 * two_byte.clone();
+            }
+            builder.assert_zero(is_output.clone() * (a_state_byte - a_sum));
+            builder.assert_zero(is_output.clone() * (b_state_byte - b_sum));
+        }
+
         // ═══ IN-CIRCUIT FOLD XOR (state[i] XOR state[i+8] == OUTPUT_FOLD[i]) ═══
         // Arithmetic trick for byte-level XOR: use 8 bits per byte from existing bit infrastructure.
         // For simplicity, use polynomial identity for XOR of two bits via existing XOR cols.
@@ -552,6 +628,7 @@ pub fn build_blake3_block_trace(
 
     // Row 0: input
     trace[COL_IS_INPUT] = F::ONE;
+    trace[COL_IS_PADDING] = F::ZERO;
     trace[COL_G_IDX] = F::new(8);
     for i in 0..16 {
         let bytes = state[i].to_le_bytes();
@@ -574,6 +651,7 @@ pub fn build_blake3_block_trace(
             let off = row * TOTAL_COLS;
             trace[off + COL_G_IDX] = F::new(g as u64);
             trace[off + COL_IS_ROUND_START] = if g == 0 { F::ONE } else { F::ZERO };
+            trace[off + COL_IS_PADDING] = F::ZERO;
 
             // Store state + msg (before G)
             for i in 0..16 {
@@ -695,6 +773,7 @@ pub fn build_blake3_block_trace(
     // Output row: fill full 16-word STATE, NEXT_STATE, and folded OUTPUT_FOLD.
     let last_off = row * TOTAL_COLS;
     trace[last_off + COL_IS_OUTPUT] = F::ONE;
+    trace[last_off + COL_IS_PADDING] = F::ZERO;
     trace[last_off + COL_G_IDX] = F::new(8);
     for i in 0..16 {
         let bytes = state[i].to_le_bytes();
@@ -709,6 +788,27 @@ pub fn build_blake3_block_trace(
         let fold_bytes = fold_word.to_le_bytes();
         for j in 0..4 {
             trace[last_off + COL_OUTPUT_FOLD + i * 4 + j] = F::new(fold_bytes[j] as u64);
+        }
+    }
+
+    // Fill fold XOR bit-cols (32 bytes × 8 bits)
+    for word_idx in 0..8 {
+        let a_word = state[word_idx];
+        let b_word = state[word_idx + 8];
+        let x_word = a_word ^ b_word;
+        for byte_idx in 0..4 {
+            let byte_pos = word_idx * 4 + byte_idx;
+            let a_byte = ((a_word >> (byte_idx * 8)) & 0xFF) as u8;
+            let b_byte = ((b_word >> (byte_idx * 8)) & 0xFF) as u8;
+            let x_byte = ((x_word >> (byte_idx * 8)) & 0xFF) as u8;
+            for k in 0..8 {
+                let a_bit = (a_byte >> k) & 1;
+                let b_bit = (b_byte >> k) & 1;
+                let x_bit = (x_byte >> k) & 1;
+                trace[last_off + COL_FOLD_A_BITS + byte_pos * 8 + k] = F::new(a_bit as u64);
+                trace[last_off + COL_FOLD_B_BITS + byte_pos * 8 + k] = F::new(b_bit as u64);
+                trace[last_off + COL_FOLD_X_BITS + byte_pos * 8 + k] = F::new(x_bit as u64);
+            }
         }
     }
     // Verify output matches folded state (removed hard assert; use in tests instead)
@@ -792,6 +892,24 @@ mod tests {
     }
 
     #[test]
+    fn trace_fold_xor_bits_valid() {
+        let cv = [0x12u8; 32];
+        let block = [0x34u8; 64];
+        let out = blake3_compress_native(&cv, &block, 0, 64, 0);
+        let t = build_blake3_block_trace(&cv, &block, 0, 64, 0, &out);
+        let last = (TRACE_ROWS - 1) * TOTAL_COLS;
+        for byte in 0..32 {
+            for k in 0..8 {
+                let a_bit = if t[last + COL_FOLD_A_BITS + byte * 8 + k] == F::ONE { 1u64 } else { 0 };
+                let b_bit = if t[last + COL_FOLD_B_BITS + byte * 8 + k] == F::ONE { 1u64 } else { 0 };
+                let x_bit = if t[last + COL_FOLD_X_BITS + byte * 8 + k] == F::ONE { 1u64 } else { 0 };
+                assert_eq!(x_bit, a_bit ^ b_bit,
+                    "Fold XOR mismatch byte {} bit {}", byte, k);
+            }
+        }
+    }
+
+    #[test]
     fn trace_output_matches_native() {
         let cv: [u8; 32] = [
             0x67, 0xE6, 0x09, 0x6A, 0x85, 0xAE, 0x67, 0xBB,
@@ -862,7 +980,7 @@ mod tests {
 
     #[test]
     fn trace_total_cols_constant() {
-        assert_eq!(TOTAL_COLS, 916);
+        assert_eq!(TOTAL_COLS, 1685);
     }
 
     #[test]

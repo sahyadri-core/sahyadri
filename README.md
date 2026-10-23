@@ -1,4 +1,3 @@
-[![CI](https://github.com/sahyadri-core/sahyadri/actions/workflows/ci.yml/badge.svg)](https://github.com/sahyadri-core/sahyadri/actions/workflows/ci.yml)
 <div align="center">
   <img src="https://www.sahyadri.io/img/Sahyadri.PNG" alt="Sahyadri Logo" width="200"/>
   <h1>Sahyadri on Rust</h1>
