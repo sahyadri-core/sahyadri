@@ -10,6 +10,7 @@ use crate::config::F;
 
 pub mod blake3_block;
 pub mod blake3_prover;
+pub mod blake3_chain;
 
 // ═══════════════════════════════════════════════════════════════
 // Layout
