@@ -13,6 +13,7 @@ pub mod blake3_prover;
 pub mod blake3_chain;
 pub mod blake3_chain_recursive;
 pub mod blake3_chain_batched;
+pub mod blake3_chain_batch;
 
 // ═══════════════════════════════════════════════════════════════
 // Layout
