@@ -75,3 +75,7 @@ path = "tests/blake3_tree_parallel.rs"
 [[test]]
 name = "serialization_gate"
 path = "tests/serialization_gate.rs"
+
+[[test]]
+name = "parallel_tree_sweep"
+path = "tests/parallel_tree_sweep.rs"
