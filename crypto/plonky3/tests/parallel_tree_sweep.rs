@@ -103,5 +103,5 @@ fn run_tree(n: usize, level1_threads: usize) {
 #[ignore]
 fn parallel_tree_sweep() {
     // Start with N=8 + 2 threads to confirm memory safety
-    run_tree(16, 4);
+    run_tree(32, 2);
 }

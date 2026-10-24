@@ -24,12 +24,12 @@ p3-lookup = "0.8.0"
 p3-merkle-tree = "0.8.0"
 p3-dft = "0.8.0"
 p3-poseidon2-air = "0.8.0"
-p3-circuit-prover = { git = "https://github.com/Plonky3/Plonky3-recursion", rev = "485455c0" }
-p3-recursion = { git = "https://github.com/Plonky3/Plonky3-recursion", rev = "485455c0" }
+p3-circuit-prover = { path = "../../../../plonky3-recursion-sahyadri/circuit-prover", features = ["parallel"] }
+p3-recursion = { path = "../../../../plonky3-recursion-sahyadri/recursion", features = ["frost-gkr"] }
 p3-symmetric = "0.8.0"
 p3-util = "0.8.0"
-p3-circuit = { git = "https://github.com/Plonky3/Plonky3-recursion", rev = "485455c0" }
-p3-poseidon2-circuit-air = { git = "https://github.com/Plonky3/Plonky3-recursion", rev = "485455c0" }
+p3-circuit = { path = "../../../../plonky3-recursion-sahyadri/circuit", features = ["parallel"] }
+p3-poseidon2-circuit-air = { path = "../../../../plonky3-recursion-sahyadri/poseidon2-circuit-air", features = ["parallel"] }
 sahyadri-dilithium = { path = "../dilithium" }
 dilithium-rs = { workspace = true }
 sha2 = "0.10"
