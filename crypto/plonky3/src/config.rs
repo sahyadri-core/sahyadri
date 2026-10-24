@@ -56,10 +56,10 @@ pub type SahyadriStarkConfig = StarkConfig<Pcs, EF, Challenger>;
 pub type DilithiumStarkConfig = SahyadriStarkConfig;
 
 // ── Constants ────────────────────────────────────────────────
-pub const LOG_BLOWUP: usize = 2;
+pub const LOG_BLOWUP: usize = 3;
 pub const DIGEST_ELEMS: usize = 4;
-pub const NUM_QUERIES: usize = 100;
-pub const PROOF_OF_WORK_BITS: usize = 16;
+pub const NUM_QUERIES: usize = 60;
+pub const PROOF_OF_WORK_BITS: usize = 20;
 
 // ── Builder ──────────────────────────────────────────────────
 pub fn build_stark_config() -> DilithiumStarkConfig {

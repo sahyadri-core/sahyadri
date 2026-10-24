@@ -87,12 +87,12 @@ where
 fn build_descriptor() -> FriConfigV1 {
     FriConfigV1::new(
         SuiteIdV1::GoldilocksD2Poseidon2BinaryFri,
-        2,   // log_blowup
+        3,   // log_blowup
         0,   // log_final_poly_len
         1,   // max_log_arity
-        100, // num_queries
+        60,  // num_queries
         0,   // commit_pow_bits
-        16,  // query_pow_bits
+        20,  // query_pow_bits
         0,   // input_cap_height
         0,   // commit_cap_height
         0,   // num_random_codewords
