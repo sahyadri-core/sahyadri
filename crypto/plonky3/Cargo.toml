@@ -64,3 +64,14 @@ parallel = ["p3-maybe-rayon/parallel", "p3-recursion/parallel"]
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
+[[test]]
+name = "aggregate_batch_scaling"
+path = "tests/aggregate_batch_scaling.rs"
+[[test]]
+name = "blake3_tree_parallel"
+path = "tests/blake3_tree_parallel.rs"
+
+[[test]]
+name = "serialization_gate"
+path = "tests/serialization_gate.rs"
