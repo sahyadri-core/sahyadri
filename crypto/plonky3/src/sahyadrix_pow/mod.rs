@@ -10,6 +10,8 @@ use crate::config::F;
 
 pub mod blake3_block;
 pub mod blake3_prover;
+pub mod blake3_binary_prover;
+pub mod binary_field_config;
 pub mod blake3_chain;
 pub mod blake3_chain_recursive;
 pub mod blake3_chain_batched;
@@ -693,3 +695,4 @@ mod tests {
         }
     }
 }
+pub mod binary_aggregation_air;

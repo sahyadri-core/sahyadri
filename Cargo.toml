@@ -408,3 +408,6 @@ opt-level = 2
 [workspace.lints.clippy]
 empty_docs = "allow"
 uninlined_format_args = "allow"
+
+[patch.crates-io]
+p3-blake3-air = { path = "vendor/p3-blake3-air" }
