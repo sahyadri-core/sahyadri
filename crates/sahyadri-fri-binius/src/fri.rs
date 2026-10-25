@@ -38,21 +38,9 @@
 //! - i_r even: y_r[2j] and y_r[2j+1], fold = y_r[2j] + alpha * y_r[2j+1]
 //! - i_r odd:  y_r[2j] and y_r[2j+1], fold = y_r[2j] + alpha * y_r[2j+1]  (same formula)
 
+use crate::bytes::Block128Bytes;
 use p3_binary_field::BinaryField128 as Block128;
 
-/// Extension: `Block128::to_le_bytes` for serialization.
-trait Block128Bytes {
-    fn blk_to_le_bytes(&self) -> [u8; 16];
-}
-
-impl Block128Bytes for Block128 {
-    #[inline]
-    fn blk_to_le_bytes(&self) -> [u8; 16] {
-        // Fallback: convert via u128 view
-        let as_u128: u128 = unsafe { core::mem::transmute_copy(self) };
-        as_u128.to_le_bytes()
-    }
-}
 
 use crate::error::FriBiniusError;
 use crate::merkle::MerkleTree;
@@ -71,6 +59,21 @@ impl Default for FriParams {
             log_inv_rate: 2,
             num_queries: 30,
             pow_bits: 16,
+        }
+    }
+}
+
+impl FriParams {
+    /// Parameters sized for ~100-bit conjectured soundness at rate 1/8.
+    ///
+    /// Conjectured error term: 60 queries * log2(rate^-1) + 20 grinding = 200 bits.
+    /// Johnson-bound floor:  60 queries * log2(rate^-1)/2 + 20      = 110 bits.
+    /// Both comfortably exceed 100.
+    pub fn production() -> Self {
+        Self {
+            log_inv_rate: 3,
+            num_queries: 60,
+            pow_bits: 20,
         }
     }
 }
@@ -531,6 +534,36 @@ mod tests {
             verifier.verify(commitment_0, &proof, seed).is_err(),
             "tampered final_poly[{target}] must be caught by query 0",
         );
+    }
+
+    #[test]
+    fn sizes_16_through_256() {
+        for log_n in [4usize, 5, 6, 7, 8] {
+            let n = 1usize << log_n;
+            let evs: Vec<_> = (0..n as u128).map(block).collect();
+            let params = FriParams { log_inv_rate: 2, num_queries: 8, pow_bits: 0 };
+            let prover = FriProver::new(params.clone());
+            let verifier = FriVerifier::new(params);
+            let seed = format!("size-{n}").into_bytes();
+            let proof = prover.prove(evs, &seed).unwrap();
+            let c0 = proof.rounds[0].root;
+            verifier.verify(c0, &proof, &seed).unwrap();
+        }
+    }
+
+    #[test]
+    fn production_params_small_input() {
+        // 32 elements, full production params (60 queries, 20-bit grinding)
+        // Should complete in a couple of seconds — this exercises the
+        // parameters that will ship on chain.
+        let evs: Vec<_> = (0..32u128).map(block).collect();
+        let params = FriParams::production();
+        let prover = FriProver::new(params.clone());
+        let verifier = FriVerifier::new(params);
+        let seed = b"prod-test";
+        let proof = prover.prove(evs, seed).unwrap();
+        let c0 = proof.rounds[0].root;
+        verifier.verify(c0, &proof, seed).unwrap();
     }
 
     #[test]
