@@ -3875,6 +3875,7 @@ dependencies = [
  "p3-binary-field",
  "p3-binary-pcs",
  "p3-blake3",
+ "p3-blake3-air",
  "p3-bus",
  "p3-challenger",
  "p3-circuit",
@@ -5292,6 +5293,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sahyadri-fri-binius"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "p3-binary-field",
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-poseidon2b",
+ "p3-symmetric",
+ "p3-util",
+ "serde",
+ "thiserror 1.0.64",
+]
+
+[[package]]
 name = "sahyadri-grpc-client"
 version = "1.1.0"
 dependencies = [
@@ -5442,6 +5459,29 @@ dependencies = [
  "serde",
  "thiserror 1.0.64",
  "triggered",
+]
+
+[[package]]
+name = "sahyadri-ivc-core"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "p3-binary-field",
+ "p3-field",
+ "sahyadri-fri-binius",
+ "serde",
+ "thiserror 1.0.64",
+]
+
+[[package]]
+name = "sahyadri-ivc-prover"
+version = "0.1.0"
+dependencies = [
+ "p3-binary-field",
+ "p3-field",
+ "sahyadri-fri-binius",
+ "sahyadri-ivc-core",
+ "thiserror 1.0.64",
 ]
 
 [[package]]

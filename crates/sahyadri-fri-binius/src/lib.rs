@@ -27,6 +27,7 @@ pub mod pcs;
 pub mod fri;
 pub mod merkle;
 pub mod error;
+pub mod poseidon2b_compression;
 
 pub use pcs::{FriBiniusPcs, FriBiniusParams, FriBiniusCommitment, FriBiniusOpening};
 pub use fri::{FoldRound, FriProof, FriProver, FriVerifier};

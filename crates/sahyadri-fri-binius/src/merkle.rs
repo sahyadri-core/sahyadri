@@ -69,23 +69,9 @@ impl MerkleTree {
     }
 }
 
-/// Hash two field elements. Phase 1 uses 3-round Feistel with x^3 S-box.
-/// Phase 2 swaps to Poseidon2b permutation.
-///
-/// Note: simple `a*b + a + b` collapses in binary field (h(1, x) = 1 for all x),
-/// so we use a Feistel structure with cube S-box for non-linearity.
+/// Hash two field elements via Poseidon2b compression.
 pub fn hash_pair(a: Block128, b: Block128) -> Block128 {
-    let c1 = Block128::from_le_bytes([0x5Au8; 16]);
-    let c2 = Block128::from_le_bytes([0xA5u8; 16]);
-    let mut x = a + c1;
-    let mut y = b + c2;
-    for _ in 0..3 {
-        let x3 = x * x * x;
-        y = y + x3 + c1;
-        let y3 = y * y * y;
-        x = x + y3 + c2;
-    }
-    x + y + c1
+    crate::poseidon2b_compression::compress(a, b)
 }
 
 #[cfg(test)]
