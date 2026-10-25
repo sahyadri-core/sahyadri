@@ -1,0 +1,22 @@
+[package]
+name = "sahyadri-fri-binius"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "FRI-Binius PCS over binary tower fields for Sahyadri"
+
+[dependencies]
+p3-binary-field = "0.8.0"
+p3-field = "0.8.0"
+p3-matrix = "0.8.0"
+p3-symmetric = "0.8.0"
+p3-util = "0.8.0"
+p3-maybe-rayon = { version = "0.8.0", optional = true }
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"], optional = true }
+blake3 = "1.5"
+
+[features]
+default = []
+parallel = ["p3-maybe-rayon/parallel"]
+serde = ["dep:serde"]

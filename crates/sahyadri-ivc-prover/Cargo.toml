@@ -1,0 +1,21 @@
+[package]
+name = "sahyadri-ivc-prover"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "IVC prover for Sahyadri binary-native proof stack"
+
+[dependencies]
+p3-binary-field = "0.8.0"
+p3-field = "0.8.0"
+thiserror = "1.0"
+
+[dependencies.sahyadri-fri-binius]
+path = "../sahyadri-fri-binius"
+
+[dependencies.sahyadri-ivc-core]
+path = "../sahyadri-ivc-core"
+
+[features]
+default = []
+parallel = ["sahyadri-fri-binius/parallel"]

@@ -1,0 +1,20 @@
+[package]
+name = "sahyadri-ivc-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "IVC (incrementally verifiable computation) primitives for Sahyadri"
+
+[dependencies]
+p3-binary-field = "0.8.0"
+p3-field = "0.8.0"
+thiserror = "1.0"
+blake3 = "1.5"
+serde = { version = "1.0", features = ["derive"] }
+
+[dependencies.sahyadri-fri-binius]
+path = "../sahyadri-fri-binius"
+
+[features]
+default = []
+parallel = ["sahyadri-fri-binius/parallel"]
