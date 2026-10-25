@@ -30,7 +30,7 @@ pub mod error;
 pub mod poseidon2b_compression;
 
 pub use pcs::{FriBiniusPcs, FriBiniusParams, FriBiniusCommitment, FriBiniusOpening};
-pub use fri::{FoldRound, FriProof, FriProver, FriVerifier};
+pub use fri::{FriProof, FriProver, FriVerifier};
 pub use error::FriBiniusError;
 
 /// Base field type for the commitment scheme.

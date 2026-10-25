@@ -1,25 +1,21 @@
 //! Top-level FRI-Binius PCS interface.
+//!
+//! Phase 2B: multi-round FRI + query sampling + grinding.
 
 use crate::error::FriBiniusError;
-use crate::fri::{FriProof, FriProver, FriVerifier};
+use crate::fri::{FriParams, FriProof, FriProver, FriVerifier};
 use crate::merkle::{Block128, MerkleTree};
 
 /// Parameters for the PCS.
 #[derive(Debug, Clone)]
 pub struct FriBiniusParams {
-    pub log_inv_rate: usize,
-    pub num_queries: usize,
-    pub folding_factor: usize,
-    pub log_blowup: usize,
+    pub fri: FriParams,
 }
 
 impl Default for FriBiniusParams {
     fn default() -> Self {
         Self {
-            log_inv_rate: 2,
-            num_queries: 64,
-            folding_factor: 2,
-            log_blowup: 1,
+            fri: FriParams::default(),
         }
     }
 }
@@ -34,8 +30,9 @@ pub struct FriBiniusCommitment {
 #[derive(Debug, Clone)]
 pub struct FriBiniusOpening {
     pub fri_proof: FriProof,
-    pub path: Vec<Block128>,
-    pub index: usize,
+    pub leaf: Block128,
+    pub leaf_path: Vec<Block128>,
+    pub leaf_index: usize,
 }
 
 /// The PCS.
@@ -48,18 +45,21 @@ impl FriBiniusPcs {
         Self { params }
     }
 
-    /// Commit to evaluation vector. Returns commitment + tree.
+    /// Commit to evaluation vector.
     pub fn commit(&self, evals: Vec<Block128>) -> (FriBiniusCommitment, MerkleTree) {
         let tree = MerkleTree::new(evals);
-        (FriBiniusCommitment { root: tree.root() }, tree)
+        (
+            FriBiniusCommitment { root: tree.root() },
+            tree,
+        )
     }
 
-    /// Open at index.
+    /// Open at index: full FRI proof + direct Merkle path.
     pub fn open(
         &self,
         tree: &MerkleTree,
         index: usize,
-        challenges: &[Block128],
+        seed: &[u8],
     ) -> Result<FriBiniusOpening, FriBiniusError> {
         if index >= tree.leaves.len() {
             return Err(FriBiniusError::InvalidParams(format!(
@@ -67,17 +67,14 @@ impl FriBiniusPcs {
                 tree.leaves.len()
             )));
         }
-        let prover = FriProver::new(
-            self.params.log_inv_rate,
-            self.params.num_queries,
-            self.params.folding_factor,
-        );
-        let fri_proof = prover.prove(tree.leaves.clone(), challenges);
-        let path = tree.path(index);
+        let prover = FriProver::new(self.params.fri.clone());
+        let fri_proof = prover.prove(tree.leaves.clone(), seed)?;
+        let leaf_path = tree.path(index);
         Ok(FriBiniusOpening {
             fri_proof,
-            path,
-            index,
+            leaf: tree.leaves[index],
+            leaf_path,
+            leaf_index: index,
         })
     }
 
@@ -86,50 +83,75 @@ impl FriBiniusPcs {
         &self,
         commitment: &FriBiniusCommitment,
         opening: &FriBiniusOpening,
-        challenges: &[Block128],
-    ) -> bool {
-        // 1. Merkle path
+        seed: &[u8],
+    ) -> Result<(), FriBiniusError> {
+        // 1. Direct leaf path
         if !MerkleTree::verify_path(
-            opening.fri_proof.rounds[0].evals[opening.index],
-            opening.index,
-            &opening.path,
+            opening.leaf,
+            opening.leaf_index,
+            &opening.leaf_path,
             commitment.root,
         ) {
-            return false;
+            return Err(FriBiniusError::Query {
+                query: opening.leaf_index,
+                msg: "leaf path verification failed".into(),
+            });
         }
-        // 2. FRI fold
-        let verifier = FriVerifier::new(self.params.log_inv_rate, self.params.num_queries);
-        verifier.verify(&opening.fri_proof, challenges)
+
+        // 2. FRI proof verification
+        let verifier = FriVerifier::new(self.params.fri.clone());
+        verifier.verify(commitment.root, &opening.fri_proof, seed)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fri::FriParams;
 
-    #[inline]
-    fn fe(n: u128) -> Block128 {
+    fn block(n: u128) -> Block128 {
         Block128::from_le_bytes(n.to_le_bytes())
     }
 
-    #[test]
-    fn commit_and_open_round_trip() {
-        let pcs = FriBiniusPcs::new(FriBiniusParams::default());
-        let evals: Vec<_> = (0..16u128).map(|n: u128| Block128::from_le_bytes(n.to_le_bytes())).collect();
-        let (commitment, tree) = pcs.commit(evals);
-        let challenges = vec![fe(2), fe(3)];
-        let opening = pcs.open(&tree, 5, &challenges).unwrap();
-        assert!(pcs.verify(&commitment, &opening, &challenges));
+    fn small_params() -> FriBiniusParams {
+        FriBiniusParams {
+            fri: FriParams {
+                log_inv_rate: 2,
+                num_queries: 4,
+                pow_bits: 0,
+            },
+        }
     }
 
     #[test]
-    fn tampered_opening_fails() {
-        let pcs = FriBiniusPcs::new(FriBiniusParams::default());
-        let evals: Vec<_> = (0..16u128).map(|n: u128| Block128::from_le_bytes(n.to_le_bytes())).collect();
+    fn commit_open_round_trip() {
+        let pcs = FriBiniusPcs::new(small_params());
+        let evals: Vec<_> = (0..32u128).map(block).collect();
         let (commitment, tree) = pcs.commit(evals);
-        let challenges = vec![fe(2), fe(3)];
-        let mut opening = pcs.open(&tree, 5, &challenges).unwrap();
-        opening.index = 6;
-        assert!(!pcs.verify(&commitment, &opening, &challenges));
+        let seed = b"pcs-test";
+        let opening = pcs.open(&tree, 5, seed).unwrap();
+        pcs.verify(&commitment, &opening, seed).unwrap();
+    }
+
+    #[test]
+    fn tampered_leaf_fails() {
+        let pcs = FriBiniusPcs::new(small_params());
+        let evals: Vec<_> = (0..32u128).map(block).collect();
+        let (commitment, tree) = pcs.commit(evals);
+        let seed = b"pcs-test";
+        let mut opening = pcs.open(&tree, 5, seed).unwrap();
+        opening.leaf = block(9999);
+        assert!(pcs.verify(&commitment, &opening, seed).is_err());
+    }
+
+    #[test]
+    fn wrong_commitment_fails() {
+        let pcs = FriBiniusPcs::new(small_params());
+        let evals: Vec<_> = (0..32u128).map(block).collect();
+        let (_, tree) = pcs.commit(evals);
+        let seed = b"pcs-test";
+        let opening = pcs.open(&tree, 5, seed).unwrap();
+        let wrong_commitment = FriBiniusCommitment { root: block(0xDEAD) };
+        assert!(pcs.verify(&wrong_commitment, &opening, seed).is_err());
     }
 }
