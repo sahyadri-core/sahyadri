@@ -48,6 +48,7 @@ p3-blake3-air = "0.8.0"
 p3-binary-field = "0.8.0"
 p3-binary-pcs = "0.8.0"
 p3-keccak-air = "0.8.0"
+hekate-math = "0.12.1"
 [dev-dependencies]
 blake3 = "1"
 bincode = "1"

@@ -21,3 +21,5 @@ target/
 sahyadri-miner/target/
 sahyadri-b.sh
 wasm/pkg/
+paper/draft.md
+paper/*.md
