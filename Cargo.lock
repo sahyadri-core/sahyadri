@@ -5297,6 +5297,7 @@ name = "sahyadri-fri-binius"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "p3-air",
  "p3-binary-field",
  "p3-field",
  "p3-matrix",
