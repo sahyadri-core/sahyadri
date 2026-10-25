@@ -32,6 +32,7 @@ pub mod fold_air;
 pub mod merkle_path_air;
 pub mod grinding_air;
 pub mod fri_verifier_air;
+pub mod fri_verifier_air_v2;
 pub mod poseidon2b_compression;
 pub mod serialize;
 
@@ -42,6 +43,7 @@ pub use fold_air::FoldAir;
 pub use merkle_path_air::MerklePathAir;
 pub use grinding_air::GrindingAir;
 pub use fri_verifier_air::FriVerifierAir;
+pub use fri_verifier_air_v2::FriVerifierAirV2;
 pub use serialize::{proof_to_bytes, proof_from_bytes};
 pub use bytes::{Block128Bytes, block_from_bytes};
 
