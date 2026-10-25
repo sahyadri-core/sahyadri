@@ -29,10 +29,12 @@ pub mod merkle;
 pub mod bytes;
 pub mod error;
 pub mod poseidon2b_compression;
+pub mod serialize;
 
 pub use pcs::{FriBiniusPcs, FriBiniusParams, FriBiniusCommitment, FriBiniusOpening};
 pub use fri::{FriProof, FriProver, FriVerifier};
 pub use error::FriBiniusError;
+pub use serialize::{proof_to_bytes, proof_from_bytes};
 pub use bytes::{Block128Bytes, block_from_bytes};
 
 /// Base field type for the commitment scheme.
