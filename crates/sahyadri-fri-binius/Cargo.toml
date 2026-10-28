@@ -8,6 +8,7 @@ description = "FRI-Binius PCS over binary tower fields for Sahyadri"
 [dependencies]
 p3-binary-field = "0.8.0"
 p3-air = "0.8.0"
+p3-bus = "0.8.0"
 p3-field = "0.8.0"
 p3-matrix = "0.8.0"
 p3-symmetric = "0.8.0"

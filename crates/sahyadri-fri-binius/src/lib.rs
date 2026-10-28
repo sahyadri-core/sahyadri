@@ -30,6 +30,7 @@ pub mod bytes;
 pub mod error;
 pub mod fold_air;
 pub mod merkle_path_air;
+pub mod merkle_path_bus_air;
 pub mod grinding_air;
 pub mod fri_verifier_air;
 pub mod fri_verifier_air_v2;
@@ -37,7 +38,7 @@ pub mod poseidon2b_compression;
 pub mod serialize;
 
 pub use pcs::{FriBiniusPcs, FriBiniusParams, FriBiniusCommitment, FriBiniusOpening};
-pub use fri::{FriProof, FriProver, FriVerifier};
+pub use fri::{FriParams, FriProof, FriProver, FriVerifier};
 pub use error::FriBiniusError;
 pub use fold_air::FoldAir;
 pub use merkle_path_air::MerklePathAir;
