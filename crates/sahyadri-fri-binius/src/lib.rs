@@ -47,6 +47,7 @@ pub use fri_verifier_air::FriVerifierAir;
 pub use fri_verifier_air_v2::FriVerifierAirV2;
 pub use serialize::{proof_to_bytes, proof_from_bytes};
 pub use bytes::{Block128Bytes, block_from_bytes};
+pub use merkle_path_bus_air::MerklePathBusAir;
 
 /// Base field type for the commitment scheme.
 pub type BaseField = p3_binary_field::BinaryField128;

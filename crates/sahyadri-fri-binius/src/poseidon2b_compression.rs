@@ -18,7 +18,7 @@ use p3_poseidon2b::poseidon2b_permutation;
 const STATE_SIZE: usize = 4;
 
 /// Domain separation tag: "MERKLE" + 0x01
-const MERKLE_DOMAIN: u128 = 0x4D45_524B_4C45_0001;
+pub const MERKLE_DOMAIN: u128 = 0x4D45_524B_4C45_0001;
 
 /// Compress two field elements into one using Poseidon2b.
 ///
