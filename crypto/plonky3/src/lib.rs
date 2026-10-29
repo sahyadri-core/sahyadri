@@ -45,3 +45,4 @@ pub const PROOF_FORMAT_VERSION: u8 = 1;
 
 /// Max signatures per batch.
 pub const MAX_BATCH_SIZE: usize = 10_000;
+pub mod binary_in_goldilocks_air;
