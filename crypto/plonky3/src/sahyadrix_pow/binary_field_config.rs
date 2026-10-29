@@ -80,3 +80,26 @@ mod tests {
         assert_eq!(DIGEST_BYTES, 32);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Blake3 transcript variant (for T1.4b.2b.2 in-circuit Fiat-Shamir)
+// ---------------------------------------------------------------------------
+//
+// Why: proves alpha derivation in-circuit using Blake3BinaryAir (milestone 3).
+// Keccak AIR does not exist; Blake3BinaryAir is proven working (816B).
+//
+// Note: proofs made with Keccak config do NOT verify with this config.
+// 3F proofs must be regenerated. State/Merkle roots unaffected (only transcript).
+
+use p3_blake3::Blake3;
+
+pub type Blake3ByteHash = Blake3;
+
+pub type Blake3LevelChallenger<L> =
+    BinaryChallenger<L, HashChallenger<u8, Blake3ByteHash, DIGEST_BYTES>>;
+
+pub type Blake3Challenger128 = Blake3LevelChallenger<BinaryField128>;
+
+pub fn blake3_challenger() -> Blake3Challenger128 {
+    Blake3Challenger128::from_hasher(Vec::new(), Blake3)
+}
