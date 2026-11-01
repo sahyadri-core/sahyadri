@@ -40,6 +40,33 @@ use crate::poseidon2b_compression::MERKLE_DOMAIN;
 
 pub type Digest = [F; 2];
 
+/// Commitment format compatible with `BinaryChallenger::CanObserve<[u8; 32]>`.
+/// Digest `[F; 2]` (2 x 16 bytes = 32 bytes) serialized directly as `[u8; 32]`.
+pub type Commitment = [u8; 32];
+
+#[inline]
+fn blk_to_bytes(v: F) -> [u8; 16] {
+    let u: u128 = unsafe { core::mem::transmute_copy(&v) };
+    u.to_le_bytes()
+}
+
+#[inline]
+fn digest_to_commitment(d: Digest) -> Commitment {
+    let mut bytes = [0u8; 32];
+    bytes[0..16].copy_from_slice(&blk_to_bytes(d[0]));
+    bytes[16..32].copy_from_slice(&blk_to_bytes(d[1]));
+    bytes
+}
+
+#[inline]
+fn commitment_to_digest(c: &Commitment) -> Digest {
+    let mut d0 = [0u8; 16];
+    let mut d1 = [0u8; 16];
+    d0.copy_from_slice(&c[0..16]);
+    d1.copy_from_slice(&c[16..32]);
+    [F::from_le_bytes(d0), F::from_le_bytes(d1)]
+}
+
 // ============================================================================
 // Compression (reuse standalone logic)
 // ============================================================================
@@ -56,9 +83,25 @@ fn hash_pair(l: Digest, r: Digest) -> Digest {
     [compress(l[0], r[0]), compress(l[1], r[1])]
 }
 
+/// Hash a full row (any width) into a single digest.
+/// Uses Poseidon2b sponge absorption: process 4 F values per permutation.
 #[inline]
-fn hash_leaf(value: F) -> Digest {
-    [compress(value, F::ZERO), compress(F::ZERO, value)]
+fn hash_row(row: &[F]) -> Digest {
+    let mut state = [
+        F::ZERO,
+        F::ZERO,
+        F::ZERO,
+        F::from_le_bytes((MERKLE_DOMAIN as u128).to_le_bytes()),
+    ];
+    let mut i = 0;
+    while i < row.len() {
+        for j in 0..4 {
+            state[j] = state[j] + row.get(i + j).copied().unwrap_or(F::ZERO);
+        }
+        poseidon2b_permutation(&mut state);
+        i += 4;
+    }
+    [state[0], state[1]]
 }
 
 // ============================================================================
@@ -117,10 +160,10 @@ impl Poseidon2bMmcs {
     pub fn new() -> Self { Self }
 
     /// Build tree for `leaves` (padded to power-of-two).
-    fn build_tree(&self, leaves: &[F]) -> (Digest, Vec<Digest>) {
-        let n = leaves.len().next_power_of_two();
+    fn build_tree_rows(&self, rows: Vec<Vec<F>>) -> (Digest, Vec<Digest>) {
+        let n = rows.len().next_power_of_two();
         let mut level: Vec<Digest> = (0..n)
-            .map(|i| hash_leaf(leaves.get(i).copied().unwrap_or(F::ZERO)))
+            .map(|i| hash_row(rows.get(i).map(|r| r.as_slice()).unwrap_or(&[])))
             .collect();
 
         let mut tree = level.clone();
@@ -153,8 +196,8 @@ impl Poseidon2bMmcs {
     }
 
     /// Verify one path.
-    fn verify_path(&self, root: &Digest, index: usize, value: F, path: &[Digest]) -> bool {
-        let mut curr = hash_leaf(value);
+    fn verify_path(&self, root: &Digest, index: usize, row: &[F], path: &[Digest]) -> bool {
+        let mut curr = hash_row(row);
         let mut idx = index;
         for sib in path {
             curr = if idx & 1 == 0 {
@@ -170,7 +213,7 @@ impl Poseidon2bMmcs {
 
 impl Mmcs<F> for Poseidon2bMmcs {
     type ProverData<M> = Poseidon2bProverData<M>;
-    type Commitment = Digest;
+    type Commitment = Commitment;
     type Proof = Poseidon2bProof;
     type MultiProof = Poseidon2bMultiProof;
     type Error = Poseidon2bMmcsError;
@@ -178,17 +221,17 @@ impl Mmcs<F> for Poseidon2bMmcs {
     fn commit<M: Matrix<F>>(&self, inputs: Vec<M>) -> (Self::Commitment, Self::ProverData<M>) {
         assert_eq!(inputs.len(), 1, "Poseidon2bMmcs commits one matrix per call");
         let matrix = inputs.into_iter().next().unwrap();
-        assert_eq!(matrix.width(), 1, "expected width-1 codeword");
 
         let height = matrix.height();
+        let width = matrix.width();
         assert!(height.is_power_of_two(), "expected power-of-two height");
 
-        // Flatten matrix to Vec<F>
-        let leaves: Vec<F> = (0..height)
-            .map(|r| matrix.get(r, 0).unwrap_or(F::ZERO))
+        // Extract each row as Vec<F> (may be width > 1 from GroupedCodeword wrapping)
+        let rows: Vec<Vec<F>> = (0..height)
+            .map(|r| (0..width).map(|c| matrix.get(r, c).unwrap_or(F::ZERO)).collect())
             .collect();
 
-        let (root, tree) = self.build_tree(&leaves);
+        let (root, tree) = self.build_tree_rows(rows);
 
         let prover_data = Poseidon2bProverData {
             tree,
@@ -197,7 +240,7 @@ impl Mmcs<F> for Poseidon2bMmcs {
             offsets: vec![0],
         };
 
-        (root, prover_data)
+        (digest_to_commitment(root), prover_data)
     }
 
     fn get_matrices<'a, M: Matrix<F>>(&self, data: &'a Self::ProverData<M>) -> Vec<&'a M> {
@@ -211,12 +254,14 @@ impl Mmcs<F> for Poseidon2bMmcs {
     ) -> BatchOpening<F, Self> {
         let matrix = &data.matrices[0];
         let height = matrix.height();
+        let width = matrix.width();
         assert!(index < height, "index out of bounds");
 
-        let value = matrix.get(index, 0).unwrap_or(F::ZERO);
+        // Return full row
+        let row: Vec<F> = (0..width).map(|c| matrix.get(index, c).unwrap_or(F::ZERO)).collect();
         let path = self.extract_path(&data.tree, height, index);
 
-        BatchOpening::new(vec![vec![value]], Poseidon2bProof { siblings: path })
+        BatchOpening::new(vec![row], Poseidon2bProof { siblings: path })
     }
 
     fn verify_batch(
@@ -232,12 +277,12 @@ impl Mmcs<F> for Poseidon2bMmcs {
             return Err(Poseidon2bMmcsError::IndexOutOfBounds);
         }
 
-        if opening.opened_values.len() != 1 || opening.opened_values[0].len() != 1 {
+        if opening.opened_values.len() != 1 {
             return Err(Poseidon2bMmcsError::DimensionMismatch);
         }
-
-        let value = opening.opened_values[0][0];
-        if self.verify_path(commitment, index, value, &opening.opening_proof.siblings) {
+        let row = &opening.opened_values[0];
+        let digest = commitment_to_digest(commitment);
+        if self.verify_path(&digest, index, row, &opening.opening_proof.siblings) {
             Ok(())
         } else {
             Err(Poseidon2bMmcsError::CommitmentMismatch)
@@ -251,12 +296,14 @@ impl Mmcs<F> for Poseidon2bMmcs {
     ) -> (Vec<Vec<Vec<F>>>, Self::MultiProof) {
         let matrix = &data.matrices[0];
         let height = matrix.height();
+        let width = matrix.width();
 
         let rows: Vec<Vec<Vec<F>>> = indices
             .iter()
             .map(|&i| {
                 assert!(i < height);
-                vec![vec![matrix.get(i, 0).unwrap_or(F::ZERO)]]
+                let row: Vec<F> = (0..width).map(|c| matrix.get(i, c).unwrap_or(F::ZERO)).collect();
+                vec![row]
             })
             .collect();
 
@@ -278,6 +325,7 @@ impl Mmcs<F> for Poseidon2bMmcs {
     ) -> Result<(), Self::Error> {
         assert_eq!(dimensions.len(), 1);
         let dim = dimensions[0];
+        let digest = commitment_to_digest(commitment);
 
         if indices.len() != opened_values.len() || indices.len() != opening_proof.paths.len() {
             return Err(Poseidon2bMmcsError::DimensionMismatch);
@@ -291,15 +339,11 @@ impl Mmcs<F> for Poseidon2bMmcs {
                 return Err(Poseidon2bMmcsError::DimensionMismatch);
             }
             let row_ref = opened_values[q][0].as_ref();
-            if row_ref.len() != 1 {
-                return Err(Poseidon2bMmcsError::DimensionMismatch);
-            }
-            let value = row_ref[0];
             let (_, ref path) = opening_proof.paths[q];
             if path.len() != (dim.height.trailing_zeros() as usize) {
                 return Err(Poseidon2bMmcsError::PathLengthMismatch);
             }
-            if !self.verify_path(commitment, index, value, path) {
+            if !self.verify_path(&digest, index, row_ref, path) {
                 return Err(Poseidon2bMmcsError::CommitmentMismatch);
             }
         }

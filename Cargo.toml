@@ -413,5 +413,6 @@ empty_docs = "allow"
 uninlined_format_args = "allow"
 
 [patch.crates-io]
+p3-binary-field = { path = "/home/surajdatir/plonky3-recursion-sahyadri/vendor/p3-binary-field" }
 p3-binary-pcs = { path = "../../plonky3-recursion-sahyadri/vendor/p3-binary-pcs" }
 p3-blake3-air = { path = "vendor/p3-blake3-air" }
