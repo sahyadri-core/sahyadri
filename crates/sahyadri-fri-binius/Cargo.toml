@@ -6,6 +6,7 @@ license = "Apache-2.0"
 description = "FRI-Binius PCS over binary tower fields for Sahyadri"
 
 [dependencies]
+p3-commit = "0.8.0"
 p3-binary-field = "0.8.0"
 p3-air = "0.8.0"
 p3-bus = "0.8.0"
@@ -15,11 +16,10 @@ p3-symmetric = "0.8.0"
 p3-util = "0.8.0"
 p3-maybe-rayon = { version = "0.8.0", optional = true }
 thiserror = "1.0"
-serde = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
 blake3 = "1.5"
 p3-poseidon2b = { path = "../../../../plonky3-recursion-sahyadri/p3-poseidon2b" }
 
 [features]
 default = []
 parallel = ["p3-maybe-rayon/parallel"]
-serde = ["dep:serde"]
