@@ -1,0 +1,8 @@
+[package]
+name = "sahyadri-proof-prover"
+version = "1.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.40", features = ["sync", "rt", "macros"] }
+tracing = "0.1"

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "components/proof_prover",
     "daemon",
     "cli",
     "core",
@@ -87,6 +88,7 @@ include = [
 ]
 
 [workspace.dependencies]
+sahyadri-proof-prover = { path = "components/proof_prover" }
 sahyadri-testing-integration = { version = "1.1.0", path = "testing/integration" }
 sahyadri-addresses = { version = "1.1.0", path = "crypto/addresses" }
 sahyadri-addressmanager = { version = "1.1.0", path = "components/addressmanager" }

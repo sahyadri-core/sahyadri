@@ -5778,6 +5778,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sahyadri-proof-prover"
+version = "1.1.0"
+dependencies = [
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "sahyadri-rpc-core"
 version = "1.1.0"
 dependencies = [

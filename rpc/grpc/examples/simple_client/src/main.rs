@@ -21,7 +21,7 @@ async fn main() -> ExitCode {
 }
 
 async fn check_node_status() -> RpcResult<()> {
-    let url = "grpc://localhost:26110".to_string();
+    let url = "grpc://127.0.0.1:27113".to_string();
 
     let client =
         GrpcClient::connect_with_args(NotificationMode::Direct, url, None, false, None, false, Some(500_000), Default::default())
