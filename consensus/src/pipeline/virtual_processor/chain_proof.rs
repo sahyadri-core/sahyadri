@@ -55,6 +55,20 @@ pub fn is_checkpoint(chain_depth: u32) -> bool {
     chain_depth == 1 || chain_depth % CHECKPOINT_INTERVAL == 0
 }
 
+/// Compute chain commitment for a pass-through (empty) block.
+/// Empty blocks carry no STARK proof, but their chain_commitment hashes into
+/// the chain so depth stays continuous and O(1) chain doesn't break on
+/// 0-attestation blocks. Pass-through entries have `proof = []`.
+pub fn compute_pass_through_commitment(
+    parent_commitment: [u8; 32],
+    block_hash: &Hash,
+) -> [u8; 32] {
+    let mut outer = Sha256::new();
+    outer.update(parent_commitment);
+    outer.update(block_hash.as_bytes());
+    outer.finalize().into()
+}
+
 /// E v2: produce recursive chain proof for this block.
 ///
 /// Skips gracefully for N=1 blocks (proof is not a BatchStarkProof).

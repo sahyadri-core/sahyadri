@@ -1972,34 +1972,84 @@ fn spawn_root_proof_for_block(
                     t.elapsed().as_secs_f64()
                 );
                 // E v2c: chain proof generation with proper parent linkage.
-                // Step 1: fetch this block's txs proof (just written by generate_root_proof_for_block)
-                let txs_bytes = match proof_roots_store.get(block_hash) {
-                    Ok(Some(entry)) => entry.proof.clone(),
-                    Ok(None) => {
-                        log::warn!("SAHYADRI: no proof entry for {block_hash}, cannot chain");
-                        return;
+                // Step 1: collect ALL parents (DAG, up to 10)
+                let all_parents: Vec<sahyadri_hashes::Hash> = headers_store
+                    .get_header(block_hash)
+                    .ok()
+                    .and_then(|h| h.parents_by_level.get(0).map(|s| s.to_vec()))
+                    .unwrap_or_default();
+
+                // Step 2: pick parent with MAX chain_depth (not first)
+                // In DAG, first() can pick a shallow sibling; max-depth keeps
+                // chain monotonic.
+                let (parent_hash, parent_depth, parent_commitment) = {
+                    let mut best: Option<(sahyadri_hashes::Hash, u32, [u8; 32])> = None;
+                    for ph in all_parents.iter() {
+                        if let Ok(Some(e)) = proof_roots_store.get(*ph) {
+                            let cand = (*ph, e.chain_depth, e.chain_commitment);
+                            match best {
+                                Some((_, d, _)) if d >= cand.1 => {}
+                                _ => best = Some(cand),
+                            }
+                        }
                     }
+                    match best {
+                        Some((ph, d, c)) => (Some(ph), d, c),
+                        None => (None, 0, [0u8; 32]),
+                    }
+                };
+
+                // Step 3: fetch this block's txs proof (only present for tx-blocks)
+                let txs_bytes_opt = match proof_roots_store.get(block_hash) {
+                    Ok(Some(entry)) if !entry.proof.is_empty() => Some(entry.proof.clone()),
+                    Ok(_) => None,
                     Err(e) => {
                         log::warn!("SAHYADRI: store read failed for {block_hash}: {e}");
                         return;
                     }
                 };
 
-                // Step 2: get parent hash from headers
-                let parent_hash = headers_store
-                    .get_header(block_hash)
-                    .ok()
-                    .and_then(|h| h.parents_by_level.get(0).and_then(|p| p.first().copied()));
-
-                // Step 3: fetch parent chain depth + commitment (if parent exists)
-                let (parent_depth, parent_commitment) = match parent_hash {
-                    Some(ph) => proof_roots_store
-                        .get(ph)
-                        .ok()
-                        .flatten()
-                        .map(|e| (e.chain_depth, e.chain_commitment))
-                        .unwrap_or((0, [0u8; 32])),
-                    None => (0, [0u8; 32]),
+                // Step 4 (NEW): pass-through chain link for empty blocks.
+                // Chain stays continuous so O(1) doesn't break on 0-attestation blocks.
+                // Pass-through entry has empty proof (tx-only semantic preserved),
+                // but continuous chain_commitment / chain_depth.
+                let txs_bytes = match txs_bytes_opt {
+                    Some(b) => b,
+                    None => {
+                        // Pass-through entry. If no parent proof yet (race with
+                        // parent's async write), seed at depth=1. Next block's
+                        // max-depth parent selection will pick up our entry and
+                        // continue from 2, 3, ...
+                        let new_commitment = crate::pipeline::virtual_processor::chain_proof::compute_pass_through_commitment(
+                            parent_commitment,
+                            &block_hash,
+                        );
+                        let new_depth = parent_depth + 1;
+                        let blue_score = headers_store
+                            .get_header(block_hash)
+                            .ok()
+                            .map(|h| h.blue_score)
+                            .unwrap_or(0);
+                        let entry = crate::model::stores::proof_roots::ProofRootEntry {
+                            proof: Vec::new(),
+                            blue_score,
+                            aggregated_count: 0,
+                            chain_commitment: new_commitment,
+                            chain_depth: new_depth,
+                            chain_proof: Vec::new(),
+                            nearest_checkpoint: None,
+                            proof_pending: false,
+                        };
+                        match proof_roots_store.insert_sync(block_hash, &entry) {
+                            Ok(_) => log::info!(
+                                "SAHYADRI: block {block_hash} chain link (empty tx) depth={new_depth}"
+                            ),
+                            Err(e) => log::warn!(
+                                "SAHYADRI: empty chain link insert failed for {block_hash}: {e}"
+                            ),
+                        }
+                        return;
+                    }
                 };
  
                 // Step 4: compute new chain commitment

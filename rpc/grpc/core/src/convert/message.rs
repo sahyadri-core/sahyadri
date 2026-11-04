@@ -295,7 +295,7 @@ from!(item: RpcResult<&sahyadri_rpc_core::SubmitTransactionReplacementResponse>,
     Self { transaction_id: item.transaction_id.to_string(), replaced_transaction: Some((&item.replaced_transaction).into()), error: None }
 });
 from!(item: &sahyadri_rpc_core::SubmitAccountTransactionRequest, protowire::SubmitAccountTransactionRequestMessage, {
-    Self { sender: item.sender.clone(), sender_pubkey: item.sender_pubkey.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
+    Self { payload_hex: item.payload_hex.clone() }
 });
 from!(item: &sahyadri_rpc_core::SubmitFlashTransactionRequest, protowire::SubmitFlashTransactionRequestMessage, {
     Self { flash_hex: item.flash_hex.clone() }
@@ -903,7 +903,7 @@ try_from!(item: &protowire::SubmitTransactionReplacementResponseMessage, RpcResu
 });
 
 try_from!(item: &protowire::SubmitAccountTransactionRequestMessage, sahyadri_rpc_core::SubmitAccountTransactionRequest, {
-    Self { sender: item.sender.clone(), sender_pubkey: item.sender_pubkey.clone(), receiver: item.receiver.clone(), amount: item.amount, nonce: item.nonce, signature: item.signature.clone() }
+    Self { payload_hex: item.payload_hex.clone() }
 });
 try_from!(item: &protowire::SubmitFlashTransactionRequestMessage, sahyadri_rpc_core::SubmitFlashTransactionRequest, {
     Self { flash_hex: item.flash_hex.clone() }

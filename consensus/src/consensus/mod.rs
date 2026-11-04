@@ -747,20 +747,21 @@ impl ConsensusApi for Consensus {
         aggregated_count: u32,
         proof_bytes: Vec<u8>,
     ) -> ConsensusResult<()> {
-        use sahyadri_plonky3::config::DilithiumStarkConfig;
-        use p3_uni_stark::Proof;
 
-        // 1. Deserialize
-        let _root: Proof<DilithiumStarkConfig> =
+        // 1. Deserialize BatchStarkProof (the actual inner proof type)
+        use p3_circuit_prover::BatchStarkProof;
+        use sahyadri_plonky3::aggregate::{verify_batch_stark_proof, RecursionConfig};
+
+        let proof: BatchStarkProof<RecursionConfig> =
             bincode::deserialize(&proof_bytes).map_err(|_| {
                 ConsensusError::General("block_root_proof: deserialize failed")
             })?;
 
-        // 2. Verify — note: verify_root_proof expects RecursionOutput, so we
-        //    need the full deserialization path. For MVP we trust the
-        //    serialized shape and store.
-        //    TODO: switch to RecursionOutput deserialize + verify_root_proof
-        //    once the exact type is exported.
+        // 2. Real cryptographic verification
+        verify_batch_stark_proof(&proof).map_err(|e| {
+            log::warn!("block_root_proof: verify failed for {block_hash}: {e:?}");
+            ConsensusError::General("block_root_proof: verify failed")
+        })?;
 
         // 3. Store
         let entry = crate::model::stores::proof_roots::ProofRootEntry {

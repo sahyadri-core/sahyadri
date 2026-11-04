@@ -5045,6 +5045,8 @@ dependencies = [
  "log",
  "num_cpus",
  "once_cell",
+ "p3-circuit-prover",
+ "p3-recursion",
  "p3-uni-stark",
  "parking_lot",
  "rand 0.8.5",

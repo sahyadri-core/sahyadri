@@ -33,6 +33,7 @@ pub mod prover;
 pub mod verifier;
 pub mod sahyadrix_pow;
 
+pub use aggregate::{verify_root_proof, verify_batch_stark_proof, aggregate_pair, aggregate_batch, RecursionConfig, AggregateError};
 pub use air::*;
 pub use batch::*;
 pub use config::*;

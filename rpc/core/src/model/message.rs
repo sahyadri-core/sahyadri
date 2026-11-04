@@ -3831,17 +3831,10 @@ impl Deserializer for UnsubscribeResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct SubmitAccountTransactionRequest {
-    /// The sender's address
-    pub sender: String,
-    pub sender_pubkey: String,
-    /// The receiver's address
-    pub receiver: String,
-    /// Amount in CSM (Sompi units)
-    pub amount: u64,
-    /// The nonce for this account
-    pub nonce: u64,
-    /// The signature of the transaction
-    pub signature: String,
+    /// Hex-encoded FLASH_V1 payload built by sahyadri-sdk buildFlashTransactionHex().
+    /// Format: hex(magic || version || pk_len || pubkey || rc_len || recipient ||
+    ///              amount || fee || expiry || salt || sig_len || signature)
+    pub payload_hex: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
@@ -3901,11 +3894,7 @@ impl Deserializer for SubmitFlashTransactionResponse {
 impl Serializer for SubmitAccountTransactionRequest {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u16, &1, writer)?; // Version 1
-        store!(String, &self.sender, writer)?;
-        store!(String, &self.receiver, writer)?;
-        store!(u64, &self.amount, writer)?;
-        store!(u64, &self.nonce, writer)?;
-        store!(String, &self.signature, writer)?;
+        store!(String, &self.payload_hex, writer)?;
         Ok(())
     }
 }
@@ -3913,13 +3902,8 @@ impl Serializer for SubmitAccountTransactionRequest {
 impl Deserializer for SubmitAccountTransactionRequest {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u16, reader)?;
-        let sender = load!(String, reader)?;
-        let sender_pubkey = load!(String, reader)?;
-        let receiver = load!(String, reader)?;
-        let amount = load!(u64, reader)?;
-        let nonce = load!(u64, reader)?;
-        let signature = load!(String, reader)?;
-        Ok(Self { sender, sender_pubkey, receiver, amount, nonce, signature })
+        let payload_hex = load!(String, reader)?;
+        Ok(Self { payload_hex })
     }
 }
 

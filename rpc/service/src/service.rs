@@ -371,40 +371,35 @@ impl RpcCoreService {
         &self,
         request: SubmitAccountTransactionRequest,
     ) -> RpcResult<SubmitAccountTransactionResponse> {
-        // 1. Parse addresses
-        let _sender_address = sahyadri_addresses::Address::try_from(request.sender.as_str())
-            .map_err(|_| RpcError::General("Invalid sender address".into()))?;
-        let receiver_address = sahyadri_addresses::Address::try_from(request.receiver.as_str())
-            .map_err(|_| RpcError::General("Invalid receiver address".into()))?;
+        // SDK already built the FLASH_V1 payload via
+        // buildFlashTransactionHex() (matches FlashTransaction::to_transaction).
+        // We just decode hex and embed it. No reconstruction.
+        if request.payload_hex.len() % 2 != 0 {
+            return Err(RpcError::General(
+                "payload_hex must have even length".into(),
+            ));
+        }
 
-        let receiver_spk = sahyadri_txscript::pay_to_address_script(&receiver_address);
+        let mut payload = vec![0u8; request.payload_hex.len() / 2];
+        hex_decode(request.payload_hex.as_bytes(), &mut payload)
+            .map_err(|_| RpcError::General("Invalid payload_hex".into()))?;
 
-        // 2. Sender's FULL pubkey (from request.sender_pubkey)
-        let mut sender_pubkey_bytes = vec![0u8; request.sender_pubkey.len() / 2];
-        hex_decode(request.sender_pubkey.as_bytes(), &mut sender_pubkey_bytes)
-            .map_err(|_| RpcError::General("Invalid sender pubkey hex".into()))?;
+        // Sanity check: FLASH_V1 magic prefix
+        if payload.len() < 8 || &payload[..8] != b"FLASH_V1" {
+            return Err(RpcError::General(
+                "payload missing FLASH_V1 magic prefix".into(),
+            ));
+        }
 
-        // 3. Signature
-        let mut sig_bytes = vec![0u8; request.signature.len() / 2];
-        hex_decode(request.signature.as_bytes(), &mut sig_bytes)
-            .map_err(|_| RpcError::General("Invalid signature hex".into()))?;
-
-        // 4. Build payload: FULL PUBKEY + NONCE + SIG (matches processor.rs)
-        let mut payload = sender_pubkey_bytes;
-        payload.extend_from_slice(&request.nonce.to_le_bytes());
-        payload.extend_from_slice(&sig_bytes);
-
-        // 5. Transaction
+        // Build transaction exactly as FlashTransaction::to_transaction does:
+        // empty inputs/outputs, native subnetwork, payload carries everything.
         let tx = sahyadri_consensus_core::tx::Transaction::new(
             0,
             vec![],
-            vec![sahyadri_consensus_core::tx::TransactionOutput::new(
-                request.amount,
-                receiver_spk,
-            )],
+            vec![],
             0,
-            sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([0; 20]),
-            1000,
+            sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([0u8; 20]),
+            0,
             payload,
         );
 

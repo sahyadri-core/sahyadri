@@ -10,6 +10,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+p3-circuit-prover = { path = "/home/surajdatir/plonky3-recursion-sahyadri/circuit-prover" }
+p3-recursion = { path = "/home/surajdatir/plonky3-recursion-sahyadri/recursion" }
 arc-swap.workspace = true
 async-channel.workspace = true
 bincode.workspace = true

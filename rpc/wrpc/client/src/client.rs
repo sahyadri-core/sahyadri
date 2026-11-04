@@ -8,7 +8,7 @@ use sahyadri_notify::{
     listener::ListenerLifespan,
     subscription::{MutationPolicies, RegistryChangedMutationPolicy, context::SubscriptionContext},
 };
-use sahyadri_rpc_core::{
+use sahyadri_rpc_core::{GetChainProofRequest, GetChainProofResponse, 
     api::ctl::RpcCtl,
     notify::collector::{RpcCoreCollector, RpcCoreConverter},
 };
@@ -811,5 +811,16 @@ impl RpcApi for SahyadriRpcClient {
     async fn stop_notify(&self, id: ListenerId, scope: Scope) -> RpcResult<()> {
         self.notifier().try_stop_notify(id, scope)?;
         Ok(())
+    }
+
+
+    async fn get_chain_proof_call(
+        &self,
+        _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>,
+        _request: GetChainProofRequest,
+    ) -> RpcResult<GetChainProofResponse> {
+        Err(sahyadri_rpc_core::RpcError::General(
+            "get_chain_proof not implemented in wrpc client (use gRPC client)".into(),
+        ))
     }
 }
