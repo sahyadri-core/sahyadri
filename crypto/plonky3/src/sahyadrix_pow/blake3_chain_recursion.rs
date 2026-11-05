@@ -133,7 +133,7 @@ pub fn prove_blake3_chain_recursive(
     })
 }
 
-/// Verify a Blake3 chain recursion proof (constant size, O(1) time).
+/// Verify a Blake3 chain recursion proof (O(1) verify time, size bounded).
 pub fn verify_blake3_chain_recursive(
     proof: &Blake3ChainRecursionProof,
 ) -> Result<(), AggregateError> {
