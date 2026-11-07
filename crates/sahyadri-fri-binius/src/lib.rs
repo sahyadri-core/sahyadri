@@ -31,6 +31,7 @@ pub mod error;
 pub mod fold_air;
 pub mod merkle_path_air;
 pub mod merkle_path_bus_air;
+pub mod merkle_path_bus_air_2f;
 pub mod grinding_air;
 pub mod fri_verifier_air;
 pub mod fri_verifier_air_v2;
