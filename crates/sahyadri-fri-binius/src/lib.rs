@@ -35,6 +35,7 @@ pub mod grinding_air;
 pub mod fri_verifier_air;
 pub mod fri_verifier_air_v2;
 pub mod poseidon2b_compression;
+pub mod poseidon2b_hasher;
 pub mod poseidon2b_mmcs;
 pub mod poseidon2b_mmcs_trait;
 pub mod serialize;
