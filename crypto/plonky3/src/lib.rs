@@ -23,6 +23,7 @@
 
 pub mod aggregate;
 pub mod aggregate_a2;
+pub mod hybrid_bridge;
 pub mod air;
 pub mod batch;
 pub mod config;
