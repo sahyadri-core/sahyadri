@@ -22,6 +22,7 @@
 //! Security: ~116 bits (FRI 50 queries + 16-bit PoW, BabyBear + Keccak)
 
 pub mod aggregate;
+pub mod aggregate_a2;
 pub mod air;
 pub mod batch;
 pub mod config;
@@ -34,6 +35,7 @@ pub mod verifier;
 pub mod sahyadrix_pow;
 
 pub use aggregate::{verify_root_proof, verify_batch_stark_proof, aggregate_pair, aggregate_batch, RecursionConfig, AggregateError};
+pub use aggregate_a2::{ChainProofBlobA2, SoundnessTier, aggregate_batch_a2};
 pub use air::*;
 pub use batch::*;
 pub use config::*;

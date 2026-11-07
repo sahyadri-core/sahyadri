@@ -170,3 +170,21 @@ mod tests {
         assert!(is_checkpoint(1000));
     }
 }
+
+// ── Phase 2b-1: Tier-aware chain proof wrapper ──────────────────
+//
+// Node can call this instead of `maybe_produce_chain_proof` to get
+// a `ChainProofBlobA2` (carries explicit SoundnessTier).
+// Current behavior: identical to Path B, tier = PathB.
+// Phase 2b-2: will add real A'2 tier.
+
+/// Compute chain commitment from a ChainProofBlobA2.
+pub fn compute_chain_commitment_a2(
+    this_proof_bytes: &[u8],
+    parent_chain_commitment: Option<[u8; 32]>,
+    parent_chain_depth: u32,
+) -> Result<([u8; 32], u32), ChainProofError> {
+    // Reuse the same commitment scheme as Path B.
+    // Future: A'2 may use different hash, but for compatibility we keep Sha256 chain.
+    compute_chain_commitment(this_proof_bytes, parent_chain_commitment, parent_chain_depth)
+}
