@@ -208,6 +208,18 @@ impl VirtualStateProcessor {
             .get(header.hash)
             .map_err(|_| AccountCommitmentComputeFailed)?;
 
+
+        // C-02.3 (SZR-2026-1108 §5.2): reject any block containing FLASH_V1
+        // payloads when the feature is disabled. Isolation checks are skipped
+        // for block validation, so this is the enforcement point.
+        if !self.enable_flash_tx {
+            for tx in txs_for_effects.iter() {
+                if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
+                    return Err(AccountCommitmentComputeFailed);
+                }
+            }
+        }
+
         let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
             &txs_for_effects,
             &self.coinbase_manager,
