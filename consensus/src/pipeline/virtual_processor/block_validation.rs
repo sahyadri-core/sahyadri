@@ -357,15 +357,24 @@ impl VirtualStateProcessor {
 
     fn validate_coinbase_transaction(
         &self,
-        _daa_score: u64,
-        _coinbase: &Transaction,
+        daa_score: u64,
+        coinbase: &Transaction,
         _sahyadri_consensus_data: &SahyadriConsensusData,
         _mergeset_rewards: &BlockHashMap<BlockRewardData>,
         _mergeset_non_daa: &BlockHashSet,
     ) -> BlockProcessResult<()> {
-        // SAHYADRI ACCOUNT MODEL BYPASS:
-        // We bypass the traditional REGISTRY_UNIT-based coinbase validation
-        // because rewards are handled directly as account balance updates.
+        // C-01.2 (SZR-2026-1108 §5.1): restore schedule validation.
+        // Previously this returned Ok(()) unconditionally, turning
+        // verify_block_state's coinbase check into a no-op and letting
+        // any miner self-declare an arbitrary subsidy.
+        let data = self
+            .coinbase_manager
+            .deserialize_coinbase_payload(&coinbase.payload)
+            .map_err(sahyadri_consensus_core::errors::block::RuleError::BadCoinbasePayload)?;
+        let expected = self.coinbase_manager.calc_block_subsidy(daa_score);
+        if data.subsidy != expected {
+            return Err(sahyadri_consensus_core::errors::block::RuleError::WrongSubsidy(expected, data.subsidy));
+        }
         Ok(())
     }
 
