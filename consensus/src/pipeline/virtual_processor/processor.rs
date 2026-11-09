@@ -930,8 +930,12 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                     if i == 0 {
                         if let Ok(coinbase_data) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
                             // 1. 
-                            let total_reward = coinbase_data.subsidy;
-
+                            let daa_for_subsidy = self.headers_store.get_daa_score(hash).unwrap_or(0);
+                            let total_reward = self.coinbase_manager.calc_block_subsidy(daa_for_subsidy);
+                            debug_assert_eq!(
+                                total_reward, coinbase_data.subsidy,
+                                "C-01: payload subsidy divergence — validator should have rejected"
+                            );
                             if total_reward > 0 {
                                 // 2.
                                 let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 20 };
