@@ -77,12 +77,15 @@ if [ "$INSECURE" = "1" ] || [ "$INSECURE" = "true" ]; then
     export SAHYADRI_SYNC_INSECURE=1
 fi
 
-# NOTE: --enable-flash-tx and --enable-unsynced-mining REMOVED pending
-# audit P1 (H-10, M-10). Flash and unsynced mining defaults (false) apply.
+# NOTE: --enable-unsynced-mining REMOVED pending audit P1 (M-10).
+# Flash (--enable-flash-tx) re-enabled: C-02.5 wires validate_flash_batch
+# into BOTH verify_block_state and commit_virtual_state, so committed
+# roots and live state stay in sync across all flash outcomes.
 
 exec "$NODE_BIN" \
   --appdir "$APPDIR" \
   "${SYNC_FLAGS[@]}" \
+  --enable-flash-tx \
   --nodnsseed \
   --disable-upnp \
   --rpclisten-borsh=127.0.0.1:27110 \

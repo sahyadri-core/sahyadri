@@ -844,11 +844,27 @@ impl VirtualStateProcessor {
 
                     let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
 
-                    let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
+                    let (raw_flash, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
                         &txs,
                         &self.coinbase_manager,
                         SAHYADRI_TREASURY_PUBKEY_HEX,
                     );
+                    // C-02.5 (SZR-2026-1108 §5.2): apply the SAME flash filter
+                    // that verify_block_state used, so the committed SMT root
+                    // matches the header commitment even when some flash txs
+                    // are rejected (expired / replayed / duplicate in batch).
+                    // On error (should be unreachable — verify would have
+                    // rejected the block already), log CRITICAL and fall back
+                    // to empty, matching the pre-C-02.5 live-store behavior.
+                    let flash_txs = self
+                        .validated_flash_for_block(&raw_flash, daa)
+                        .unwrap_or_else(|e| {
+                            log::error!(
+                                "C-02.5 CRITICAL: commit-path flash validation failed for {}: {:?} — empty set",
+                                hash, e
+                            );
+                            Vec::new()
+                        });
 
                     let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
                     let mut overlay = sahyadri_smt::OverlayStore::new(&db_base);

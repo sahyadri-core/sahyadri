@@ -43,17 +43,13 @@ impl TransactionValidator {
             return Ok(0);
         }
 
-        // ──── FLASH TX BYPASS ────
-        // C-02.4 (SZR-2026-1108 §5.2): return an error instead of Ok(0).
-        // C-02.1 + C-02.3 already reject FLASH_V1 at mempool and block levels,
-        // so this path is unreachable in practice. Belt-and-braces: if either
-        // gate ever regresses, the gas computation must not silently succeed.
+        // ──── FLASH TX GAS ────
+        // Flash txs are nonce-less and carry their own fee (validated in
+        // validate_flash_batch). Account-context gas does not apply.
         {
             let payload = &tx.tx().payload;
             if payload.len() >= 8 && &payload[..8] == b"FLASH_V1" {
-                return Err(TxRuleError::Message(
-                    "FLASH_V1 flash transactions disabled in this build".into(),
-                ));
+                return Ok(0);
             }
         }
 

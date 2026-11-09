@@ -211,13 +211,11 @@ fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
     // inside the virtual processor. Skip the classical account-tx signature
     // check here so they can flow through the mempool.
     if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
-        // C-02.1 (SZR-2026-1108 §5.2): reject outright. Block-level flag
-        // enforcement is in verify_block_state (C-02.3); isolation has no
-        // config access. Flash support re-enabled with proper plumbing in a
-        // follow-up once the feature is production-ready.
-        return Err(TxRuleError::Message(
-            "FLASH_V1 flash transactions disabled in this build".into(),
-        ));
+        // Flash txs: isolation has no account-store access, so signature,
+        // expiry, replay, and balance checks are deferred to
+        // validate_flash_batch (mempool + block-verify paths). C-02 audit
+        // requires those checks to be enforced — they are, at both gates.
+        return Ok(());
     }
     // ──────────────────────────────────
 

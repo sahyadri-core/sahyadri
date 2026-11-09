@@ -20,6 +20,7 @@ NODE_BIN=~/sahyadri-final/sahyadri/target/release/sahyadrid
 $NODE_BIN \
   --appdir "$HOME/.sahyadri" \
   --archival \
+  --enable-flash-tx \
   --nodnsseed \
   --disable-upnp \
   

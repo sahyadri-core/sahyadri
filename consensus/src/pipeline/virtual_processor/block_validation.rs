@@ -209,22 +209,17 @@ impl VirtualStateProcessor {
             .map_err(|_| AccountCommitmentComputeFailed)?;
 
 
-        // C-02.3 (SZR-2026-1108 §5.2): reject any block containing FLASH_V1
-        // payloads when the feature is disabled. Isolation checks are skipped
-        // for block validation, so this is the enforcement point.
-        if !self.enable_flash_tx {
-            for tx in txs_for_effects.iter() {
-                if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
-                    return Err(AccountCommitmentComputeFailed);
-                }
-            }
-        }
-
-        let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
+        // C-02.3 (SZR-2026-1108 §5.2): extract raw effects, then filter
+        // flash txs through validate_flash_batch. The FILTERED set is what
+        // feeds compute_block_account_changes — otherwise rejected flash
+        // would still land in the committed root, causing root/live-state
+        // divergence when commit applies only the valid subset.
+        let (raw_flash, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
             &txs_for_effects,
             &self.coinbase_manager,
             super::processor::SAHYADRI_TREASURY_PUBKEY_HEX,
         );
+        let flash_txs = self.validated_flash_for_block(&raw_flash, header.daa_score)?;
 
         let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
         let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
@@ -388,6 +383,38 @@ impl VirtualStateProcessor {
             return Err(sahyadri_consensus_core::errors::block::RuleError::WrongSubsidy(expected, data.subsidy));
         }
         Ok(())
+    }
+
+    /// C-02.5 (SZR-2026-1108 §5.2): filter flash txs to the eligible set
+    /// using `validate_flash_batch`. This is the single source of truth —
+    /// verify_block_state and commit_virtual_state MUST both call it so that
+    /// the header account commitment and the applied state agree.
+    ///
+    /// - flag off + no flash in block  → Ok(empty)
+    /// - flag off + flash in block     → reject (account-commitment error)
+    /// - flag on, batch validates       → Ok(filtered)
+    /// - flag on, batch fails           → reject (account-commitment error)
+    pub(super) fn validated_flash_for_block(
+        &self,
+        raw_flash: &[sahyadri_consensus_core::tx::FlashTransaction],
+        daa_score: u64,
+    ) -> BlockProcessResult<Vec<sahyadri_consensus_core::tx::FlashTransaction>> {
+        if raw_flash.is_empty() {
+            return Ok(Vec::new());
+        }
+        if !self.enable_flash_tx {
+            log::warn!(
+                "C-02.5: block contains {} flash txs but enable_flash_tx=false",
+                raw_flash.len()
+            );
+            return Err(AccountCommitmentComputeFailed);
+        }
+        self.transaction_validator
+            .validate_flash_batch(raw_flash, daa_score)
+            .map_err(|e| {
+                log::warn!("C-02.5: flash batch rejected: {:?}", e);
+                AccountCommitmentComputeFailed
+            })
     }
 
     pub(crate) fn validate_transactions_in_parallel<'a>(
