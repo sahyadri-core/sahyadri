@@ -67,11 +67,11 @@ impl BlockBodyProcessor {
                     return Err(RuleError::BadCoinbasePayloadBlueScore(data.blue_score, block.header.blue_score));
                 }
 
-                let _expected_subsidy = self.coinbase_manager.calc_block_subsidy(block.header.daa_score);
+                let expected_subsidy = self.coinbase_manager.calc_block_subsidy(block.header.daa_score);
 
-                //   if data.subsidy != expected_subsidy {
-                //       return Err(RuleError::WrongSubsidy(expected_subsidy, data.subsidy));
-                //    }
+                   if data.subsidy != expected_subsidy {
+                       return Err(RuleError::WrongSubsidy(expected_subsidy, data.subsidy));
+                    }
 
                 Ok(())
             }
