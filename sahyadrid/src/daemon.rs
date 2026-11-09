@@ -745,10 +745,38 @@ Do you confirm? (y/n)";
 
         let session = consensus_manager.consensus().unguarded_session_blocking();
 
+        // C-03.2: trusted account root for the checkpoint (optional).
+        let checkpoint_root = match std::env::var("SAHYADRI_CHECKPOINT_ROOT").ok() {
+            Some(h) if !h.is_empty() => match h.parse::<Hash>() {
+                Ok(h) => Some(h),
+                Err(e) => panic!(
+                    "SyncWave: invalid SAHYADRI_CHECKPOINT_ROOT '{}': {}",
+                    h, e
+                ),
+            },
+            _ => None,
+        };
+
+        // C-03.2: explicit insecure opt-in for local testing.
+        let insecure = matches!(
+            std::env::var("SAHYADRI_SYNC_INSECURE").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE") | Ok("yes")
+        );
+
+        if !insecure && checkpoint.is_none() {
+            panic!(
+                "SyncWave: --sync-wave-checkpoint (or SAHYADRI_CHECKPOINT_HASH) is required. \n\
+                 Get the hash from the archival node's log line \"checkpoint block=<hash> height=<n>\".\n\
+                 For local testing only, set SAHYADRI_SYNC_INSECURE=1 to bypass."
+            );
+        }
+
         let config = crate::sync_wave_bootstrap::SyncWaveBootstrapConfig {
             peer_url,
             checkpoint_hash: checkpoint,
+            checkpoint_root,
             timeout_secs: 120,
+            insecure,
         };
 
         // GrpcClient relies on tokio's reactor; futures::executor::block_on
