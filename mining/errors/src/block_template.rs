@@ -10,6 +10,10 @@ pub enum BuilderError {
     /// A coinbase error
     #[error(transparent)]
     CoinbaseError(#[from] CoinbaseError),
+
+    /// H-12 (SZR-2026-1108 §6): feature disabled pending proper fix.
+    #[error("block template feature disabled: {0}")]
+    NotSupported(String),
 }
 
 pub type BuilderResult<T> = std::result::Result<T, BuilderError>;
