@@ -111,6 +111,7 @@ impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCac
         difficulty_sample_rate: u64,
         past_median_time_window_size: usize,
         past_median_time_sample_rate: u64,
+        network_type: sahyadri_consensus_core::network::NetworkType,
     ) -> Self {
         let difficulty_manager = SampledDifficultyManager::new(
             headers_store.clone(),
@@ -122,6 +123,7 @@ impl<T: SahyadriConsensusStoreReader, U: BlockWindowCacheReader + BlockWindowCac
             min_difficulty_window_size,
             difficulty_sample_rate,
             target_time_per_block,
+            network_type,
         );
         let past_median_time_manager = SampledPastMedianTimeManager::new(headers_store.clone(), genesis.timestamp);
         Self {
