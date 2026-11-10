@@ -4,7 +4,8 @@
 
 use crate::imports::*;
 use sahyadri_consensus_core::network::NetworkType;
-use sha2::{Digest, Sha256};
+use sha2::{Digest as _, Sha256};
+use sha3::Sha3_256;
 
 /// Data structure that envelopes a Dilithium PublicKey (1952 bytes).
 /// @category Wallet SDK
@@ -46,7 +47,13 @@ impl PublicKey {
 impl PublicKey {
     #[inline]
     pub fn to_address(&self, network_type: NetworkType) -> Result<Address> {
-        let payload = &Sha256::digest(&self.bytes)[..20];
+        // H-04 (SZR-2026-1108 §6): unify with consensus account-key derivation.
+        // Consensus (tx_validation_in_account_context.rs) computes the spending
+        // account as Sha3_256(pubkey)[..20]. The wallet previously used Sha256,
+        // producing a different address — funds sent to wallet-generated
+        // addresses were credited to a SHA3-derived account the user could not
+        // spend. Both crates now use SHA3-256 for payment addresses.
+        let payload = &Sha3_256::digest(&self.bytes)[..20];
         let address = Address::new(network_type.into(), AddressVersion::PubKeyDilithium, payload);
         Ok(address)
     }

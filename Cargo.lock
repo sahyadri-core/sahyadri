@@ -6219,6 +6219,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "sha2",
+ "sha3",
  "thiserror 1.0.64",
  "tokio",
  "wasm-bindgen",
