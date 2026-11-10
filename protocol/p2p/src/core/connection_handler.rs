@@ -42,7 +42,7 @@ pub enum ConnectionError {
 }
 
 /// Maximum P2P decoded gRPC message size to send and receive
-const P2P_MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 1024; // 1GB
+const P2P_MAX_MESSAGE_SIZE: usize = 32 * 1024 * 1024; // 32MB (H-08)
 
 /// Handles Router creation for both server and client-side new connections
 #[derive(Clone)]
