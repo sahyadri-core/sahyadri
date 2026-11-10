@@ -186,6 +186,69 @@ impl TransactionValidator {
         Ok(())
     }
     
+    /// C-02.6 (SZR-2026-1108 §5.2): deterministic flash filter for
+    /// verify_block_state and commit_virtual_state. Identical inputs (block
+    /// header + parent root) MUST produce identical outputs across nodes —
+    /// no reads from node-local live account_store.
+    ///
+    /// Skip (do not reject):
+    /// - within-batch duplicate flash_id
+    /// - expired (block_daa_score > expiry)
+    ///
+    /// Reject (whole batch fails):
+    /// - fee below FLASH_MIN_FEE_KANA
+    /// - invalid ML-DSA-65 signature
+    ///
+    /// Replay (flash_id already in parent chain state) and per-sender
+    /// balance are handled by compute_block_account_changes against
+    /// parent_root — deterministic, header-anchored.
+    pub fn filter_flash_deterministic(
+        &self,
+        txs: &[sahyadri_consensus_core::tx::FlashTransaction],
+        block_daa_score: u64,
+    ) -> TxResult<Vec<sahyadri_consensus_core::tx::FlashTransaction>> {
+        use std::collections::HashSet;
+
+        if txs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        const FLASH_MIN_FEE_KANA: u64 = 1000;
+
+        let mut seen: HashSet<sahyadri_hashes::Hash> = HashSet::new();
+        let mut eligible: Vec<sahyadri_consensus_core::tx::FlashTransaction> =
+            Vec::with_capacity(txs.len());
+
+        for tx in txs {
+            let id = tx.flash_id();
+
+            if !seen.insert(id) {
+                log::warn!("C-02.6: duplicate flash_id in batch, skipping: {:?}", id);
+                continue;
+            }
+            if block_daa_score > tx.expiry_daa_score {
+                log::warn!("C-02.6: flash tx expired, skipping: {:?}", id);
+                continue;
+            }
+            if tx.fee < FLASH_MIN_FEE_KANA {
+                return Err(TxRuleError::ZeroFee);
+            }
+
+            let sig = DilithiumSignature::from_slice(&tx.signature);
+            let sighash = tx.sighash();
+            let is_valid = DilithiumKeyPair::verify(&tx.pubkey, &sig, &sighash, b"", SAHYADRI_MODE);
+            if !is_valid {
+                return Err(TxRuleError::Message(
+                    "C-02.6: FlashTx ML-DSA-65 signature verification FAILED".into(),
+                ));
+            }
+
+            eligible.push(tx.clone());
+        }
+
+        Ok(eligible)
+    }
+
     /// Validate a batch of flash transactions for a block.
     ///
     /// Returns the list of unique, valid flash txs that should be applied.

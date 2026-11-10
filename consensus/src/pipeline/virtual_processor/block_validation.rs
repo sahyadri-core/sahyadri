@@ -409,10 +409,13 @@ impl VirtualStateProcessor {
             );
             return Err(AccountCommitmentComputeFailed);
         }
+        // C-02.6: deterministic filter — no live-store reads. Balance and
+        // replay are validated inside compute_block_account_changes against
+        // parent_root, so verify and commit always agree.
         self.transaction_validator
-            .validate_flash_batch(raw_flash, daa_score)
+            .filter_flash_deterministic(raw_flash, daa_score)
             .map_err(|e| {
-                log::warn!("C-02.5: flash batch rejected: {:?}", e);
+                log::warn!("C-02.6: flash batch rejected: {:?}", e);
                 AccountCommitmentComputeFailed
             })
     }
