@@ -22,6 +22,7 @@ use std::{
 
 use super::sahyadri_consensus::ordering::SortableBlock;
 use itertools::Itertools;
+use sahyadri_consensus_core::network::NetworkType;
 
 trait DifficultyManagerExtension {
     fn headers_store(&self) -> &dyn HeaderStoreReader;
@@ -139,6 +140,11 @@ pub struct SampledDifficultyManager<T: HeaderStoreReader, U: SahyadriConsensusSt
     min_difficulty_window_size: usize,
     difficulty_sample_rate: u64,
     target_time_per_block: u64,
+    // H-01 (SZR-2026-1108 §6): network type used to gate the genesis-difficulty
+    // cap. Applied only on Testnet to protect single-miner testnets from DAA
+    // overshoot; on Mainnet the true difficulty adjustment is honored so BPS
+    // converges to the configured target and the 4-year halving schedule holds.
+    network_type: NetworkType,
 }
 
 impl<T: HeaderStoreReader, U: SahyadriConsensusStoreReader> SampledDifficultyManager<T, U> {
@@ -152,6 +158,7 @@ impl<T: HeaderStoreReader, U: SahyadriConsensusStoreReader> SampledDifficultyMan
         min_difficulty_window_size: usize,
         difficulty_sample_rate: u64,
         target_time_per_block: u64,
+        network_type: NetworkType,
     ) -> Self {
         Self::check_min_difficulty_window_size(difficulty_window_size, min_difficulty_window_size);
         Self {
@@ -164,6 +171,7 @@ impl<T: HeaderStoreReader, U: SahyadriConsensusStoreReader> SampledDifficultyMan
             min_difficulty_window_size,
             difficulty_sample_rate,
             target_time_per_block,
+            network_type,
         }
     }
 
@@ -231,10 +239,22 @@ impl<T: HeaderStoreReader, U: SahyadriConsensusStoreReader> SampledDifficultyMan
         let expected_duration = self.target_time_per_block * self.difficulty_sample_rate * difficulty_blocks_len; // This does differ from FullDifficultyManager version
         let new_target = average_target * measured_duration / expected_duration;
 
-        // SAHYADRI TESTNET CAP: never harder than genesis.
-        // Prevents DAA overshoot on single-miner testnets.
+        // H-01 (SZR-2026-1108 §6): the genesis-cap was applied on every network,
+        // including Mainnet — difficulty could never rise above launch value.
+        // Result: as hashrate grew, blocks arrived proportionally faster, the
+        // 21M CSM supply cap was reached in ~3 years instead of the audited
+        // 28, and cheap block-storm DoS became viable.
+        //
+        // Fix: cap only on Testnet (single-miner testnets need DAA-overshoot
+        // protection). Mainnet enforces true difficulty adjustment via
+        // max_difficulty_target, so BPS converges to target_time_per_block
+        // and the 4-year halving schedule is honored.
         let genesis_target = Uint320::from(Uint256::from_compact_target_bits(self.genesis_bits));
-        let capped_target = new_target.max(genesis_target);
+        let capped_target = if self.network_type == NetworkType::Testnet {
+            new_target.max(genesis_target)
+        } else {
+            new_target
+        };
         Uint256::try_from(capped_target.min(self.max_difficulty_target)).expect("max target < Uint256::MAX").compact_target_bits()
     }
 

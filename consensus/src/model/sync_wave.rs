@@ -198,13 +198,18 @@ impl SyncWaveExporter {
             });
         }
 
-        let computed = root;
-        if computed != hash_to_h256(snapshot.metadata.account_root) {
-            return Err(SyncWaveError::RootMismatch {
-                expected: snapshot.metadata.account_root,
-                computed: h256_to_hash(computed),
-            });
-        }
+        // NOTE (C-03, SZR-2026-1108 §5.3): the previous version compared
+        // `computed = root` against `metadata.account_root` — comparing the
+        // same value to itself, an unreachable branch. Removed.
+        //
+        // `walk_and_check` above validates internal consistency: every node
+        // hash matches its content, the tree is reachable from `metadata.account_root`,
+        // and node counts agree. That's the maximum this function can prove —
+        // it has no access to any PoW-verified header.
+        //
+        // External anchoring (snapshot.metadata.block_hash == locally-trusted
+        // checkpoint, and account_root == trusted root) MUST be enforced by the
+        // caller: see `sync_wave_bootstrap::bootstrap_from_peer`.
 
         // Account states
         for (state_hash, state) in &snapshot.account_states {

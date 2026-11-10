@@ -738,64 +738,59 @@ impl VirtualStateProcessor {
                     }
                     // ─────────────────────────
 
-                    // Reverse the outputs (Deduct what was wrongly added)
-                    for output in tx.outputs.iter() {
-                        let amount = -(output.value as i64); // Negative to deduct
-                        {
-                            if let Err(e) = self.account_store.update_balance_batch(&mut batch, &output.script_public_key, amount) {
-                                log::error!("SAHYADRI: CRITICAL — failed to reverse balance during reorg: {:?}", e);
-                                continue;
+                    // C-05 (SZR-2026-1108 §5.5): reverse coinbase subsidy.
+                    // The apply path (processor.rs, C-01.3) credits the miner
+                    // and treasury via `calc_block_subsidy`, NOT via tx.outputs.
+                    // Without this reversal, orphaned-block rewards accumulate
+                    // across reorgs — money duplication independent of the
+                    // sign-flip vector below.
+                    if i == 0 {
+                        if let Ok(cb) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
+                            let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
+                            let total = self.coinbase_manager.calc_block_subsidy(daa);
+                            let dev = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total / 20 };
+                            let miner_amt = total.saturating_sub(dev);
+                            // i64::try_from guard — subsidy bounded by MAX_KANA
+                            // (~2.1e15), cannot fail in practice; defense in depth.
+                            if let Ok(amt) = i64::try_from(miner_amt) {
+                                if let Err(e) = self.account_store.update_balance_batch(
+                                    &mut batch, &cb.miner_data.script_public_key, -amt,
+                                ) {
+                                    log::error!("C-05: failed to reverse miner reward: {:?}", e);
+                                }
+                            }
+                            if dev > 0 {
+                                let mut tbytes = vec![0u8; PUBKEY_SIZE];
+                                if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut tbytes).is_ok() {
+                                    let tspk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, tbytes);
+                                    if let Ok(amt) = i64::try_from(dev) {
+                                        if let Err(e) = self.account_store.update_balance_batch(
+                                            &mut batch, &tspk, -amt,
+                                        ) {
+                                            log::error!("C-05: failed to reverse treasury fee: {:?}", e);
+                                        }
+                                    }
+                                }
                             }
                         }
+                        continue;  // coinbase has empty outputs — no other work
                     }
 
-                    if i > 0 {
-                        // Refund the sender and roll back their nonce, mirroring the apply path.
-                        // BUT: only refund if the tx was actually applied in the first place.
-                        // We detect this by checking the current nonce — if it's 0, no tx was
-                        // ever applied from this account, so this is a skipped tx (nonce mismatch,
-                        // insufficient balance, etc.) and must NOT be refunded.
-                        let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
-                        if tx.payload.len() >= min_payload {
-                            let sig_start = tx.payload.len() - SIG_SIZE;
-                            let sender_pubkey = &tx.payload[..sig_start - 8];
-                            let sender_spk = pubkey_to_p2pkh_spk(sender_pubkey);
-
-                            // Only refund if this exact tx was the LAST APPLIED on this account
-                            let last_applied = self.account_store.get_last_tx_id(&sender_spk).unwrap_or([0u8; 32]);
-                            if last_applied != tx.id().as_bytes() {
-                                log::warn!(
-                                    "SAHYADRI: reorg — skipping refund: tx id mismatch (last_applied {:02x?}, this tx {:02x?})",
-                                    &last_applied[..4],
-                                    &tx.id().as_bytes()[..4]
-                                );
-                                continue;
-                            }
-
-                            let mut total_spent: u64 = tx.gas;
-                            for output in tx.outputs.iter() {
-                                total_spent += output.value;
-                            }
-
-                            if let Err(e) = self.account_store.update_balance_batch(&mut batch, &sender_spk, total_spent as i64) {
-                                log::error!("SAHYADRI: CRITICAL — failed to refund sender during reorg: {:?}", e);
-                                continue;
-                            }
-                            // Clear last_tx_id so this tx can't be refunded twice
-                            if let Err(e) = self.account_store.set_last_tx_id_batch(
-                                &mut batch,
-                                &sender_spk,
-                                [0u8; 32],
-                            ) {
-                                log::error!("SAHYADRI: CRITICAL — failed to clear last_tx_id during reorg: {:?}", e);
-                            }
-                        } else {
-                            log::error!(
-                                "SAHYADRI: reorg refund skipped — undersized payload ({} bytes) for tx in removed block",
-                                tx.payload.len()
-                            );
-                        }
-                    }
+                    // C-05 (SZR-2026-1108 §5.5): output-reversal and sender-refund
+                    // REMOVED. The account model applies transactions via balance
+                    // arithmetic (coinbase via subsidy, reversed above; flash via
+                    // apply_flash_tx; DID via state update), never via
+                    // Transaction.outputs. The removed loop cast output.value as
+                    // i64 and negated it — sign-flipping for values >= 2^63
+                    // (i64::MIN wrap), the audit's money-minting vector.
+                    //
+                    // The removed refund block was gated on get_last_tx_id, which
+                    // is a permanent stub (always zero) — so refunds never executed
+                    // and senders' funds were destroyed on every reorg anyway.
+                    //
+                    // Neither path is reachable in production: account-tx is
+                    // disabled by C-04; DID ops touch DID state (unwound
+                    // separately); flash is handled by reorg_flash_block below.
                 }
 
                 // ──── FLASH TX REORG HOOK ────
@@ -844,11 +839,27 @@ impl VirtualStateProcessor {
 
                     let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
 
-                    let (flash_txs, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
+                    let (raw_flash, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
                         &txs,
                         &self.coinbase_manager,
                         SAHYADRI_TREASURY_PUBKEY_HEX,
                     );
+                    // C-02.5 (SZR-2026-1108 §5.2): apply the SAME flash filter
+                    // that verify_block_state used, so the committed SMT root
+                    // matches the header commitment even when some flash txs
+                    // are rejected (expired / replayed / duplicate in batch).
+                    // On error (should be unreachable — verify would have
+                    // rejected the block already), log CRITICAL and fall back
+                    // to empty, matching the pre-C-02.5 live-store behavior.
+                    let flash_txs = self
+                        .validated_flash_for_block(&raw_flash, daa)
+                        .unwrap_or_else(|e| {
+                            log::error!(
+                                "C-02.5 CRITICAL: commit-path flash validation failed for {}: {:?} — empty set",
+                                hash, e
+                            );
+                            Vec::new()
+                        });
 
                     let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
                     let mut overlay = sahyadri_smt::OverlayStore::new(&db_base);
@@ -930,8 +941,12 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                     if i == 0 {
                         if let Ok(coinbase_data) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
                             // 1. 
-                            let total_reward = coinbase_data.subsidy;
-
+                            let daa_for_subsidy = self.headers_store.get_daa_score(hash).unwrap_or(0);
+                            let total_reward = self.coinbase_manager.calc_block_subsidy(daa_for_subsidy);
+                            debug_assert_eq!(
+                                total_reward, coinbase_data.subsidy,
+                                "C-01: payload subsidy divergence — validator should have rejected"
+                            );
                             if total_reward > 0 {
                                 // 2.
                                 let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 20 };

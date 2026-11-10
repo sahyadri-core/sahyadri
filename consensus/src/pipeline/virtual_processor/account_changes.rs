@@ -34,6 +34,10 @@ use sahyadri_consensus_core::model::proof::{
 pub enum AccountError {
     Smt(sahyadri_smt::SmtError),
     Store(StoreError),
+    /// C-02.2 (SZR-2026-1108 §5.2): sender cannot cover amount + fee.
+    InsufficientFunds,
+    /// C-02.2 (SZR-2026-1108 §5.2): arithmetic overflow in balance math.
+    ArithmeticOverflow,
 }
 
 impl From<sahyadri_smt::SmtError> for AccountError {
@@ -122,10 +126,37 @@ pub fn compute_block_account_changes(
             touched.insert(recipient_spk.clone(), s);
         }
 
-        let total_debit = tx.amount.saturating_add(tx.fee);
+        // C-02.6: deterministic replay check against parent_root-derived state.
+        // If flash_id was already applied in an ancestor block, skip here.
+        // This runs identically during verify and commit (same parent_root),
+        // so both produce the same filtered set and the same SMT root.
+        let flash_id = tx.flash_id();
+        if touched
+            .get(&sender_spk)
+            .unwrap()
+            .recent_flashes
+            .iter()
+            .any(|f| f.flash_id == flash_id)
+        {
+            log::warn!(
+                "C-02.6: flash_id already in parent chain state, skipping: {:?}",
+                flash_id
+            );
+            continue;
+        }
+
+        // C-02.2: checked arithmetic. Previously saturating_* silently clamped
+        // overflow and underflow, letting u64::MAX amounts mint out of thin air.
+        let total_debit = tx
+            .amount
+            .checked_add(tx.fee)
+            .ok_or(AccountError::ArithmeticOverflow)?;
         {
             let sender = touched.get_mut(&sender_spk).unwrap();
-            sender.balance = sender.balance.saturating_sub(total_debit);
+            sender.balance = sender
+                .balance
+                .checked_sub(total_debit)
+                .ok_or(AccountError::InsufficientFunds)?;
             sender.recent_flashes.push(FlashEntry {
                 flash_id: tx.flash_id(),
                 expiry_daa_score: tx.expiry_daa_score,
@@ -134,7 +165,10 @@ pub fn compute_block_account_changes(
         }
         {
             let recipient = touched.get_mut(&recipient_spk).unwrap();
-            recipient.balance = recipient.balance.saturating_add(tx.amount);
+            recipient.balance = recipient
+                .balance
+                .checked_add(tx.amount)
+                .ok_or(AccountError::ArithmeticOverflow)?;
         }
     }
 

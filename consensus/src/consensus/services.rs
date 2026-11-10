@@ -107,6 +107,7 @@ impl ConsensusServices {
             params.difficulty_sample_rate,
             params.past_median_time_window_size,
             params.past_median_time_sample_rate,
+            params.net.network_type(),  // H-01: gated on Testnet only
         );
         let depth_manager = BlockDepthManager::new(
             params.merge_depth(),

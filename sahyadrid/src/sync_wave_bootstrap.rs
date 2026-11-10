@@ -25,10 +25,20 @@ use sahyadri_rpc_core::api::rpc::RpcApi;
 pub struct SyncWaveBootstrapConfig {
     /// Peer gRPC URL, e.g. `grpc://127.0.0.1:16110`.
     pub peer_url: String,
-    /// Checkpoint block hash. `None` → use the peer's current tip.
+    /// Trusted checkpoint block hash. Required unless `insecure = true`.
+    /// Verified against `metadata.block_hash` before any state is loaded.
     pub checkpoint_hash: Option<Hash>,
+    /// Optional trusted account root for the checkpoint block. When set,
+    /// `metadata.account_root` is verified to match before any state is loaded.
+    /// Get it from the archival node's log line at checkpoint height, or from
+    /// the checkpoint header returned by a trusted `get_block` RPC.
+    pub checkpoint_root: Option<Hash>,
     /// Hard timeout for the entire bootstrap.
     pub timeout_secs: u64,
+    /// C-03.2 (SZR-2026-1108 §5.3): bypass all checkpoint anchoring. A
+    /// malicious seed in this mode controls the entire loaded ledger.
+    /// Allowed only for local development / integration tests.
+    pub insecure: bool,
 }
 
 impl Default for SyncWaveBootstrapConfig {
@@ -36,7 +46,9 @@ impl Default for SyncWaveBootstrapConfig {
         Self {
             peer_url: String::new(),
             checkpoint_hash: None,
+            checkpoint_root: None,
             timeout_secs: 60,
+            insecure: false,
         }
     }
 }
@@ -48,6 +60,12 @@ pub enum SyncWaveBootstrapError {
     Timeout,
     Verify(String),
     Load(String),
+    /// C-03.2: bootstrap attempted without a trusted checkpoint and without
+    /// explicitly opting into insecure mode.
+    CheckpointRequired,
+    /// C-03.2: peer-supplied checkpoint metadata did not match the trusted
+    /// checkpoint hash or trusted account root.
+    CheckpointMismatch { expected: Hash, got: Hash },
 }
 
 impl std::fmt::Display for SyncWaveBootstrapError {
@@ -58,6 +76,15 @@ impl std::fmt::Display for SyncWaveBootstrapError {
             Self::Timeout => write!(f, "timeout"),
             Self::Verify(s) => write!(f, "verify: {s}"),
             Self::Load(s) => write!(f, "load: {s}"),
+            Self::CheckpointRequired => write!(
+                f,
+                "checkpoint required: pass --sync-wave-checkpoint or set \
+                 SAHYADRI_CHECKPOINT_HASH (use SAHYADRI_SYNC_INSECURE=1 only for local testing)"
+            ),
+            Self::CheckpointMismatch { expected, got } => write!(
+                f,
+                "checkpoint mismatch: expected {expected}, peer sent {got}"
+            ),
         }
     }
 }
@@ -98,6 +125,36 @@ pub async fn bootstrap_from_peer(
         metadata.total_accounts,
         metadata.total_chunks
     );
+
+    // ─── 2b. Enforce checkpoint anchoring (C-03.2, SZR-2026-1108 §5.3) ───
+    if config.insecure {
+        log::warn!(
+            "SyncWave: INSECURE mode active — checkpoint hash NOT verified. \
+             A malicious seed can inject arbitrary state. Use only for local testing."
+        );
+    } else {
+        let expected_hash = config
+            .checkpoint_hash
+            .ok_or(SyncWaveBootstrapError::CheckpointRequired)?;
+        if metadata.block_hash != expected_hash {
+            return Err(SyncWaveBootstrapError::CheckpointMismatch {
+                expected: expected_hash,
+                got: metadata.block_hash,
+            });
+        }
+        if let Some(expected_root) = config.checkpoint_root {
+            if metadata.account_root != expected_root {
+                return Err(SyncWaveBootstrapError::CheckpointMismatch {
+                    expected: expected_root,
+                    got: metadata.account_root,
+                });
+            }
+        }
+        log::info!("SyncWave: checkpoint hash verified ✓ (block={})", expected_hash);
+        if config.checkpoint_root.is_some() {
+            log::info!("SyncWave: account root verified ✓");
+        }
+    }
 
     // ─── 3. Download chunks ───
     info!("SyncWave: downloading {} chunks", metadata.total_chunks);

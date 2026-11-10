@@ -691,6 +691,11 @@ impl FlashTransaction {
         let rc_len = u32::from_le_bytes(p[off..off + 4].try_into().ok()?) as usize;
         off += 4;
         if off + rc_len > p.len() { return None; }
+        // H-02 (SZR-2026-1108 §6): recipient MUST be exactly 20 bytes.
+        // Without this, a flash tx with a shorter recipient passed parse and
+        // hit an `assert!` in `hash20_to_p2pkh_spk` — release-build assert →
+        // every verifying node panicked simultaneously. Reject at parse time.
+        if rc_len != 20 { return None; }
         let recipient = p[off..off + rc_len].to_vec();
         off += rc_len;
 

@@ -1,3 +1,4 @@
+#![allow(unused_imports)]  // H-12: COINBASE_TRANSACTION_INDEX, unix_now unused while stub active
 use super::errors::BuilderResult;
 use sahyadri_consensus_core::{
     api::ConsensusApi,
@@ -90,29 +91,29 @@ impl BlockTemplateBuilder {
 
     /// modify_block_template clones an existing block template, modifies it to the requested coinbase data and updates the timestamp
     pub(crate) fn modify_block_template(
-        consensus: &dyn ConsensusApi,
-        new_miner_data: &MinerData,
-        block_template_to_modify: &BlockTemplate,
+        _consensus: &dyn ConsensusApi,
+        _new_miner_data: &MinerData,
+        _block_template_to_modify: &BlockTemplate,
     ) -> BuilderResult<BlockTemplate> {
-        let mut block_template = block_template_to_modify.clone();
-
-        // The first transaction is always the coinbase transaction
-        let coinbase_tx = &mut block_template.block.transactions[COINBASE_TRANSACTION_INDEX];
-        let new_payload = consensus.modify_coinbase_payload(coinbase_tx.payload.clone(), new_miner_data)?;
-        coinbase_tx.payload = new_payload;
-
-        // SURGERY: Red reward REGISTRY_UNIT output modification removed for Account Model.
-        // We no longer rely on REGISTRY_UNIT outputs for rewards.
-
-        block_template.block.header.timestamp = u64::max(block_template.block.header.timestamp, unix_now());
-        let new_timestamp = unix_now();
-        if new_timestamp > block_template.block.header.timestamp {
-            // Only if new time stamp is later than current, update the header. Otherwise,
-            // we keep the previous time as built by internal consensus median time logic
-            block_template.block.header.timestamp = new_timestamp;
-        }
-        block_template.block.header.finalize();
-        block_template.miner_data = new_miner_data.clone();
-        Ok(block_template)
+        // H-12 (SZR-2026-1108 §6): previously swapped the coinbase payload but
+        // only called `header.finalize()` — the header's account_commitment
+        // field, which is part of the hash preimage and depends on coinbase
+        // contents, was left stale. Every block mined on such a template was
+        // rejected by verify_block_state with BadAccountCommitment, blocking
+        // external miners (pools, ASICs) from producing valid blocks entirely.
+        //
+        // The proper fix requires a new ConsensusApi::recompute_account_commitment
+        // method (deferred to a follow-up commit) that recomputes the commitment
+        // from the modified coinbase using parent_root + DAA + subsidy schedule.
+        //
+        // Until then: fail-closed. External miners MUST call build_block_template
+        // with their own MinerData — that path produces a fully-consistent
+        // template including the correct account_commitment.
+        Err(super::errors::BuilderError::NotSupported(
+            "modify_block_template temporarily disabled (audit H-12). \
+             External miners: call build_block_template with your own MinerData \
+             instead — it produces a fully-consistent template with the correct \
+             account_commitment.".into(),
+        ))
     }
 }
