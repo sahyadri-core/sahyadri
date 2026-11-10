@@ -49,6 +49,36 @@ impl TransactionValidator {
         // SAHYADRI ACCOUNT MODEL: Verify signature for account transactions
         // Payload: [sender_pubkey:PUBKEY_SIZE][nonce:8][signature:SIG_SIZE]
         if tx.inputs.is_empty() && !tx.payload.is_empty() && !tx.is_coinbase() {
+            // C-04 (SZR-2026-1108 §5.4): account-tx path disabled.
+            //
+            // The legacy upstream account-tx path parsed a signed nonce but
+            // never compared it against stored per-account state
+            // (AccountState has no sequence counter; get_last_tx_id is a
+            // permanent stub). Any confirmed payment could be re-included
+            // in a later parallel block until the sender's balance drained
+            // — consensus double-spend.
+            //
+            // Fix chosen: reject, do not re-implement. Ethereum-style
+            // monotonic nonces force serial sequencing and would break
+            // parallel flash UX. Sahyadri's replay protection is nonce-less:
+            //   FLASH_V1  → flash_id = sha3(domain||pubkey||recipient
+            //               ||amount||fee||expiry||salt); 16-byte random
+            //               salt + expiry window + recent_flashes ring.
+            //   DCRT/DUPD/DDEC → crest model; DID state root in header
+            //               commitment, per-op signature, monotonic version.
+            // Account-tx had neither and cannot be repaired without
+            // reintroducing sequencing.
+            //
+            // FLASH_V1 continues through verify_account_tx_signature (which
+            // bypasses it). DID ops are already handled above this block.
+            if !(tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1") {
+                return Err(TxRuleError::Message(
+                    "Account transactions disabled: use FLASH_V1 (flash tx) or \
+                     DCRT/DUPD/DDEC (DID ops). The legacy nonce-based \
+                     account-tx path is not accepted — see SZR-2026-1108 §5.4."
+                        .into(),
+                ));
+            }
             check_transaction_output_value_ranges(tx)?;
             verify_account_tx_signature(tx)?;
             return Ok(());
