@@ -75,45 +75,55 @@ impl Mempool {
         // Check double spends and try to remove them if the RBF policy requires it
         let removed_transaction = self.execute_replace_by_fee(&transaction, rbf_policy)?;
 
-        // =====================================================================
-        // SAHYADRI 100% ANTI-SPAM SHIELD: ZERO-PENDING VIP RULE
-        // =====================================================================
+        // M-01 fix (SZR-2026-1108 §7.1): flash txs bypass the UTXO-based anti-spam
+        // because (a) they have no UTXO entries so sender_address is always empty —
+        // all flash txs from ALL users would share one global 50-cap bucket, and
+        // (b) they are economically protected: MIN_FLASH_FEE=1000 kana + ML-DSA-65
+        // signature per tx. 10K flash txs cost >=10M kana = 0.1 CSM in fees,
+        // self-limiting for spam. Chain-level protection remains: template
+        // builder filters flash txs exceeding cumulative balance, block verify
+        // rejects if unchanged.
+        let is_flash_tx = transaction.tx.payload.len() >= 8
+            && &transaction.tx.payload[..8] == b"FLASH_V1";
 
-        // 1. Calculate Mempool Fullness (Emergency Mode Trigger)
-        let max_tx_count = self.config.maximum_transaction_count as f64;
-        let current_tx_count = self.transaction_pool.len() as f64;
-        let mempool_fullness = current_tx_count / max_tx_count;
-        let is_emergency_mode = mempool_fullness > 0.80; // 80% Full
+        if !is_flash_tx {
+            // =====================================================================
+            // SAHYADRI 100% ANTI-SPAM SHIELD: ZERO-PENDING VIP RULE (non-flash only)
+            // =====================================================================
 
-        // 2. Extract Sender's Wallet Address (From the first input's REGISTRY_UNIT entry)
-        let mut sender_address = String::new();
-        if let Some(Some(entry)) = transaction.entries.first() {
-            let script = entry.script_public_key.script();
-            let version = entry.script_public_key.version();
-            let mut full_script = Vec::new();
-            full_script.extend_from_slice(&version.to_le_bytes());
-            full_script.push(script.len() as u8);
-            full_script.extend_from_slice(script);
-            sender_address = faster_hex::hex_string(&full_script);
+            // 1. Calculate Mempool Fullness (Emergency Mode Trigger)
+            let max_tx_count = self.config.maximum_transaction_count as f64;
+            let current_tx_count = self.transaction_pool.len() as f64;
+            let mempool_fullness = current_tx_count / max_tx_count;
+            let is_emergency_mode = mempool_fullness > 0.80; // 80% Full
+
+            // 2. Extract Sender's Wallet Address (From the first input's REGISTRY_UNIT entry)
+            let mut sender_address = String::new();
+            if let Some(Some(entry)) = transaction.entries.first() {
+                let script = entry.script_public_key.script();
+                let version = entry.script_public_key.version();
+                let mut full_script = Vec::new();
+                full_script.extend_from_slice(&version.to_le_bytes());
+                full_script.push(script.len() as u8);
+                full_script.extend_from_slice(script);
+                sender_address = faster_hex::hex_string(&full_script);
+            }
+
+            // 3. Count Pending Transactions for this Sender
+            let pending_count = self.transaction_pool.count_txs_by_sender(&sender_address);
+
+            // RULE A: Absolute Max 50 pending per account (Hacker Blocked)
+            if pending_count >= 50 {
+                debug!("Sahyadri Anti-Spam: Sender {} reached max 50 pending txs. Dropping.", sender_address);
+                return Err(RuleError::RejectInvalid(transaction_id));
+            }
+
+            // RULE B: Emergency Mode VIP Entry
+            if is_emergency_mode && pending_count > 0 {
+                debug!("Sahyadri Emergency Mode: Dropping tx from {} to save space for Normal Users.", sender_address);
+                return Err(RuleError::RejectInvalid(transaction_id));
+            }
         }
-
-        // 3. Count Pending Transactions for this Sender
-        // Note: You will need a helper in your pool to count this. Assuming `count_txs_by_sender` exists.
-        let pending_count = self.transaction_pool.count_txs_by_sender(&sender_address);
-
-        // RULE A: Absolute Max 50 pending per account (Hacker Blocked)
-        if pending_count >= 50 {
-            debug!("Sahyadri Anti-Spam: Sender {} reached max 50 pending txs. Dropping.", sender_address);
-            return Err(RuleError::RejectInvalid(transaction_id));
-        }
-
-        // RULE B: Emergency Mode VIP Entry
-        // If mempool is > 80% full, ONLY allow users with 0 pending transactions!
-        if is_emergency_mode && pending_count > 0 {
-            debug!("Sahyadri Emergency Mode: Dropping tx from {} to save space for Normal Users.", sender_address);
-            return Err(RuleError::RejectInvalid(transaction_id));
-        }
-        // =====================================================================
 
         //
         // Note: there exists a case below where `limit_transaction_count` returns an error signaling that

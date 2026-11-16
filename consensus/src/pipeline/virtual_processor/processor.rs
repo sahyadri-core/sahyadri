@@ -1700,6 +1700,9 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         // rewards are bounded u64). This lets the chain progress with empty
         // blocks instead of halting on a bad flash tx in mempool.
         let mut actual_flash_txs = template_flash_txs.clone();
+        // M-01: deterministic order so build and verify paths converge on the
+        // same surviving subset after incremental drops
+        actual_flash_txs.sort_by_key(|tx| tx.flash_id());
         let accounts_root_h256 = loop {
             match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
                 parent_root,
@@ -1712,12 +1715,17 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                 Ok((root, _changes)) => break root,
                 Err(e) => {
                     if !actual_flash_txs.is_empty() {
+                        let prev_len = actual_flash_txs.len();
+                        let new_len = prev_len * 3 / 4;
+                        if new_len == 0 {
+                            actual_flash_txs.clear();
+                        } else {
+                            actual_flash_txs.truncate(new_len);
+                        }
                         log::warn!(
-                            "M-01 build: dropping all {} flash txs after failure ({:?}); retrying with coinbase-only template",
-                            actual_flash_txs.len(), e
+                            "M-01 build: {}→{} flash txs after {:?}",
+                            prev_len, actual_flash_txs.len(), e
                         );
-                        actual_flash_txs.clear();
-                        // Reset overlay (was partially applied)
                         smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
                         continue;
                     }
