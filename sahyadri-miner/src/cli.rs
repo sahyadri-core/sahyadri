@@ -41,6 +41,11 @@ pub struct Opt {
     #[clap(long = "throttle", display_order = 9)]
     /// Throttle (milliseconds) between each pow hash generation (used for development testing)
     pub throttle: Option<u64>,
+    #[clap(long = "block-delay-ms", default_value = "0", display_order = 11)]
+    /// Delay (milliseconds) after each block submission. Prevents parallel
+    /// mergesets in testnet testing that can trigger M-01 conflicts (parallel
+    /// flash txs from same sender). 0 = no delay (default, production).
+    pub block_delay_ms: u64,
     #[clap(long, display_order = 10)]
     /// Output logs in alternative format (same as sahyadrid)
     pub altlogs: bool,

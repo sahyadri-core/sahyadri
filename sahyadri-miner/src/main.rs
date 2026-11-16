@@ -93,7 +93,7 @@ async fn main() -> Result<(), Error> {
         client.client_get_block_template().await?;
 
         let mut miner_manager =
-            MinerManager::new(client.send_channel.clone(), opt.num_threads, throttle, shutdown.clone());
+            MinerManager::new(client.send_channel.clone(), opt.num_threads, throttle, shutdown.clone(), opt.block_delay_ms);
         client.listen(&mut miner_manager, shutdown.clone()).await?;
         warn!("Disconnected from sahyadrid, retrying");
     }

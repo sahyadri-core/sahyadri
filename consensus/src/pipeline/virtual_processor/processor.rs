@@ -1692,18 +1692,38 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
         let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
         // First compute accounts root
-        let accounts_root_h256 = match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
-            parent_root,
-            &mut smt_overlay,
-            &*self.account_states_store,
-            &template_flash_txs,
-            &template_rewards,
-            virtual_state.daa_score,
-        ) {
-            Ok((root, _changes)) => root,
-            Err(e) => {
-                log::error!("SAHYADRI: account commitment compute failed in build: {:?}", e);
-                sahyadri_smt::EMPTY
+        // M-01 defensive fix (SZR-2026-1108 §7.1): previously fell back to
+        // EMPTY on compute failure, which produced a header with an EMPTY
+        // account_commitment — always rejected at verify — triggering cascade
+        // disqualification of descendants. Now: drop ALL flash txs from the
+        // template on failure (coinbase-only template is always valid since
+        // rewards are bounded u64). This lets the chain progress with empty
+        // blocks instead of halting on a bad flash tx in mempool.
+        let mut actual_flash_txs = template_flash_txs.clone();
+        let accounts_root_h256 = loop {
+            match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
+                parent_root,
+                &mut smt_overlay,
+                &*self.account_states_store,
+                &actual_flash_txs,
+                &template_rewards,
+                virtual_state.daa_score,
+            ) {
+                Ok((root, _changes)) => break root,
+                Err(e) => {
+                    if !actual_flash_txs.is_empty() {
+                        log::warn!(
+                            "M-01 build: dropping all {} flash txs after failure ({:?}); retrying with coinbase-only template",
+                            actual_flash_txs.len(), e
+                        );
+                        actual_flash_txs.clear();
+                        // Reset overlay (was partially applied)
+                        smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
+                        continue;
+                    }
+                    log::error!("M-01 CRITICAL: coinbase-only template still fails: {:?}", e);
+                    break sahyadri_smt::EMPTY;
+                }
             }
         };
 

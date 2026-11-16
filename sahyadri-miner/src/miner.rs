@@ -52,6 +52,7 @@ impl MinerManager {
         n_cpus: Option<u16>,
         throttle: Option<Duration>,
         shutdown: ShutdownHandler,
+        block_delay_ms: u64,
     ) -> Self {
         let hashes_tried = Arc::new(AtomicU64::new(0));
         let watch = WatchSwap::empty();
@@ -62,6 +63,7 @@ impl MinerManager {
             shutdown,
             n_cpus,
             throttle,
+            block_delay_ms,
         )
         .collect();
 
@@ -82,6 +84,7 @@ impl MinerManager {
         shutdown: ShutdownHandler,
         n_cpus: Option<u16>,
         throttle: Option<Duration>,
+        block_delay_ms: u64,
     ) -> impl Iterator<Item = MinerHandler> {
         let n_cpus = get_num_cpus(n_cpus);
         info!("Launching: {} cpu miners", n_cpus);
@@ -92,6 +95,7 @@ impl MinerManager {
                 hashes_tried.clone(),
                 throttle,
                 shutdown.clone(),
+                block_delay_ms,
             )
         })
     }
@@ -119,13 +123,19 @@ impl MinerManager {
         hashes_tried: Arc<AtomicU64>,
         throttle: Option<Duration>,
         shutdown: ShutdownHandler,
+        block_delay_ms: u64,
     ) -> MinerHandler {
         // We mark it cold as the function is not called often, and it's not in the hot path
         #[cold]
-        fn found_block(send_channel: &Sender<SahyadridRequest>, block: RpcBlock) -> Result<(), Error> {
+        fn found_block(send_channel: &Sender<SahyadridRequest>, block: RpcBlock, block_delay_ms: u64) -> Result<(), Error> {
             let block_hash = block.block_hash().expect("We just got it from the state, we should be able to hash it");
             send_channel.blocking_send(SahyadridRequest::submit_block(0, block))?;
             info!("Found a block: {:x}", block_hash);
+            // M-01 mitigation: sleep after block submission so DAG doesn't produce
+            // parallel mergesets that can trigger cumulative flash balance conflicts
+            if block_delay_ms > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(block_delay_ms));
+            }
             Ok(())
         }
 
@@ -142,7 +152,7 @@ impl MinerManager {
                 state_ref.nonce = nonce.0;
 
                 if let Some(block) = state_ref.generate_block_if_pow() {
-                    found_block(&send_channel, block)?;
+                    found_block(&send_channel, block, block_delay_ms)?;
                 }
                 nonce += Wrapping(1);
 
