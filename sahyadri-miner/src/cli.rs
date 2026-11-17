@@ -36,14 +36,14 @@ pub struct Opt {
     /// Amount of miner threads to launch [default: number of logical cpus]
     pub num_threads: Option<u16>,
     #[clap(long = "mine-when-not-synced", display_order = 8)]
-    /// Mine even when sahyadrid says it is not synced, only useful when passing `--allow-submit-block-when-not-synced` to sahyadrid  [default: false]
+    /// Mine even when sahyadrid says it is not synced, only useful when passing `--allow-submit-block-when-not-synced` to sahyadrid [default: false]
     pub mine_when_not_synced: bool,
     #[clap(long = "throttle", display_order = 9)]
     /// Throttle (milliseconds) between each pow hash generation (used for development testing)
     pub throttle: Option<u64>,
     #[clap(long = "block-delay-ms", default_value = "0", display_order = 11)]
     /// Delay (milliseconds) after each block submission. Prevents parallel
-    /// mergesets in testnet testing that can trigger M-01 conflicts (parallel
+    /// mergesets in testnet testing that can trigger conflicts (parallel
     /// flash txs from same sender). 0 = no delay (default, production).
     pub block_delay_ms: u64,
     #[clap(long, display_order = 10)]

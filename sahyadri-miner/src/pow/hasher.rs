@@ -3,7 +3,7 @@ use crate::Hash;
 use sha3::{Sha3_256, Digest};
 use std::cell::RefCell;
 
-// Audit H-03 (SZR-2026-1108 §6): Poseidon2 finalization stage, ported
+// Poseidon2 finalization stage, ported
 // byte-for-byte from crypto/hashes/src/pow_hashers.rs. Kept as duplicate
 // rather than a dependency because sahyadri-hashes transitively pulls in
 // Plonky3 crates that conflict with sahyadri-miner's standalone workspace

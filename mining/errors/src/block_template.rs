@@ -11,7 +11,7 @@ pub enum BuilderError {
     #[error(transparent)]
     CoinbaseError(#[from] CoinbaseError),
 
-    /// H-12 (SZR-2026-1108 §6): feature disabled pending proper fix.
+    /// Feature disabled pending a proper fix.
     #[error("block template feature disabled: {0}")]
     NotSupported(String),
 }

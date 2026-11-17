@@ -691,7 +691,7 @@ impl FlashTransaction {
         let rc_len = u32::from_le_bytes(p[off..off + 4].try_into().ok()?) as usize;
         off += 4;
         if off + rc_len > p.len() { return None; }
-        // H-02 (SZR-2026-1108 §6): recipient MUST be exactly 20 bytes.
+        // recipient MUST be exactly 20 bytes.
         // Without this, a flash tx with a shorter recipient passed parse and
         // hit an `assert!` in `hash20_to_p2pkh_spk` — release-build assert →
         // every verifying node panicked simultaneously. Reject at parse time.
@@ -908,45 +908,45 @@ mod tests {
     // use wasm_bindgen_test::wasm_bindgen_test;
     // #[wasm_bindgen_test]
     // pub fn test_wasm_serde_spk_constructor() {
-    //     let str = "sahyadri:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j";
-    //     let a = Address::constructor(str);
-    //     let value = to_value(&a).unwrap();
+    // let str = "sahyadri:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j";
+    // let a = Address::constructor(str);
+    // let value = to_value(&a).unwrap();
     //
-    //     assert_eq!(JsValue::from_str("string"), value.js_typeof());
-    //     assert_eq!(value, JsValue::from_str(str));
-    //     assert_eq!(a, from_value(value).unwrap());
+    // assert_eq!(JsValue::from_str("string"), value.js_typeof());
+    // assert_eq!(value, JsValue::from_str(str));
+    // assert_eq!(a, from_value(value).unwrap());
     // }
     //
     // #[wasm_bindgen_test]
     // pub fn test_wasm_js_serde_spk_object() {
-    //     let expected = Address::constructor("sahyadri:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j");
+    // let expected = Address::constructor("sahyadri:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j");
     //
-    //     use web_sys::console;
-    //     console::log_4(&"address: ".into(), &expected.version().into(), &expected.prefix().into(), &expected.payload().into());
+    // use web_sys::console;
+    // console::log_4(&"address: ".into(), &expected.version().into(), &expected.prefix().into(), &expected.payload().into());
     //
-    //     let obj = Object::new();
-    //     obj.set("version", &JsValue::from_str("PubKey")).unwrap();
-    //     obj.set("prefix", &JsValue::from_str("csm")).unwrap();
-    //     obj.set("payload", &JsValue::from_str("qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j")).unwrap();
+    // let obj = Object::new();
+    // obj.set("version", &JsValue::from_str("PubKey")).unwrap();
+    // obj.set("prefix", &JsValue::from_str("csm")).unwrap();
+    // obj.set("payload", &JsValue::from_str("qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j")).unwrap();
     //
-    //     assert_eq!(JsValue::from_str("object"), obj.js_typeof());
+    // assert_eq!(JsValue::from_str("object"), obj.js_typeof());
     //
-    //     let obj_js = obj.into_js_result().unwrap();
-    //     let actual = from_value(obj_js).unwrap();
-    //     assert_eq!(expected, actual);
+    // let obj_js = obj.into_js_result().unwrap();
+    // let actual = from_value(obj_js).unwrap();
+    // assert_eq!(expected, actual);
     // }
     //
     // #[wasm_bindgen_test]
     // pub fn test_wasm_serde_spk_object() {
-    //     use wasm_bindgen::convert::IntoWasmAbi;
+    // use wasm_bindgen::convert::IntoWasmAbi;
     //
-    //     let expected = Address::constructor("sahyadri:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j");
-    //     let wasm_js_value: JsValue = expected.clone().into_abi().into();
+    // let expected = Address::constructor("sahyadri:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j");
+    // let wasm_js_value: JsValue = expected.clone().into_abi().into();
     //
-    //     // use web_sys::console;
-    //     // console::log_4(&"address: ".into(), &expected.version().into(), &expected.prefix().into(), &expected.payload().into());
+    // // use web_sys::console;
+    // // console::log_4(&"address: ".into(), &expected.version().into(), &expected.prefix().into(), &expected.payload().into());
     //
-    //     let actual = from_value(wasm_js_value).unwrap();
-    //     assert_eq!(expected, actual);
+    // let actual = from_value(wasm_js_value).unwrap();
+    // assert_eq!(expected, actual);
     // }
 }

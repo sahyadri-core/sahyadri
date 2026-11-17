@@ -131,7 +131,7 @@ impl MinerManager {
             let block_hash = block.block_hash().expect("We just got it from the state, we should be able to hash it");
             send_channel.blocking_send(SahyadridRequest::submit_block(0, block))?;
             info!("Found a block: {:x}", block_hash);
-            // M-01 mitigation: sleep after block submission so DAG doesn't produce
+            // mitigation: sleep after block submission so DAG doesn't produce
             // parallel mergesets that can trigger cumulative flash balance conflicts
             if block_delay_ms > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(block_delay_ms));
