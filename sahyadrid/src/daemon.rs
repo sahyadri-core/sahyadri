@@ -8,7 +8,7 @@ use sahyadri_consensus_core::{
     mining_rules::MiningRules,
 };
 use sahyadri_consensus_notify::{root::ConsensusNotificationRoot, service::NotifyService};
-use sahyadri_core::{core::Core, debug, info};
+use sahyadri_core::{core::Core, debug, info, warn};
 use sahyadri_core::{sahyadrid_env::version, task::tick::TickService};
 use sahyadri_database::{
     prelude::{CachePolicy, DbWriter, DirectDbWriter, RocksDbPreset},
@@ -552,6 +552,40 @@ Do you confirm? (y/n)";
 
     let grpc_server_addr = args.rpclisten.unwrap_or(ContextualNetAddress::loopback()).normalize(config.default_rpc_port());
 
+    // Load TLS certificate and key if both paths are provided.
+    let rpc_tls_config: Option<tonic::transport::ServerTlsConfig> = match (&args.rpc_cert, &args.rpc_key) {
+        (Some(cert_path), Some(key_path)) => {
+            let cert = std::fs::read(cert_path)
+                .unwrap_or_else(|e| panic!("RPC cert not readable at {}: {}", cert_path, e));
+            let key = std::fs::read(key_path)
+                .unwrap_or_else(|e| panic!("RPC key not readable at {}: {}", key_path, e));
+            let identity = tonic::transport::Identity::from_pem(cert, key);
+            Some(tonic::transport::ServerTlsConfig::new().identity(identity))
+        }
+        (Some(_), None) | (None, Some(_)) => {
+            panic!("--rpccert and --rpckey must be provided together");
+        }
+        _ => None,
+    };
+
+    // Parse Basic-Auth credentials if provided.
+    let rpc_auth_credentials: Option<(String, String)> = args.rpc_auth.as_ref().map(|s| {
+        let mut parts = s.splitn(2, ':');
+        (parts.next().unwrap_or("").to_string(), parts.next().unwrap_or("").to_string())
+    });
+
+    // Warn on non-loopback without TLS or auth (does not refuse — ease of use).
+    {
+        let addr_str = grpc_server_addr.to_string();
+        let is_loopback = addr_str.starts_with("127.") || addr_str.contains("::1") || addr_str.contains("localhost");
+        if !is_loopback && rpc_tls_config.is_none() && !args.unsafe_rpc {
+            warn!("gRPC on non-loopback {} without TLS — traffic is plaintext. Use --rpccert/--rpckey or --unsaferpc.", grpc_server_addr);
+        }
+        if !is_loopback && rpc_auth_credentials.is_none() && !args.unsafe_rpc {
+            warn!("gRPC on non-loopback {} without auth — anyone can submit blocks. Use --rpcauth=user:pass.", grpc_server_addr);
+        }
+    }
+
     let core = Arc::new(Core::new());
 
     // ---
@@ -676,6 +710,8 @@ Do you confirm? (y/n)";
     let grpc_service = if !args.disable_grpc {
         Some(Arc::new(GrpcService::new(
             grpc_server_addr,
+            rpc_tls_config,
+            rpc_auth_credentials,
             config,
             rpc_core_service.clone(),
             args.rpc_max_clients,

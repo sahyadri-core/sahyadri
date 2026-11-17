@@ -69,8 +69,28 @@ impl Debug for ServerContext {
 }
 
 /// A protowire gRPC connections handler.
+/// Enforces Basic-Auth on every gRPC request when configured.
+#[derive(Clone)]
+struct AuthInterceptor {
+    expected: Option<String>,
+}
+
+impl tonic::service::Interceptor for AuthInterceptor {
+    fn call(&mut self, req: tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> {
+        if let Some(e) = &self.expected {
+            let a = req.metadata().get("authorization").and_then(|v| v.to_str().ok()).unwrap_or("");
+            if a != *e {
+                return Err(tonic::Status::unauthenticated("missing or invalid Authorization header"));
+            }
+        }
+        Ok(req)
+    }
+}
+
 #[derive(Clone)]
 pub struct ConnectionHandler {
+    tls_config: Option<tonic::transport::ServerTlsConfig>,
+    auth_credentials: Option<(String, String)>,
     manager_sender: MpscSender<ManagerEvent>,
     server_context: ServerContext,
     interface: Arc<Interface>,
@@ -89,6 +109,8 @@ impl ConnectionHandler {
         subscription_context: SubscriptionContext,
         broadcasters: usize,
         counters: Arc<TowerConnectionCounters>,
+        tls_config: Option<tonic::transport::ServerTlsConfig>,
+        auth_credentials: Option<(String, String)>,
     ) -> Self {
         // This notifier REGISTRY_UNITs subscription granularity to rpc-core notifier
         let policies = MutationPolicies::new(RegistryChangedMutationPolicy::AddressSet);
@@ -118,7 +140,7 @@ impl ConnectionHandler {
         let interface = Arc::new(Factory::new_interface(server_context.clone(), network_bps));
         let running = Default::default();
 
-        Self { manager_sender, server_context, interface, running, counters }
+        Self { manager_sender, server_context, interface, running, counters, tls_config, auth_credentials }
     }
 
     /// Launches a gRPC server listener loop
@@ -130,6 +152,8 @@ impl ConnectionHandler {
 
         let bytes_tx = self.counters.bytes_tx.clone();
         let bytes_rx = self.counters.bytes_rx.clone();
+        let tls_config = self.tls_config.clone();
+        let auth_credentials = self.auth_credentials.clone();
 
         // Spawn server task
         let server_handle = tokio::spawn(async move {
@@ -141,11 +165,27 @@ impl ConnectionHandler {
             // TODO: check whether we should set tcp_keepalive
             // const GRPC_KEEP_ALIVE_PING_INTERVAL: Duration = Duration::from_secs(5);
             // const GRPC_KEEP_ALIVE_PING_TIMEOUT: Duration = Duration::from_secs(120);
-            let serve_result = TonicServer::builder()
-                // .http2_keepalive_interval(Some(GRPC_KEEP_ALIVE_PING_INTERVAL))
-                // .http2_keepalive_timeout(Some(GRPC_KEEP_ALIVE_PING_TIMEOUT))
+            // Basic-Auth: build expected header from configured credentials.
+            let auth_expected = auth_credentials.map(|(user, pass)| {
+                use base64::Engine;
+                format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(format!("{user}:{pass}")))
+            });
+            let protowire_server = tonic::service::interceptor::InterceptedService::new(
+                protowire_server,
+                AuthInterceptor { expected: auth_expected },
+            );
+
+            let mut builder = TonicServer::builder()
                 .layer(MapRequestBodyLayer::new(move |body| CountBytesBody::new(body, bytes_rx.clone()).boxed_unsync()))
-                .layer(MapResponseBodyLayer::new(move |body| CountBytesBody::new(body, bytes_tx.clone())))
+                .layer(MapResponseBodyLayer::new(move |body| CountBytesBody::new(body, bytes_tx.clone())));
+
+            // TLS termination. When configured, the listener performs the TLS
+            // handshake before any RPC bytes are read.
+            if let Some(tls) = tls_config {
+                builder = builder.tls_config(tls).expect("invalid TLS configuration");
+            }
+
+            let serve_result = builder
                 .add_service(protowire_server)
                 .serve_with_shutdown(
                     serve_address.into(),

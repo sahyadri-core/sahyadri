@@ -13,6 +13,8 @@ use triggered::Listener;
 
 pub struct GrpcService {
     net_address: NetAddress,
+    tls_config: Option<tonic::transport::ServerTlsConfig>,
+    auth_credentials: Option<(String, String)>,
     config: Arc<Config>,
     core_service: Arc<RpcCoreService>,
     rpc_max_clients: usize,
@@ -27,6 +29,8 @@ impl GrpcService {
 
     pub fn new(
         address: NetAddress,
+        tls_config: Option<tonic::transport::ServerTlsConfig>,
+        auth_credentials: Option<(String, String)>,
         config: Arc<Config>,
         core_service: Arc<RpcCoreService>,
         rpc_max_clients: usize,
@@ -35,6 +39,8 @@ impl GrpcService {
     ) -> Self {
         Self {
             net_address: address,
+            tls_config,
+            auth_credentials,
             config,
             core_service,
             rpc_max_clients,
@@ -71,6 +77,8 @@ impl AsyncService for GrpcService {
             self.core_service.subscription_context(),
             self.broadcasters,
             self.counters.clone(),
+            self.tls_config.clone(),
+            self.auth_credentials.clone(),
         );
 
         // Signal the server was started

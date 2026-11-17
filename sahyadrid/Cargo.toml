@@ -15,6 +15,7 @@ name = "sahyadrid_lib"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+tonic = { workspace = true, features = ["tls"] }
 futures.workspace = true
 sahyadri-grpc-client.workspace = true
 bincode.workspace = true

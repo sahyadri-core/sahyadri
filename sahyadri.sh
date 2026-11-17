@@ -47,14 +47,14 @@ if [ -n "$SEED" ] && [ ! -d "$APPDIR/sahyadri-mainnet/datadir" ]; then
  fi
  elif [ "$INSECURE" = "1" ] || [ "$INSECURE" = "true" ]; then
  echo ""
- echo " ⚠️ WARNING: SAHYADRI_SYNC_INSECURE=1"
- echo " ⚠️ Checkpoint anchoring DISABLED — malicious seed can inject state."
- echo " ⚠️ Use only for local testing."
+ echo " WARNING: SAHYADRI_SYNC_INSECURE=1"
+ echo " Checkpoint anchoring DISABLED — malicious seed can inject state."
+ echo " Use only for local testing."
  echo ""
  SYNC_FLAGS+=(--sync-wave "$SEED")
  else
  echo ""
- echo " ❌ ERROR: SAHYADRI_SEED is set but SAHYADRI_CHECKPOINT_HASH is missing."
+ echo " ERROR: SAHYADRI_SEED is set but SAHYADRI_CHECKPOINT_HASH is missing."
  echo ""
  echo " Get the checkpoint hash from your archival node:"
  echo " sahyadri-cli get_block_hash \$(sahyadri-cli get_block_count)"
@@ -82,9 +82,18 @@ fi
 # into BOTH verify_block_state and commit_virtual_state, so committed
 # roots and live state stay in sync across all flash outcomes.
 
+RPC_FLAGS=()
+if [ -n "${SAHYADRI_RPC_CERT:-}" ] && [ -n "${SAHYADRI_RPC_KEY:-}" ]; then
+  RPC_FLAGS+=(--rpccert="$SAHYADRI_RPC_CERT" --rpckey="$SAHYADRI_RPC_KEY")
+fi
+if [ -n "${SAHYADRI_RPC_AUTH:-}" ]; then
+  RPC_FLAGS+=(--rpcauth="$SAHYADRI_RPC_AUTH")
+fi
+
 exec "$NODE_BIN" \
  --appdir "$APPDIR" \
  "${SYNC_FLAGS[@]}" \
+ "${RPC_FLAGS[@]}" \
  --enable-flash-tx \
  --nodnsseed \
  --disable-upnp \

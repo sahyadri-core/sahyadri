@@ -15,9 +15,18 @@ echo "---------------------------------------------------"
 APPDIR="${SAHYADRI_APPDIR:-$HOME/.sahyadri}"
 NODE_BIN=~/sahyadri-final/sahyadri/target/release/sahyadrid
 
+RPC_FLAGS=()
+if [ -n "${SAHYADRI_RPC_CERT:-}" ] && [ -n "${SAHYADRI_RPC_KEY:-}" ]; then
+  RPC_FLAGS+=(--rpccert="$SAHYADRI_RPC_CERT" --rpckey="$SAHYADRI_RPC_KEY")
+fi
+if [ -n "${SAHYADRI_RPC_AUTH:-}" ]; then
+  RPC_FLAGS+=(--rpcauth="$SAHYADRI_RPC_AUTH")
+fi
+
 exec "$NODE_BIN" \
  --appdir "$APPDIR" \
  --archival \
+ "${RPC_FLAGS[@]}" \
  --enable-flash-tx \
  --nodnsseed \
  --disable-upnp \
