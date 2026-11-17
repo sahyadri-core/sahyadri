@@ -6,11 +6,11 @@
 //! function with identical inputs, guaranteeing byte-identical roots.
 //!
 //! The function:
-//!   1. Starts from `parent_root`
-//!   2. Applies flash tx effects (debit sender, credit recipient, record flash_id)
-//!   3. Applies coinbase rewards (credit miner(s))
-//!   4. Prunes expired flash entries on all touched accounts
-//!   5. Updates the SMT overlay and returns the new root + list of changes
+//! 1. Starts from `parent_root`
+//! 2. Applies flash tx effects (debit sender, credit recipient, record flash_id)
+//! 3. Applies coinbase rewards (credit miner(s))
+//! 4. Prunes expired flash entries on all touched accounts
+//! 5. Updates the SMT overlay and returns the new root + list of changes
 //!
 //! The caller is responsible for persisting the overlay's pending nodes
 //! and the new root. This function does not touch any persistent store.
@@ -34,9 +34,9 @@ use sahyadri_consensus_core::model::proof::{
 pub enum AccountError {
     Smt(sahyadri_smt::SmtError),
     Store(StoreError),
-    /// C-02.2 (SZR-2026-1108 §5.2): sender cannot cover amount + fee.
+    /// sender cannot cover amount + fee.
     InsufficientFunds,
-    /// C-02.2 (SZR-2026-1108 §5.2): arithmetic overflow in balance math.
+    /// arithmetic overflow in balance math.
     ArithmeticOverflow,
 }
 
@@ -75,7 +75,13 @@ fn read_account_state(
             let state_hash = Hash::from_bytes(state_hash_bytes);
             match state_store.get(state_hash) {
                 Ok(state) => Ok(state),
-                Err(StoreError::KeyNotFound(_)) => Ok(AccountState::default()),
+                Err(StoreError::KeyNotFound(_)) => {
+                    log::debug!(
+    "state_hash {:?} NOT FOUND in account_states_store — returning balance=0. This causes spurious InsufficientFunds in build/verify. Parent root may be stale or state store race.",
+                        state_hash
+                    );
+                    Ok(AccountState::default())
+                },
                 Err(e) => Err(AccountError::Store(e)),
             }
         }
@@ -95,7 +101,7 @@ fn read_account_state(
 /// Returns:
 /// - `new_root`: SMT root after all changes
 /// - `changes`: `(SPK, new_state)` for each account modified. Order is
-///   unspecified (HashMap iteration); the SMT root is order-independent.
+/// unspecified (HashMap iteration); the SMT root is order-independent.
 ///
 /// The changes carry `block_hash = Hash::default()`. Callers that persist
 /// to the live `account_store` should overwrite this field with the actual
@@ -126,7 +132,7 @@ pub fn compute_block_account_changes(
             touched.insert(recipient_spk.clone(), s);
         }
 
-        // C-02.6: deterministic replay check against parent_root-derived state.
+        // deterministic replay check against parent_root-derived state.
         // If flash_id was already applied in an ancestor block, skip here.
         // This runs identically during verify and commit (same parent_root),
         // so both produce the same filtered set and the same SMT root.
@@ -139,13 +145,13 @@ pub fn compute_block_account_changes(
             .any(|f| f.flash_id == flash_id)
         {
             log::warn!(
-                "C-02.6: flash_id already in parent chain state, skipping: {:?}",
+                "flash_id already in parent chain state, skipping: {:?}",
                 flash_id
             );
             continue;
         }
 
-        // C-02.2: checked arithmetic. Previously saturating_* silently clamped
+        // checked arithmetic. Previously saturating_* silently clamped
         // overflow and underflow, letting u64::MAX amounts mint out of thin air.
         let total_debit = tx
             .amount
@@ -268,12 +274,16 @@ pub fn extract_block_effects(
     }
 
     // ── Flash txs (skip coinbase) ──
+    //
+    // Only FLASH_V1 transactions contribute to account state here. Legacy
+    // account transactions are rejected at mempool admission (isolation
+    // validator), so they cannot appear in a committed block. DID operations
+    // are folded into the same header commitment via compute_block_did_changes
+    // on a separate path.
     for tx in txs.iter().skip(1) {
         if let Some(flash) = FlashTransaction::from_transaction(tx) {
             flash_txs.push(flash);
         }
-        // DID (DCRT/DUPD/DDEC) — skip
-        // Legacy account tx — skip, is dead 
     }
 
     (flash_txs, rewards)
@@ -308,10 +318,10 @@ pub fn prove_account<S: NodeStore>(
     // 3. Resolve account state via leaf value.
     //
     // Two exclusion cases exist:
-    //   (a) Empty terminal — path ends in an empty subtree.
-    //   (b) Divergent leaf — path ends at a leaf whose key differs from
-    //       the queried key. In that case the queried account is absent
-    //       and we MUST NOT return the divergent account's state.
+    // (a) Empty terminal — path ends in an empty subtree.
+    // (b) Divergent leaf — path ends at a leaf whose key differs from
+    // the queried key. In that case the queried account is absent
+    // and we MUST NOT return the divergent account's state.
     let (state, state_hash) = match &terminal {
         AccountProofTerminal::Empty => (None, [0u8; 32]),
         AccountProofTerminal::Leaf { key: leaf_key, value } => {

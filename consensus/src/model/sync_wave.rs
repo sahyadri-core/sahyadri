@@ -1,12 +1,12 @@
 //! SyncWave — exporter, verifier, loader.
 //!
 //! A fresh node can bootstrap by:
-//!   1. Discovering the highest checkpoint from peers
-//!   2. Exporting (on the serving side) or downloading (on the receiving side)
-//!      a `SyncWaveSnapshot` at that checkpoint
-//!   3. Verifying: rebuild SMT root from snapshot nodes, compare against the
-//!      checkpoint header's `account_commitment`
-//!   4. Loading: atomically insert all nodes and states into local stores
+//! 1. Discovering the highest checkpoint from peers
+//! 2. Exporting (on the serving side) or downloading (on the receiving side)
+//! a `SyncWaveSnapshot` at that checkpoint
+//! 3. Verifying: rebuild SMT root from snapshot nodes, compare against the
+//! checkpoint header's `account_commitment`
+//! 4. Loading: atomically insert all nodes and states into local stores
 //!
 //! Snapshots are UNTRUSTED — verification is what binds them to consensus.
 
@@ -198,7 +198,7 @@ impl SyncWaveExporter {
             });
         }
 
-        // NOTE (C-03, SZR-2026-1108 §5.3): the previous version compared
+        // NOTE: the previous version compared
         // `computed = root` against `metadata.account_root` — comparing the
         // same value to itself, an unreachable branch. Removed.
         //

@@ -75,7 +75,7 @@ impl Mempool {
         // Check double spends and try to remove them if the RBF policy requires it
         let removed_transaction = self.execute_replace_by_fee(&transaction, rbf_policy)?;
 
-        // M-01 fix (SZR-2026-1108 §7.1): flash txs bypass the UTXO-based anti-spam
+        // fix: flash txs bypass the UTXO-based anti-spam
         // because (a) they have no UTXO entries so sender_address is always empty —
         // all flash txs from ALL users would share one global 50-cap bucket, and
         // (b) they are economically protected: MIN_FLASH_FEE=1000 kana + ML-DSA-65
@@ -127,10 +127,10 @@ impl Mempool {
 
         //
         // Note: there exists a case below where `limit_transaction_count` returns an error signaling that
-        //       this tx should be rejected due to mempool size limits (rather than evicting others). However,
-        //       if this tx happened to be an RBF tx, it might have already caused an eviction in the line
-        //       above. We choose to ignore this rare case for now, as it essentially means that even the increased
-        //       feerate of the replacement tx is very low relative to the mempool overall.
+        // this tx should be rejected due to mempool size limits (rather than evicting others). However,
+        // if this tx happened to be an RBF tx, it might have already caused an eviction in the line
+        // above. We choose to ignore this rare case for now, as it essentially means that even the increased
+        // feerate of the replacement tx is very low relative to the mempool overall.
         //
 
         // Before adding the transaction, check if there is room in the pool
@@ -260,10 +260,10 @@ impl Mempool {
     fn unorphan_transaction(&mut self, transaction_id: &TransactionId) -> RuleResult<MempoolTransaction> {
         // Rust rewrite:
         // - Instead of adding the validated transaction to mempool transaction pool,
-        //   we return it.
+        // we return it.
         // - The function is relocated from OrphanPool into Mempool.
         // - The function no longer validates the transaction in mempool (signatures) nor in context.
-        //   This job is delegated to a fn called later in the process (Manager::validate_and_insert_unorphaned_transactions).
+        // This job is delegated to a fn called later in the process (Manager::validate_and_insert_unorphaned_transactions).
 
         // Remove the transaction identified by transaction_id from the orphan pool.
         let mut transactions = self.orphan_pool.remove_orphan(transaction_id, false, TxRemovalReason::Unorphaned, "")?;
@@ -284,8 +284,8 @@ impl Mempool {
         // The RBF policy applied to an orphaned transaction is not recorded in the orphan pool
         // but we can infer it from the priority:
         //
-        //  - high means a submitted tx via RPC which forbids RBF
-        //  - low means a tx arrived via P2P which allows RBF
+        // - high means a submitted tx via RPC which forbids RBF
+        // - low means a tx arrived via P2P which allows RBF
         //
         // Note that the RPC submit transaction replacement case, implying a mandatory RBF, forbids orphans
         // so is excluded here.

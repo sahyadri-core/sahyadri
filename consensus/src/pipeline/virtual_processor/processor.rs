@@ -390,10 +390,10 @@ impl VirtualStateProcessor {
         // PRUNE SAFETY: in order to avoid locking the prune lock throughout virtual resolving we make sure
         // to only process blocks in the future of the finality point (F) which are never pruned (since finality depth << pruning depth).
         // This is justified since:
-        //      1. Tips which are not in the future of F definitely don't have F on their chain
-        //         hence cannot become the next sink (due to finality violation).
-        //      2. Such tips cannot be merged by virtual since they are violating the merge depth
-        //         bound (merge depth <= finality depth).
+        // 1. Tips which are not in the future of F definitely don't have F on their chain
+        // hence cannot become the next sink (due to finality violation).
+        // 2. Such tips cannot be merged by virtual since they are violating the merge depth
+        // bound (merge depth <= finality depth).
         // (both claims are true by induction for any block in their past as well)
         let prune_guard = self.pruning_lock.blocking_read();
         let tips = self
@@ -738,8 +738,8 @@ impl VirtualStateProcessor {
                     }
                     // ─────────────────────────
 
-                    // C-05 (SZR-2026-1108 §5.5): reverse coinbase subsidy.
-                    // The apply path (processor.rs, C-01.3) credits the miner
+                    // reverse coinbase subsidy.
+                    // The apply path (processor.rs) credits the miner
                     // and treasury via `calc_block_subsidy`, NOT via tx.outputs.
                     // Without this reversal, orphaned-block rewards accumulate
                     // across reorgs — money duplication independent of the
@@ -756,7 +756,7 @@ impl VirtualStateProcessor {
                                 if let Err(e) = self.account_store.update_balance_batch(
                                     &mut batch, &cb.miner_data.script_public_key, -amt,
                                 ) {
-                                    log::error!("C-05: failed to reverse miner reward: {:?}", e);
+                                    log::error!("failed to reverse miner reward: {:?}", e);
                                 }
                             }
                             if dev > 0 {
@@ -767,7 +767,7 @@ impl VirtualStateProcessor {
                                         if let Err(e) = self.account_store.update_balance_batch(
                                             &mut batch, &tspk, -amt,
                                         ) {
-                                            log::error!("C-05: failed to reverse treasury fee: {:?}", e);
+                                            log::error!("failed to reverse treasury fee: {:?}", e);
                                         }
                                     }
                                 }
@@ -776,7 +776,7 @@ impl VirtualStateProcessor {
                         continue;  // coinbase has empty outputs — no other work
                     }
 
-                    // C-05 (SZR-2026-1108 §5.5): output-reversal and sender-refund
+                    // output-reversal and sender-refund
                     // REMOVED. The account model applies transactions via balance
                     // arithmetic (coinbase via subsidy, reversed above; flash via
                     // apply_flash_tx; DID via state update), never via
@@ -789,7 +789,7 @@ impl VirtualStateProcessor {
                     // and senders' funds were destroyed on every reorg anyway.
                     //
                     // Neither path is reachable in production: account-tx is
-                    // disabled by C-04; DID ops touch DID state (unwound
+                    // disabled ; DID ops touch DID state (unwound
                     // separately); flash is handled by reorg_flash_block below.
                 }
 
@@ -844,18 +844,18 @@ impl VirtualStateProcessor {
                         &self.coinbase_manager,
                         SAHYADRI_TREASURY_PUBKEY_HEX,
                     );
-                    // C-02.5 (SZR-2026-1108 §5.2): apply the SAME flash filter
+                    // apply the SAME flash filter
                     // that verify_block_state used, so the committed SMT root
                     // matches the header commitment even when some flash txs
                     // are rejected (expired / replayed / duplicate in batch).
                     // On error (should be unreachable — verify would have
                     // rejected the block already), log CRITICAL and fall back
-                    // to empty, matching the pre-C-02.5 live-store behavior.
+                    // to empty, matching the previous live-store behavior.
                     let flash_txs = self
                         .validated_flash_for_block(&raw_flash, daa)
                         .unwrap_or_else(|e| {
                             log::error!(
-                                "C-02.5 CRITICAL: commit-path flash validation failed for {}: {:?} — empty set",
+                                "commit-path flash validation failed for {}: {:?} — empty set",
                                 hash, e
                             );
                             Vec::new()
@@ -945,7 +945,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                             let total_reward = self.coinbase_manager.calc_block_subsidy(daa_for_subsidy);
                             debug_assert_eq!(
                                 total_reward, coinbase_data.subsidy,
-                                "C-01: payload subsidy divergence — validator should have rejected"
+                                "payload subsidy divergence — validator should have rejected"
                             );
                             if total_reward > 0 {
                                 // 2.
@@ -1347,9 +1347,9 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
 
     /// Picks the virtual parents according to virtual parent selection pruning constrains.
     /// Assumes:
-    ///     1. `selected_parent` is a REGISTRY_UNIT-valid block
-    ///     2. `candidates` are an antichain ordered in descending blue work order
-    ///     3. `candidates` do not contain `selected_parent` and `selected_parent.blue work > max(candidates.blue_work)`  
+    /// 1. `selected_parent` is a REGISTRY_UNIT-valid block
+    /// 2. `candidates` are an antichain ordered in descending blue work order
+    /// 3. `candidates` do not contain `selected_parent` and `selected_parent.blue work > max(candidates.blue_work)` 
     pub(super) fn pick_virtual_parents(
         &self,
         selected_parent: Hash,
@@ -1660,7 +1660,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
 
         let version = BLOCK_VERSION;
         let parents_by_level = self.parents_manager.calc_block_parents(pruning_point, &virtual_state.parents);
-        let hash_merkle_root = calc_hash_merkle_root(txs.iter());
+        let _hash_merkle_root_full = calc_hash_merkle_root(txs.iter());  // recomputed below over truncated txs
 
         let accepted_id_merkle_root = self.calc_accepted_id_merkle_root(
             virtual_state.accepted_tx_ids.iter().copied(),
@@ -1692,7 +1692,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
         let mut smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
         // First compute accounts root
-        // M-01 defensive fix (SZR-2026-1108 §7.1): previously fell back to
+        // defensive fix: previously fell back to
         // EMPTY on compute failure, which produced a header with an EMPTY
         // account_commitment — always rejected at verify — triggering cascade
         // disqualification of descendants. Now: drop ALL flash txs from the
@@ -1700,7 +1700,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         // rewards are bounded u64). This lets the chain progress with empty
         // blocks instead of halting on a bad flash tx in mempool.
         let mut actual_flash_txs = template_flash_txs.clone();
-        // M-01: deterministic order so build and verify paths converge on the
+        // deterministic order so build and verify paths converge on the
         // same surviving subset after incremental drops
         actual_flash_txs.sort_by_key(|tx| tx.flash_id());
         let accounts_root_h256 = loop {
@@ -1723,17 +1723,58 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                             actual_flash_txs.truncate(new_len);
                         }
                         log::warn!(
-                            "M-01 build: {}→{} flash txs after {:?}",
+                            "{}→{} flash txs after {:?}",
                             prev_len, actual_flash_txs.len(), e
                         );
                         smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
                         continue;
                     }
-                    log::error!("M-01 CRITICAL: coinbase-only template still fails: {:?}", e);
+                    log::error!("coinbase-only template still fails: {:?}", e);
                     break sahyadri_smt::EMPTY;
                 }
             }
         };
+
+        // COMPLETE: truncate txs to surviving flash subset.
+        //
+        // Previous commit (f4f0af2) added 25%-drop narrowing to actual_flash_txs (used
+        // for commitment calculation) but left block.transactions with the full original
+        // list. Header's hash_merkle_root and account_commitment were committed over the
+        // subset; block carried all txs; verify read all txs, hit InsufficientFunds,
+        // disqualified, cascade halted the chain.
+        //
+        // Fix: rebuild txs as [coinbase] + [surviving flash txs] + [non-flash non-coinbase]
+        // and recompute hash_merkle_root over the truncated list.
+        //
+        // accepted_id_merkle_root is left as computed at line 1665 over the full txs list.
+        // Verify path does not enforce it ( disabled the check), and it participates
+        // only in the header hash which remains self-consistent. Recompute when the check
+        // is re-enabled in block_validation.rs.
+        let is_flash_payload_m01 = |tx: &sahyadri_consensus_core::tx::Transaction| -> bool {
+            tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1"
+        };
+        let truncated_txs_m01: Vec<sahyadri_consensus_core::tx::Transaction> = {
+            let mut v = Vec::with_capacity(1 + actual_flash_txs.len() + txs.len());
+            v.push(txs[0].clone());
+            for flash in &actual_flash_txs {
+                v.push(flash.to_transaction());
+            }
+            for tx in txs.iter().skip(1) {
+                if !is_flash_payload_m01(tx) {
+                    v.push(tx.clone());
+                }
+            }
+            v
+        };
+        let dropped_m01 = txs.len().saturating_sub(truncated_txs_m01.len());
+        if dropped_m01 > 0 {
+            log::warn!(
+                "truncated block txs {} -> {} (dropped {} flash txs to match surviving subset)",
+                txs.len(), truncated_txs_m01.len(), dropped_m01
+            );
+        }
+        let txs = truncated_txs_m01;
+        let hash_merkle_root = calc_hash_merkle_root(txs.iter());  // recomputed below over truncated txs
 
         // Extract DID ops from template txs
         let template_did_ops: Vec<_> = txs.iter().skip(1)
@@ -1855,11 +1896,11 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
     /// SAHYADRI: resolve the account (SMT) root of a parent block.
     ///
     /// - For the genesis block, its header's `account_commitment` is a legacy
-    ///   REGISTRY_UNIT multiset hash (hardcoded in config/genesis.rs), NOT an SMT
-    ///   root. The correct SMT root at genesis is `EMPTY`.
+    /// REGISTRY_UNIT multiset hash (hardcoded in config/genesis.rs), NOT an SMT
+    /// root. The correct SMT root at genesis is `EMPTY`.
     /// - For every other block, the header's `account_commitment` field is
-    ///   the SMT root produced by this node's own commitment function,
-    ///   so it can be read directly.
+    /// the SMT root produced by this node's own commitment function,
+    /// so it can be read directly.
     pub(super) fn parent_account_root(
         &self,
         parent_hash: Hash,

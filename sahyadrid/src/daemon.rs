@@ -492,7 +492,7 @@ Do you confirm? (y/n)";
                     writer.delete_range(start_parents_prefix_vec.clone(), end_parents_prefix_vec.clone()).unwrap();
                     writer.delete_range(start_children_prefix_vec.clone(), end_children_prefix_vec.clone()).unwrap();
 
-                    //  update the version to one higher:
+                    // update the version to one higher:
                     mcms.set_version(6).unwrap();
                     info!("Deprecated stores have been removed from database, storage will be gradually cleared in due time.");
                     info!("Database is now in version 6");
@@ -745,7 +745,7 @@ Do you confirm? (y/n)";
 
         let session = consensus_manager.consensus().unguarded_session_blocking();
 
-        // C-03.2: trusted account root for the checkpoint (optional).
+        // trusted account root for the checkpoint (optional).
         let checkpoint_root = match std::env::var("SAHYADRI_CHECKPOINT_ROOT").ok() {
             Some(h) if !h.is_empty() => match h.parse::<Hash>() {
                 Ok(h) => Some(h),
@@ -757,7 +757,7 @@ Do you confirm? (y/n)";
             _ => None,
         };
 
-        // C-03.2: explicit insecure opt-in for local testing.
+        // explicit insecure opt-in for local testing.
         let insecure = matches!(
             std::env::var("SAHYADRI_SYNC_INSECURE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE") | Ok("yes")

@@ -38,6 +38,9 @@ pub struct Args {
     pub rpclisten_json: Option<WrpcNetAddress>,
     #[serde(rename = "unsaferpc")]
     pub unsafe_rpc: bool,
+    pub rpc_cert: Option<String>,
+    pub rpc_key: Option<String>,
+    pub rpc_auth: Option<String>,
     pub wrpc_verbose: bool,
     #[serde(rename = "loglevel")]
     pub log_level: String,
@@ -114,6 +117,9 @@ impl Default for Args {
             rpclisten_borsh: None,
             rpclisten_json: None,
             unsafe_rpc: false,
+            rpc_cert: None,
+            rpc_key: None,
+            rpc_auth: None,
             async_threads: num_cpus::get(),
             registry_unitindex: false,
             reset_db: false,
@@ -280,6 +286,9 @@ pub fn cli() -> Command {
                 .help("Interface:port to listen for wRPC JSON connections (default port: 18110, testnet: 18210)."),
         )
         .arg(arg!(--unsaferpc "Enable RPC commands which affect the state of the node").env("SAHYADRID_UNSAFERPC"))
+        .arg(Arg::new("rpccert").long("rpccert").help("TLS certificate file (default: ~/.sahyadri/sahyadri-mainnet/rpc/rpc.cert)").value_name("PATH"))
+        .arg(Arg::new("rpckey").long("rpckey").help("TLS key file (default: ~/.sahyadri/sahyadri-mainnet/rpc/rpc.key)").value_name("PATH"))
+        .arg(Arg::new("rpcauth").long("rpcauth").help("RPC Basic-Auth <user>:<password>. Set when binding on non-loopback.").value_name("USER:PASS"))
         .arg(
             Arg::new("connect-peers")
                 .long("connect")
@@ -513,6 +522,9 @@ impl Args {
             rpclisten_borsh: m.get_one::<WrpcNetAddress>("rpclisten-borsh").cloned().or(defaults.rpclisten_borsh),
             rpclisten_json: m.get_one::<WrpcNetAddress>("rpclisten-json").cloned().or(defaults.rpclisten_json),
             unsafe_rpc: arg_match_unwrap_or::<bool>(&m, "unsaferpc", defaults.unsafe_rpc),
+            rpc_cert: m.get_one::<String>("rpccert").cloned().or(defaults.rpc_cert),
+            rpc_key: m.get_one::<String>("rpckey").cloned().or(defaults.rpc_key),
+            rpc_auth: m.get_one::<String>("rpcauth").cloned().or(defaults.rpc_auth),
             wrpc_verbose: false,
             log_level: arg_match_unwrap_or::<String>(&m, "log_level", defaults.log_level),
             async_threads: arg_match_unwrap_or::<usize>(&m, "async_threads", defaults.async_threads),
@@ -608,10 +620,9 @@ fn arg_match_many_unwrap_or<T: Clone + Send + Sync + 'static>(m: &clap::ArgMatch
                                             ::1)
       --rpclisten=                          Add an interface/port to listen for RPC connections (default port: 26110,
                                             testnet: 16210)
-      --rpccert=                            File containing the certificate file (default:
-                                            /Users/aspect/Library/Application Support/Sahyadrid/rpc.cert)
-      --rpckey=                             File containing the certificate key (default:
-                                            /Users/aspect/Library/Application Support/Sahyadrid/rpc.key)
+      --rpccert=                            TLS certificate file (default: ~/.sahyadri/sahyadri-mainnet/rpc/rpc.cert)
+      --rpckey=                             TLS key file (default: ~/.sahyadri/sahyadri-mainnet/rpc/rpc.key)
+      --rpcauth=                            RPC Basic-Auth <user>:<password>. Required for non-loopback bind.
       --rpcmaxclients=                      Max number of RPC clients for standard connections (default: 128)
       --rpcmaxwebsockets=                   Max number of RPC websocket connections (default: 25)
       --rpcmaxconcurrentreqs=               Max number of concurrent RPC requests that may be processed concurrently

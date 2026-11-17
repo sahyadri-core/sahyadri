@@ -124,13 +124,45 @@ pub struct RpcCoreService {
     /// Caches the most recently exported SyncWave snapshot to avoid
     /// re-walking the SMT for every chunk download. Evicted when a
     /// different block_hash is requested.
-    sync_wave_cache: Arc<std::sync::RwLock<Option<SyncWaveCacheEntry>>>,
+    sync_wave_cache: Arc<std::sync::RwLock<std::collections::HashMap<sahyadri_hashes::Hash, Arc<sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot>>>>,
+    sync_wave_rate_limiter: Arc<SyncWaveRateLimiter>,
 }
 
-struct SyncWaveCacheEntry {
-    block_hash: sahyadri_hashes::Hash,
-    snapshot: Arc<sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot>,
+
+/// Global rate limiter for SyncWave serving. Sliding 60-second window.
+/// Prevents anonymous clients from alternating block hashes to force a
+/// full sparse-Merkle-tree walk per request (CPU/IO amplification).
+struct SyncWaveRateLimiter {
+    window: std::sync::Mutex<std::collections::VecDeque<std::time::Instant>>,
+    max_per_minute: u32,
 }
+
+impl SyncWaveRateLimiter {
+    fn new(max_per_minute: u32) -> Self {
+        Self {
+            window: std::sync::Mutex::new(std::collections::VecDeque::with_capacity(64)),
+            max_per_minute,
+        }
+    }
+
+    fn try_acquire(&self) -> bool {
+        let now = std::time::Instant::now();
+        let cutoff = now - std::time::Duration::from_secs(60);
+        let mut w = self.window.lock().unwrap();
+        while w.front().map_or(false, |t| *t < cutoff) {
+            w.pop_front();
+        }
+        if w.len() >= self.max_per_minute as usize {
+            return false;
+        }
+        w.push_back(now);
+        true
+    }
+}
+
+const SYNC_WAVE_MAX_PER_MINUTE: u32 = 60;
+const SYNC_WAVE_MAX_CACHE_ENTRIES: usize = 8;
+
 
 const RPC_CORE: &str = "rpc-core";
 
@@ -217,17 +249,23 @@ impl RpcCoreService {
         &self,
         block_hash: sahyadri_hashes::Hash,
     ) -> RpcResult<Arc<sahyadri_consensus_core::model::sync_wave::SyncWaveSnapshot>> {
+        // Apply global rate limit before any expensive work. Prevents
+        // alternating-hash clients from forcing a full SMT walk per request.
+        if !self.sync_wave_rate_limiter.try_acquire() {
+            return Err(RpcError::General(
+                "sync wave rate limit exceeded (60 req/min). Retry in a minute.".into(),
+            ));
+        }
+
         // Fast path: cached for this block
         {
             let guard = self.sync_wave_cache.read().unwrap();
-            if let Some(entry) = guard.as_ref() {
-                if entry.block_hash == block_hash {
-                    return Ok(entry.snapshot.clone());
-                }
+            if let Some(snapshot) = guard.get(&block_hash) {
+                return Ok(snapshot.clone());
             }
         }
 
-        // Slow path: export
+        // Slow path: full SMT walk
         let session = self.consensus_manager.consensus().session().await;
         let snapshot = session
             .async_export_sync_wave(block_hash)
@@ -235,8 +273,13 @@ impl RpcCoreService {
             .map_err(|e| RpcError::General(format!("sync_wave export failed: {e:?}")))?;
 
         let snapshot = Arc::new(snapshot);
+        // Bound cache size. Eviction is coarse (full clear on overflow) but
+        // avoids pulling in an `lru` dependency for what is a small cache.
         let mut guard = self.sync_wave_cache.write().unwrap();
-        *guard = Some(SyncWaveCacheEntry { block_hash, snapshot: snapshot.clone() });
+        if guard.len() >= SYNC_WAVE_MAX_CACHE_ENTRIES {
+            guard.clear();
+        }
+        guard.insert(block_hash, snapshot.clone());
         Ok(snapshot)
     }
     pub const IDENT: &'static str = "rpc-core-service";
@@ -316,7 +359,8 @@ impl RpcCoreService {
             fee_estimate_verbose_cache: ExpiringCache::new(Duration::from_millis(500), Duration::from_millis(1000)),
             mining_rule_engine,
             relay_state,
-            sync_wave_cache: Arc::new(std::sync::RwLock::new(None)),
+            sync_wave_cache: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            sync_wave_rate_limiter: Arc::new(SyncWaveRateLimiter::new(SYNC_WAVE_MAX_PER_MINUTE)),
         }
     }
 
@@ -928,6 +972,14 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: GetSyncWaveMetadataRequest,
     ) -> RpcResult<GetSyncWaveMetadataResponse> {
+        // SyncWave serving exposes the full ledger to any caller. It is
+        // disabled by default and must be explicitly opted into via
+        // `--unsafe-rpc` so a public-facing node doesn't leak bulk state.
+        if !self.config.unsafe_rpc {
+            return Err(RpcError::General(
+                "sync wave serving disabled; enable with --unsafe-rpc".into(),
+            ));
+        }
         let block_hash = match request.block_hash {
             Some(h) => h,
             None => {
@@ -956,6 +1008,12 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: DownloadSyncWaveChunkRequest,
     ) -> RpcResult<DownloadSyncWaveChunkResponse> {
+        // Same gate as metadata.
+        if !self.config.unsafe_rpc {
+            return Err(RpcError::General(
+                "sync wave serving disabled; enable with --unsafe-rpc".into(),
+            ));
+        }
         let snapshot = self.get_or_export_sync_wave(request.block_hash).await?;
 
         let chunk_size = snapshot.metadata.chunk_size as usize;

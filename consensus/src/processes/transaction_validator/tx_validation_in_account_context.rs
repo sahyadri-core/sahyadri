@@ -124,11 +124,11 @@ impl TransactionValidator {
     // ═══════════════════════════════════════════════════════════════
 
     /// Validate a FlashTransaction. Check order (cheap → expensive):
-    ///   1. Expiry (u64 compare — fail fast)
-    ///   2. Fee minimum
-    ///   3. Replay (bounded `recent_flashes` lookup)
-    ///   4. Signature (ML-DSA-65 — CPU heavy)
-    ///   5. Balance (state read + compare)
+    /// 1. Expiry (u64 compare — fail fast)
+    /// 2. Fee minimum
+    /// 3. Replay (bounded `recent_flashes` lookup)
+    /// 4. Signature (ML-DSA-65 — CPU heavy)
+    /// 5. Balance (state read + compare)
     pub fn validate_flash_transaction(
         &self,
         tx: &FlashTransaction,
@@ -186,7 +186,7 @@ impl TransactionValidator {
         Ok(())
     }
     
-    /// C-02.6 (SZR-2026-1108 §5.2): deterministic flash filter for
+    /// deterministic flash filter for
     /// verify_block_state and commit_virtual_state. Identical inputs (block
     /// header + parent root) MUST produce identical outputs across nodes —
     /// no reads from node-local live account_store.
@@ -223,11 +223,11 @@ impl TransactionValidator {
             let id = tx.flash_id();
 
             if !seen.insert(id) {
-                log::warn!("C-02.6: duplicate flash_id in batch, skipping: {:?}", id);
+                log::warn!("duplicate flash_id in batch, skipping: {:?}", id);
                 continue;
             }
             if block_daa_score > tx.expiry_daa_score {
-                log::warn!("C-02.6: flash tx expired, skipping: {:?}", id);
+                log::warn!("flash tx expired, skipping: {:?}", id);
                 continue;
             }
             if tx.fee < FLASH_MIN_FEE_KANA {
@@ -239,7 +239,7 @@ impl TransactionValidator {
             let is_valid = DilithiumKeyPair::verify(&tx.pubkey, &sig, &sighash, b"", SAHYADRI_MODE);
             if !is_valid {
                 return Err(TxRuleError::Message(
-                    "C-02.6: FlashTx ML-DSA-65 signature verification FAILED".into(),
+                    "FlashTx ML-DSA-65 signature verification FAILED".into(),
                 ));
             }
 
@@ -257,8 +257,8 @@ impl TransactionValidator {
     /// - **within-batch duplicate**: same `flash_id` twice in one block.
     /// - **expired**: `block_daa_score > tx.expiry_daa_score`.
     /// - **replay**: `flash_id` already present in sender's `recent_flashes`,
-    ///   which happens when a parallel block in the same mergeset already
-    ///   applied the same logical flash tx.
+    /// which happens when a parallel block in the same mergeset already
+    /// applied the same logical flash tx.
     ///
     /// Reject rules (whole batch fails):
     /// - per-sender aggregate debit exceeds sender balance.
@@ -338,9 +338,9 @@ impl TransactionValidator {
         }
 
         // ── 4. Per-tx validation on eligible: fee, signature, individual balance ──
-        //    Expiry and replay were already filtered in step 1, so this loop
-        //    only sees txs that should pass those checks. Any failure here is a
-        //    genuine rejection (bad signature, insufficient individual balance).
+        // Expiry and replay were already filtered in step 1, so this loop
+        // only sees txs that should pass those checks. Any failure here is a
+        // genuine rejection (bad signature, insufficient individual balance).
         for tx in &eligible {
             self.validate_flash_transaction(tx, block_daa_score)?;
         }

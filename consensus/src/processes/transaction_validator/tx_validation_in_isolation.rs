@@ -23,16 +23,16 @@ impl TransactionValidator {
     /// context -- header or registry_unit. **Note** that any check performed here should be moved to
     /// header contextual validation if it becomes HF activation dependent. This is bcs we rely
     /// on checks here to be truly independent and avoid calling it multiple times wherever possible
-    /// (e.g., BBT relies on mempool in isolation checks even though virtual daa score might have changed)   
+    /// (e.g., BBT relies on mempool in isolation checks even though virtual daa score might have changed) 
     pub fn validate_tx_in_isolation(&self, tx: &Transaction) -> TxResult<()> {
         // ──── DID SUBNETWORK EXEMPTION ────
         // DID operations (DCRT/DUPD/DDEC) use 0-value outputs (free identity,
         // works even with 0 balance). Skip account-tx specific checks here:
         //
-        //  - `check_transaction_output_value_ranges` rejects 0-value → skip
-        //  - `verify_account_tx_signature` expects account-tx payload layout
-        //    [pk][nonce][sig], but DID tx layout is [OP][len+did][len+pk]
-        //    [len+addr][len+doc][len+sig] → format mismatch, skip
+        // - `check_transaction_output_value_ranges` rejects 0-value → skip
+        // - `verify_account_tx_signature` expects account-tx payload layout
+        // [pk][nonce][sig], but DID tx layout is [OP][len+did][len+pk]
+        // [len+addr][len+doc][len+sig] → format mismatch, skip
         //
         // SECURITY: DID signatures ARE verified in the virtual processor
         // (commit_virtual_state DCRT/DUPD/DDEC handlers, lines 880-1004)
@@ -49,7 +49,7 @@ impl TransactionValidator {
         // SAHYADRI ACCOUNT MODEL: Verify signature for account transactions
         // Payload: [sender_pubkey:PUBKEY_SIZE][nonce:8][signature:SIG_SIZE]
         if tx.inputs.is_empty() && !tx.payload.is_empty() && !tx.is_coinbase() {
-            // C-04 (SZR-2026-1108 §5.4): account-tx path disabled.
+            // account-tx path disabled.
             //
             // The legacy upstream account-tx path parsed a signed nonce but
             // never compared it against stored per-account state
@@ -61,11 +61,11 @@ impl TransactionValidator {
             // Fix chosen: reject, do not re-implement. Ethereum-style
             // monotonic nonces force serial sequencing and would break
             // parallel flash UX. Sahyadri's replay protection is nonce-less:
-            //   FLASH_V1  → flash_id = sha3(domain||pubkey||recipient
-            //               ||amount||fee||expiry||salt); 16-byte random
-            //               salt + expiry window + recent_flashes ring.
-            //   DCRT/DUPD/DDEC → crest model; DID state root in header
-            //               commitment, per-op signature, monotonic version.
+            // FLASH_V1 → flash_id = sha3(domain||pubkey||recipient
+            // ||amount||fee||expiry||salt); 16-byte random
+            // salt + expiry window + recent_flashes ring.
+            // DCRT/DUPD/DDEC → crest model; DID state root in header
+            // commitment, per-op signature, monotonic version.
             // Account-tx had neither and cannot be repaired without
             // reintroducing sequencing.
             //
@@ -75,7 +75,7 @@ impl TransactionValidator {
                 return Err(TxRuleError::Message(
                     "Account transactions disabled: use FLASH_V1 (flash tx) or \
                      DCRT/DUPD/DDEC (DID ops). The legacy nonce-based \
-                     account-tx path is not accepted — see SZR-2026-1108 §5.4."
+                     account-tx path is not accepted."
                         .into(),
                 ));
             }
@@ -243,7 +243,7 @@ fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
     if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
         // Flash txs: isolation has no account-store access, so signature,
         // expiry, replay, and balance checks are deferred to
-        // validate_flash_batch (mempool + block-verify paths). C-02 audit
+        // validate_flash_batch (mempool + block-verify paths). audit
         // requires those checks to be enforced — they are, at both gates.
         return Ok(());
     }

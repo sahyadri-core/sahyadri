@@ -1,4 +1,4 @@
-#![allow(unused_imports)]  // H-12: COINBASE_TRANSACTION_INDEX, unix_now unused while stub active
+#![allow(unused_imports)]  // COINBASE_TRANSACTION_INDEX and unix_now are unused while the template-modification stub is active.
 use super::errors::BuilderResult;
 use sahyadri_consensus_core::{
     api::ConsensusApi,
@@ -95,7 +95,7 @@ impl BlockTemplateBuilder {
         _new_miner_data: &MinerData,
         _block_template_to_modify: &BlockTemplate,
     ) -> BuilderResult<BlockTemplate> {
-        // H-12 (SZR-2026-1108 §6): previously swapped the coinbase payload but
+        // Previously swapped the coinbase payload but
         // only called `header.finalize()` — the header's account_commitment
         // field, which is part of the hash preimage and depends on coinbase
         // contents, was left stale. Every block mined on such a template was
@@ -110,7 +110,7 @@ impl BlockTemplateBuilder {
         // with their own MinerData — that path produces a fully-consistent
         // template including the correct account_commitment.
         Err(super::errors::BuilderError::NotSupported(
-            "modify_block_template temporarily disabled (audit H-12). \
+            "modify_block_template temporarily disabled. \
              External miners: call build_block_template with your own MinerData \
              instead — it produces a fully-consistent template with the correct \
              account_commitment.".into(),

@@ -174,11 +174,11 @@ impl VirtualStateProcessor {
 
     /// Verify that the current block fully respects its own REGISTRY_UNIT view. We define a block as
     /// REGISTRY_UNIT valid if all the following conditions hold:
-    ///     1. The block header includes the expected `account_commitment`.
-    ///     2. The block header includes the expected `accepted_id_merkle_root`.
-    ///     3. The block header includes the expected `pruning_point`.
-    ///     4. The block coinbase transaction rewards the mergeset blocks correctly.
-    ///     5. All non-coinbase block transactions are valid against its own REGISTRY_UNIT view.
+    /// 1. The block header includes the expected `account_commitment`.
+    /// 2. The block header includes the expected `accepted_id_merkle_root`.
+    /// 3. The block header includes the expected `pruning_point`.
+    /// 4. The block coinbase transaction rewards the mergeset blocks correctly.
+    /// 5. All non-coinbase block transactions are valid against its own REGISTRY_UNIT view.
     pub(super) fn verify_block_state(
         &self,
         ctx: &mut BlockProcessingContext,
@@ -209,7 +209,7 @@ impl VirtualStateProcessor {
             .map_err(|_| AccountCommitmentComputeFailed)?;
 
 
-        // C-02.3 (SZR-2026-1108 §5.2): extract raw effects, then filter
+        // extract raw effects, then filter
         // flash txs through validate_flash_batch. The FILTERED set is what
         // feeds compute_block_account_changes — otherwise rejected flash
         // would still land in the committed root, causing root/live-state
@@ -309,7 +309,7 @@ impl VirtualStateProcessor {
             self.calc_accepted_id_merkle_root(ctx.accepted_tx_ids.iter().copied(), ctx.selected_parent());
 
         // if expected_accepted_id_merkle_root != header.accepted_id_merkle_root {
-        //  return Err(BadAcceptedIDMerkleRoot(header.hash, header.accepted_id_merkle_root, expected_accepted_id_merkle_root));
+        // return Err(BadAcceptedIDMerkleRoot(header.hash, header.accepted_id_merkle_root, expected_accepted_id_merkle_root));
         // }
 
         let txs = self.block_transactions_store.get(header.hash).unwrap();
@@ -370,7 +370,7 @@ impl VirtualStateProcessor {
         _mergeset_rewards: &BlockHashMap<BlockRewardData>,
         _mergeset_non_daa: &BlockHashSet,
     ) -> BlockProcessResult<()> {
-        // C-01.2 (SZR-2026-1108 §5.1): restore schedule validation.
+        // restore schedule validation.
         // Previously this returned Ok(()) unconditionally, turning
         // verify_block_state's coinbase check into a no-op and letting
         // any miner self-declare an arbitrary subsidy.
@@ -385,15 +385,15 @@ impl VirtualStateProcessor {
         Ok(())
     }
 
-    /// C-02.5 (SZR-2026-1108 §5.2): filter flash txs to the eligible set
+    /// filter flash txs to the eligible set
     /// using `validate_flash_batch`. This is the single source of truth —
     /// verify_block_state and commit_virtual_state MUST both call it so that
     /// the header account commitment and the applied state agree.
     ///
-    /// - flag off + no flash in block  → Ok(empty)
-    /// - flag off + flash in block     → reject (account-commitment error)
-    /// - flag on, batch validates       → Ok(filtered)
-    /// - flag on, batch fails           → reject (account-commitment error)
+    /// - flag off + no flash in block → Ok(empty)
+    /// - flag off + flash in block → reject (account-commitment error)
+    /// - flag on, batch validates → Ok(filtered)
+    /// - flag on, batch fails → reject (account-commitment error)
     pub(super) fn validated_flash_for_block(
         &self,
         raw_flash: &[sahyadri_consensus_core::tx::FlashTransaction],
@@ -404,18 +404,18 @@ impl VirtualStateProcessor {
         }
         if !self.enable_flash_tx {
             log::warn!(
-                "C-02.5: block contains {} flash txs but enable_flash_tx=false",
+                "block contains {} flash txs but enable_flash_tx=false",
                 raw_flash.len()
             );
             return Err(AccountCommitmentComputeFailed);
         }
-        // C-02.6: deterministic filter — no live-store reads. Balance and
+        // deterministic filter — no live-store reads. Balance and
         // replay are validated inside compute_block_account_changes against
         // parent_root, so verify and commit always agree.
         self.transaction_validator
             .filter_flash_deterministic(raw_flash, daa_score)
             .map_err(|e| {
-                log::warn!("C-02.6: flash batch rejected: {:?}", e);
+                log::warn!("flash batch rejected: {:?}", e);
                 AccountCommitmentComputeFailed
             })
     }

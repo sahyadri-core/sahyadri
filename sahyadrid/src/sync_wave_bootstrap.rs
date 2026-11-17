@@ -1,12 +1,12 @@
 //! SyncWave bootstrap — fast node bootstrap from a peer's state.
 //!
 //! Reduces fresh-node startup from hours of full IBD to seconds:
-//!   1. Connect to a seed peer (gRPC)
-//!   2. Fetch SyncWaveMetadata (a few hundred bytes)
-//!   3. Download all chunks, reassemble SyncWaveSnapshot
-//!   4. Verify: rebuild SMT root locally, compare against checkpoint header
-//!   5. Load into local stores (idempotent content-addressed inserts)
-//!   6. Resume ordinary IBD from checkpoint forward
+//! 1. Connect to a seed peer (gRPC)
+//! 2. Fetch SyncWaveMetadata (a few hundred bytes)
+//! 3. Download all chunks, reassemble SyncWaveSnapshot
+//! 4. Verify: rebuild SMT root locally, compare against checkpoint header
+//! 5. Load into local stores (idempotent content-addressed inserts)
+//! 6. Resume ordinary IBD from checkpoint forward
 //!
 //! SyncWave is UNTRUSTED. Any peer may serve; verification is local.
 
@@ -35,7 +35,7 @@ pub struct SyncWaveBootstrapConfig {
     pub checkpoint_root: Option<Hash>,
     /// Hard timeout for the entire bootstrap.
     pub timeout_secs: u64,
-    /// C-03.2 (SZR-2026-1108 §5.3): bypass all checkpoint anchoring. A
+    /// bypass all checkpoint anchoring. A
     /// malicious seed in this mode controls the entire loaded ledger.
     /// Allowed only for local development / integration tests.
     pub insecure: bool,
@@ -60,10 +60,10 @@ pub enum SyncWaveBootstrapError {
     Timeout,
     Verify(String),
     Load(String),
-    /// C-03.2: bootstrap attempted without a trusted checkpoint and without
+    /// bootstrap attempted without a trusted checkpoint and without
     /// explicitly opting into insecure mode.
     CheckpointRequired,
-    /// C-03.2: peer-supplied checkpoint metadata did not match the trusted
+    /// peer-supplied checkpoint metadata did not match the trusted
     /// checkpoint hash or trusted account root.
     CheckpointMismatch { expected: Hash, got: Hash },
 }
@@ -126,7 +126,7 @@ pub async fn bootstrap_from_peer(
         metadata.total_chunks
     );
 
-    // ─── 2b. Enforce checkpoint anchoring (C-03.2, SZR-2026-1108 §5.3) ───
+    // ─── 2b. Enforce checkpoint anchoring ───
     if config.insecure {
         log::warn!(
             "SyncWave: INSECURE mode active — checkpoint hash NOT verified. \

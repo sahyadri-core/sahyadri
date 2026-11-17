@@ -140,7 +140,7 @@ pub struct SampledDifficultyManager<T: HeaderStoreReader, U: SahyadriConsensusSt
     min_difficulty_window_size: usize,
     difficulty_sample_rate: u64,
     target_time_per_block: u64,
-    // H-01 (SZR-2026-1108 §6): network type used to gate the genesis-difficulty
+    // network type used to gate the genesis-difficulty
     // cap. Applied only on Testnet to protect single-miner testnets from DAA
     // overshoot; on Mainnet the true difficulty adjustment is honored so BPS
     // converges to the configured target and the 4-year halving schedule holds.
@@ -239,7 +239,7 @@ impl<T: HeaderStoreReader, U: SahyadriConsensusStoreReader> SampledDifficultyMan
         let expected_duration = self.target_time_per_block * self.difficulty_sample_rate * difficulty_blocks_len; // This does differ from FullDifficultyManager version
         let new_target = average_target * measured_duration / expected_duration;
 
-        // H-01 (SZR-2026-1108 §6): the genesis-cap was applied on every network,
+        // the genesis-cap was applied on every network,
         // including Mainnet — difficulty could never rise above launch value.
         // Result: as hashrate grew, blocks arrived proportionally faster, the
         // 21M CSM supply cap was reached in ~3 years instead of the audited
