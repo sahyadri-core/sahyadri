@@ -1541,26 +1541,13 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             });
         }
 
-        // Verify the DID exists and is active before allowing a subscription.
-        // This prevents anonymous clients from registering arbitrary DID strings
-        // to drain message queues they do not own.
-        let did_session = self.consensus_manager.consensus().unguarded_session();
-        match did_session.get_did_document(&request.did) {
-            Some(doc) if doc.active => {}
-            Some(_) => {
-                return Ok(RelaySubscribeResponse {
-                    subscribed: false,
-                    pending: Vec::new(),
-                    error: Some("did is deactivated".to_string()),
-                });
-            }
-            None => {
-                return Ok(RelaySubscribeResponse {
-                    subscribed: false,
-                    pending: Vec::new(),
-                    error: Some("did not found".to_string()),
-                });
-            }
+        // Verify DID ownership via ML-DSA-65 signature proof.
+        if !self.verify_did_proof(&request.did, &request.proof, request.timestamp) {
+            return Ok(RelaySubscribeResponse {
+                subscribed: false,
+                pending: Vec::new(),
+                error: Some("DID ownership proof required (sign did||timestamp with your DID key)".to_string()),
+            });
         }
 
         // Prevent session hijacking: if the DID already has an active session
@@ -1730,9 +1717,17 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             });
         }
 
+        // Verify DID ownership via ML-DSA-65 signature proof.
+        if !self.verify_did_proof(&request.did, &request.proof, request.timestamp) {
+            return Ok(RelayPollResponse {
+                envelopes: Vec::new(),
+                remaining: 0,
+                error: Some("DID ownership proof required".to_string()),
+            });
+        }
+
         // Verify ownership: the caller's connection must match the session
-        // bound to this DID. Without this check, any anonymous client could
-        // drain any DID's message queue.
+        // bound to this DID.
         let owns_session = {
             if let Some(mut s) = self.relay_state.sessions.get_mut(&request.did) {
                 if s.conn_id == conn_id {
@@ -2438,4 +2433,46 @@ impl AsyncService for RpcCoreService {
             Ok(())
         })
     }
+}
+
+impl RpcCoreService {
+    /// Verifies that the caller owns the given DID by checking an ML-DSA-65
+    /// signature against the DID document's registered public key.
+    fn verify_did_proof(&self, did: &str, proof: &[u8], timestamp: u64) -> bool {
+        if proof.is_empty() {
+            return false;
+        }
+        // Reject stale or future timestamps (5-minute window).
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if timestamp.abs_diff(now) > 300 {
+            return false;
+        }
+        // Look up the DID document.
+        let session = self.consensus_manager.consensus().unguarded_session();
+        let doc = match session.get_did_document(did) {
+            Some(d) if d.active => d,
+            _ => return false,
+        };
+        // Decode the public key from hex.
+        let hex_str = doc.public_key.as_bytes();
+        if hex_str.len() % 2 != 0 {
+            return false;
+        }
+        let mut pubkey_bytes = vec![0u8; hex_str.len() / 2];
+        if faster_hex::hex_decode(hex_str, &mut pubkey_bytes).is_err() {
+            return false;
+        }
+        // Build the signed message: did_bytes || timestamp_le_bytes.
+        let mut msg = Vec::with_capacity(did.len() + 8);
+        msg.extend_from_slice(did.as_bytes());
+        msg.extend_from_slice(&timestamp.to_le_bytes());
+        // Verify the ML-DSA-65 signature.
+        use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, SAHYADRI_MODE};
+        let sig = DilithiumSignature::from_slice(proof);
+        DilithiumKeyPair::verify(&pubkey_bytes, &sig, &msg, b"sahyadri-relay", SAHYADRI_MODE)
+    }
+
 }

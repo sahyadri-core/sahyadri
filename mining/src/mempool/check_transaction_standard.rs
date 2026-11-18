@@ -90,7 +90,32 @@ impl Mempool {
         // attacks.
         let ncm = match transaction.calculated_non_contextual_masses {
             Some(ncm) => ncm,
-            None => return Ok(()),  // FlashTx: skip standard checks
+            None => {
+                // FlashTx: enforce version + size limits even without
+                // full mass calculation. Cannot skip all standardness.
+                if transaction.tx.version > self.config.maximum_standard_transaction_version
+                    || transaction.tx.version < self.config.minimum_standard_transaction_version
+                {
+                    return Err(NonStandardError::RejectVersion(
+                        transaction_id,
+                        transaction.tx.version,
+                        self.config.minimum_standard_transaction_version,
+                        self.config.maximum_standard_transaction_version,
+                    ));
+                }
+                let tx_size = transaction.tx.payload.len()
+                    + transaction.tx.outputs.iter()
+                        .map(|o| o.script_public_key.script().len() + 8)
+                        .sum::<usize>();
+                if tx_size > MAXIMUM_STANDARD_TRANSACTION_MASS as usize {
+                    return Err(NonStandardError::RejectComputeMass(
+                        transaction_id,
+                        tx_size as u64,
+                        MAXIMUM_STANDARD_TRANSACTION_MASS,
+                    ));
+                }
+                return Ok(());
+            }
         };
         let NonContextualMasses { compute_mass, transient_mass } = ncm;
         if compute_mass > MAXIMUM_STANDARD_TRANSACTION_MASS {

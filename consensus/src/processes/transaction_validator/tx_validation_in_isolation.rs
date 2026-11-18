@@ -43,8 +43,16 @@ impl TransactionValidator {
             if p == b"DCRT" || p == b"DUPD" || p == b"DDEC" {
                 // DID operations: enforce output value-range checks but allow
                 // zero-value outputs (DID ops carry no CSM transfer).
-                // Signatures are verified in the virtual processor.
                 check_did_output_value_ranges(tx)?;
+
+                // DCRT (DID Create): verify the embedded ML-DSA-65 signature
+                // at mempool admission. The public key is self-contained in
+                // the payload, so no store lookup is needed.
+                // DUPD/DDEC signatures are verified in the virtual processor
+                // (requires DID store lookup for the registered public key).
+                if p == b"DCRT" {
+                    verify_did_create_signature(tx)?;
+                }
                 return Ok(());
             }
         }
@@ -222,6 +230,42 @@ fn check_did_output_value_ranges(tx: &Transaction) -> TxResult<()> {
         }
     }
     Ok(())
+}
+
+/// Verifies the ML-DSA-65 signature on a DCRT (DID Create) transaction at
+/// mempool admission. The public key is embedded in the payload, so no
+/// consensus store lookup is needed. This prevents invalid-signature DID
+/// ops from being relayed and mined, saving CPU on double verification.
+fn verify_did_create_signature(tx: &Transaction) -> TxResult<()> {
+    use sahyadri_dilithium::{DilithiumKeyPair, DilithiumSignature, SAHYADRI_MODE};
+    use crate::pipeline::virtual_processor::did_changes::parse_did_op;
+
+    // ML-DSA-65 signature size is 3309 bytes.
+    const SIG_SIZE: usize = 3309;
+
+    let payload = &tx.payload;
+    if payload.len() < 4 + SIG_SIZE {
+        return Err(TxRuleError::Message("DCRT payload too short for signature".to_string()));
+    }
+
+    // Parse the DID op to extract the embedded public key and signature.
+    let op = match parse_did_op(payload, SIG_SIZE) {
+        Some(o) => o,
+        None => return Err(TxRuleError::Message("DCRT payload parse failed".to_string())),
+    };
+
+    match op {
+        crate::pipeline::virtual_processor::did_changes::DidOp::Create { pubkey, sig, .. } => {
+            // The signed message is the payload body (everything except the signature).
+            let body = &payload[..payload.len() - SIG_SIZE];
+            let dilithium_sig = DilithiumSignature::from_slice(&sig);
+            if !DilithiumKeyPair::verify(&pubkey, &dilithium_sig, body, b"sahyadri-did", SAHYADRI_MODE) {
+                return Err(TxRuleError::Message("DCRT signature verification failed".to_string()));
+            }
+            Ok(())
+        }
+        _ => Ok(()), // Not a Create op — should not reach here.
+    }
 }
 
 fn check_transaction_output_value_ranges(tx: &Transaction) -> TxResult<()> {

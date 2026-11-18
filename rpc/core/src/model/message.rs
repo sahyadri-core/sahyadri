@@ -4270,6 +4270,14 @@ impl Deserializer for ResolveDidByAddressResponse {
 pub struct RelaySubscribeRequest {
     /// Caller's DID (did:sahyadri:...)
     pub did: String,
+    /// ML-DSA-65 signature over did_bytes || timestamp_le_bytes.
+    /// Required to prove DID ownership.
+    #[serde(default)]
+    pub proof: Vec<u8>,
+    /// Unix timestamp (seconds) included in the signed message.
+    /// Must be within 300 seconds of server time.
+    #[serde(default)]
+    pub timestamp: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
@@ -4312,6 +4320,12 @@ pub struct RelayPollRequest {
     pub did: String,
     /// Max envelopes to return in this call (server may cap further)
     pub limit: u32,
+    /// ML-DSA-65 signature proving DID ownership.
+    #[serde(default)]
+    pub proof: Vec<u8>,
+    /// Unix timestamp included in the signed message.
+    #[serde(default)]
+    pub timestamp: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
@@ -4361,7 +4375,7 @@ impl Deserializer for RelaySubscribeRequest {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _v = load!(u16, reader)?;
         let did = load!(String, reader)?;
-        Ok(Self { did })
+        Ok(Self { did, proof: Vec::new(), timestamp: 0 })
     }
 }
 
@@ -4437,7 +4451,7 @@ impl Deserializer for RelayPollRequest {
         let _v = load!(u16, reader)?;
         let did = load!(String, reader)?;
         let limit = load!(u32, reader)?;
-        Ok(Self { did, limit })
+        Ok(Self { did, limit, proof: Vec::new(), timestamp: 0 })
     }
 }
 
