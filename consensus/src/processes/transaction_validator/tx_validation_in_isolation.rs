@@ -41,6 +41,10 @@ impl TransactionValidator {
         if tx.payload.len() >= 4 {
             let p = &tx.payload[..4];
             if p == b"DCRT" || p == b"DUPD" || p == b"DDEC" {
+                // DID operations: enforce output value-range checks but allow
+                // zero-value outputs (DID ops carry no CSM transfer).
+                // Signatures are verified in the virtual processor.
+                check_did_output_value_ranges(tx)?;
                 return Ok(());
             }
         }
@@ -195,6 +199,27 @@ fn check_gas(tx: &Transaction) -> TxResult<()> {
 fn check_transaction_version(tx: &Transaction) -> TxResult<()> {
     if tx.version != TX_VERSION {
         return Err(TxRuleError::UnknownTxVersion(tx.version));
+    }
+    Ok(())
+}
+
+/// DID-specific output value check. Identical to check_transaction_output_value_ranges
+/// but allows zero-value outputs because DID operations (create/update/deactivate)
+/// carry no CSM transfer — their outputs are placeholders, not payments.
+fn check_did_output_value_ranges(tx: &Transaction) -> TxResult<()> {
+    let mut total: u64 = 0;
+    for (i, output) in tx.outputs.iter().enumerate() {
+        if output.value > MAX_KANA {
+            return Err(TxRuleError::TxOutTooHigh(i));
+        }
+        if let Some(new_total) = total.checked_add(output.value) {
+            total = new_total
+        } else {
+            return Err(TxRuleError::OutputsValueOverflow);
+        }
+        if total > MAX_KANA {
+            return Err(TxRuleError::TotalTxOutTooHigh);
+        }
     }
     Ok(())
 }

@@ -216,6 +216,16 @@ pub fn compute_block_did_changes(
     prefix: Prefix,
     verify: &dyn Fn(&[u8], &[u8], &[u8]) -> bool,
 ) -> Result<(H256, Vec<DidDocument>), DidError> {
+    // Cap per-block DID operations to prevent block-space exhaustion.
+    // Both commit and verify paths apply the same truncation, so state
+    // remains consistent across nodes.
+    const MAX_DID_OPS_PER_BLOCK: usize = 100;
+    let ops: &[DidOp] = if ops.len() > MAX_DID_OPS_PER_BLOCK {
+        &ops[..MAX_DID_OPS_PER_BLOCK]
+    } else {
+        ops
+    };
+
     let mut touched: HashMap<String, DidDocument> = HashMap::new();
 
     for op in ops {

@@ -195,6 +195,8 @@ struct RelayState {
     ttl: Duration,
     max_per_did: usize,
     max_envelope_bytes: usize,
+    max_total_envelopes: usize,
+    max_total_queues: usize,
     cleanup_started: std::sync::atomic::AtomicBool,
 }
 
@@ -203,9 +205,11 @@ impl RelayState {
         Self {
             sessions: DashMap::new(),
             queues: DashMap::new(),
-            ttl: Duration::from_secs(48 * 3600),
-            max_per_did: 100,
+            ttl: Duration::from_secs(24 * 3600),
+            max_per_did: 50,
             max_envelope_bytes: 8 * 1024,
+            max_total_envelopes: 50_000,
+            max_total_queues: 5_000,
             cleanup_started: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -1537,16 +1541,63 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             });
         }
 
+        // Verify the DID exists and is active before allowing a subscription.
+        // This prevents anonymous clients from registering arbitrary DID strings
+        // to drain message queues they do not own.
+        let did_session = self.consensus_manager.consensus().unguarded_session();
+        match did_session.get_did_document(&request.did) {
+            Some(doc) if doc.active => {}
+            Some(_) => {
+                return Ok(RelaySubscribeResponse {
+                    subscribed: false,
+                    pending: Vec::new(),
+                    error: Some("did is deactivated".to_string()),
+                });
+            }
+            None => {
+                return Ok(RelaySubscribeResponse {
+                    subscribed: false,
+                    pending: Vec::new(),
+                    error: Some("did not found".to_string()),
+                });
+            }
+        }
+
+        // Prevent session hijacking: if the DID already has an active session
+        // bound to a different connection, reject the new subscriber.
+        if let Some(existing) = self.relay_state.sessions.get(&request.did) {
+            if existing.conn_id != conn_id
+                && Instant::now().duration_since(existing.last_seen) < Duration::from_secs(90)
+            {
+                return Ok(RelaySubscribeResponse {
+                    subscribed: false,
+                    pending: Vec::new(),
+                    error: Some("did already subscribed on another connection".to_string()),
+                });
+            }
+        }
+
+        // Enforce global queue cap.
+        if self.relay_state.queues.len() >= self.relay_state.max_total_queues
+            && !self.relay_state.queues.contains_key(&request.did)
+        {
+            return Ok(RelaySubscribeResponse {
+                subscribed: false,
+                pending: Vec::new(),
+                error: Some("relay queue capacity reached".to_string()),
+            });
+        }
+
         self.relay_state.sessions.insert(
             request.did.clone(),
             SessionInfo { conn_id, last_seen: Instant::now() },
         );
 
-        let pending = self.drain_queue(&request.did, 100);
-
+        // Do not drain the queue on subscribe. The subscriber must call
+        // relay_poll, which enforces connection ownership, to retrieve messages.
         Ok(RelaySubscribeResponse {
             subscribed: true,
-            pending,
+            pending: Vec::new(),
             error: None,
         })
     }
@@ -1557,14 +1608,29 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         request: RelaySendRequest,
     ) -> RpcResult<RelaySendResponse> {
         self.relay_state.clone().ensure_cleanup_task();
-        let conn_id = connection.map(|c| c.id());
-        let mut sender_ok = conn_id.is_none();
-        if let Some(mut s) = self.relay_state.sessions.get_mut(&request.from) {
-            if conn_id.is_none() || Some(s.conn_id) == conn_id {
-                s.last_seen = Instant::now();
-                sender_ok = true;
+        let conn_id = match connection.map(|c| c.id()) {
+            Some(id) => id,
+            None => {
+                return Ok(RelaySendResponse {
+                    status: "error".to_string(),
+                    error: Some("relay_send requires an active connection".to_string()),
+                });
             }
-        }
+        };
+        // Verify sender ownership: the `from` DID must have an active session
+        // bound to this connection.
+        let sender_ok = {
+            if let Some(mut s) = self.relay_state.sessions.get_mut(&request.from) {
+                if s.conn_id == conn_id {
+                    s.last_seen = Instant::now();
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
         if !sender_ok {
             return Ok(RelaySendResponse {
                 status: "error".to_string(),
@@ -1601,18 +1667,31 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         let max = self.relay_state.max_per_did;
 
         {
+            // Enforce global envelope cap before inserting.
+            let total: usize = self.relay_state.queues.iter().map(|q| q.len()).sum();
+            if total >= self.relay_state.max_total_envelopes {
+                return Ok(RelaySendResponse {
+                    status: "error".to_string(),
+                    error: Some("relay global envelope capacity reached".to_string()),
+                });
+            }
             let mut entry = self
                 .relay_state
                 .queues
                 .entry(request.to.clone())
                 .or_insert_with(VecDeque::new);
+            // Reject new envelopes when the per-DID queue is full instead of
+            // evicting existing (potentially legitimate) messages.
+            if entry.len() >= max {
+                return Ok(RelaySendResponse {
+                    status: "error".to_string(),
+                    error: Some(format!("recipient queue is full (max {})", max)),
+                });
+            }
             entry.push_back(QueuedEnvelope {
                 envelope,
                 enqueued_at: Instant::now(),
             });
-            while entry.len() > max {
-                entry.pop_front();
-            }
         }
 
         Ok(RelaySendResponse {
@@ -1627,10 +1706,22 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
 
     async fn relay_poll_call(
         &self,
-        _connection: Option<&DynRpcConnection>,
+        connection: Option<&DynRpcConnection>,
         request: RelayPollRequest,
     ) -> RpcResult<RelayPollResponse> {
         self.relay_state.clone().ensure_cleanup_task();
+
+        let conn_id = match connection.map(|c| c.id()) {
+            Some(id) => id,
+            None => {
+                return Ok(RelayPollResponse {
+                    envelopes: Vec::new(),
+                    remaining: 0,
+                    error: Some("relay_poll requires an active connection".to_string()),
+                });
+            }
+        };
+
         if request.did.is_empty() {
             return Ok(RelayPollResponse {
                 envelopes: Vec::new(),
@@ -1639,8 +1730,27 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             });
         }
 
-        if let Some(mut s) = self.relay_state.sessions.get_mut(&request.did) {
-            s.last_seen = Instant::now();
+        // Verify ownership: the caller's connection must match the session
+        // bound to this DID. Without this check, any anonymous client could
+        // drain any DID's message queue.
+        let owns_session = {
+            if let Some(mut s) = self.relay_state.sessions.get_mut(&request.did) {
+                if s.conn_id == conn_id {
+                    s.last_seen = Instant::now();
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
+        if !owns_session {
+            return Ok(RelayPollResponse {
+                envelopes: Vec::new(),
+                remaining: 0,
+                error: Some("did is not subscribed with this connection".to_string()),
+            });
         }
 
         let limit = request.limit.clamp(1, 200) as usize;

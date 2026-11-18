@@ -82,13 +82,7 @@ fi
 # into BOTH verify_block_state and commit_virtual_state, so committed
 # roots and live state stay in sync across all flash outcomes.
 
-RPC_FLAGS=()
-if [ -n "${SAHYADRI_RPC_CERT:-}" ] && [ -n "${SAHYADRI_RPC_KEY:-}" ]; then
-  RPC_FLAGS+=(--rpccert="$SAHYADRI_RPC_CERT" --rpckey="$SAHYADRI_RPC_KEY")
-fi
-if [ -n "${SAHYADRI_RPC_AUTH:-}" ]; then
-  RPC_FLAGS+=(--rpcauth="$SAHYADRI_RPC_AUTH")
-fi
+source "$(dirname "$0")/rpc-setup.sh" "$@"
 
 exec "$NODE_BIN" \
  --appdir "$APPDIR" \

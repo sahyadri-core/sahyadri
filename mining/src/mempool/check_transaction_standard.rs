@@ -39,6 +39,7 @@ const MAXIMUM_STANDARD_TRANSACTION_MASS: u64 = 100_000;
 
 impl Mempool {
     pub(crate) fn check_transaction_standard_in_isolation(&self, transaction: &MutableTransaction) -> NonStandardResult<()> {
+        let transaction_id = transaction.id();
         // ──── DID SUBNETWORK EXEMPTION ────
         // DID operations (create/update/deactivate) are FREE:
         //  - 0-value output (no CSM required)
@@ -47,12 +48,25 @@ impl Mempool {
         if transaction.tx.payload.len() >= 4 {
             let p = &transaction.tx.payload[..4];
             if p == b"DCRT" || p == b"DUPD" || p == b"DDEC" {
+                // DID operations: enforce a size limit to prevent block-space
+                // exhaustion. Dust and script-class checks are skipped because
+                // DID ops use 0-value outputs and a custom payload format.
+                // Signatures are verified in the virtual processor.
+                let tx_size = transaction.tx.payload.len()
+                    + transaction.tx.outputs.iter()
+                        .map(|o| o.script_public_key.script().len() + 8)
+                        .sum::<usize>();
+                if tx_size > MAXIMUM_STANDARD_TRANSACTION_MASS as usize {
+                    return Err(NonStandardError::RejectComputeMass(
+                        transaction_id,
+                        tx_size as u64,
+                        MAXIMUM_STANDARD_TRANSACTION_MASS,
+                    ));
+                }
                 return Ok(());
             }
         }
         // ─────────────────────────────────
-
-        let transaction_id = transaction.id();
 
         // The transaction must be a currently supported version.
         //
