@@ -1,0 +1,11 @@
+[profile.ci]
+# Hosted Linux runners have four CPUs. Keep memory reservations consistent
+# when this profile is also used on a machine with more CPUs.
+test-threads = 4
+
+# Binary and native verifier circuits and their outer proofs use up to ~14 GiB
+# each, and their parallel provers already occupy every CPU. Run every test in
+# these suites alone so no pair of them can exhaust hosted runner memory.
+[[profile.ci.overrides]]
+filter = "package(=p3-recursion) & binary(/^(binary_(components|boolean|stark|poly)|native_recursion)$/)"
+threads-required = "num-test-threads"

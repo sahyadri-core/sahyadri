@@ -1,0 +1,22 @@
+//! Circuit builder module with specialized sub-components.
+
+mod circuit_builder;
+pub mod compiler;
+mod config;
+mod construction;
+mod errors;
+mod expression_builder;
+pub(crate) mod npo;
+mod public_input_tracker;
+
+pub use circuit_builder::{CircuitBuilder, VerifiedStatementTargets};
+pub use config::BuilderConfig;
+pub use construction::{CircuitConstructionLimits, CircuitConstructionUsage};
+pub use errors::CircuitBuilderError;
+pub use expression_builder::ExpressionBuilder;
+#[cfg(feature = "profiling")]
+pub use expression_builder::OpCounts;
+pub use npo::{
+    NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlugin, NpoLoweringContext,
+};
+pub use public_input_tracker::PublicInputTracker;

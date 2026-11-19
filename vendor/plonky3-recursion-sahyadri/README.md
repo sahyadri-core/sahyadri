@@ -1,0 +1,309 @@
+# Plonky3-recursion
+
+Plonky3 native support for recursive STARK verification, enabling proof composition and multi-layer recursion.
+
+## Overview
+
+This library provides a **fixed recursive verifier** for Plonky3 STARK (both `p3-uni-stark` and `p3-batch-stark` proofs), allowing you to verify proofs inside circuits and compose proofs recursively. The recursive verifier is implemented as a circuit itself, which can be proven and verified in subsequent layers.
+
+### Key Features
+
+- **Recursive STARK Verification**: Verify Plonky3 STARK proofs inside circuits
+- **Batch STARK Support**: Verify multiple proofs in a single batch
+- **Modular Circuit Builder**: Build circuits with primitive operations (add, mul, etc.) and non-primitive operations (Poseidon2)
+- **FRI-based PCS**: Full support for FRI (Fast Reed-Solomon Interactive) polynomial commitment scheme verification in-circuit
+- **ZK support**: Full support for Zero-Knowledge.
+
+## Production Use
+
+**⚠️ This codebase is under active development and hasn't been audited yet.** As such, we do not recommend its use in any production software.
+
+[![Coverage](https://github.com/Plonky3/Plonky3-recursion/actions/workflows/coverage.yml/badge.svg)](https://plonky3.github.io/Plonky3-recursion/coverage/) (_updated weekly_)
+
+## Quick Start
+
+### Development requirements
+
+Use the latest stable Rust toolchain for development. CI also uses nightly for
+`rustfmt`; the project does not promise an untested minimum supported Rust
+version. The root `Cargo.lock` fixes dependency resolution for local development
+and CI. Published library crates keep their semver dependency requirements, so
+downstream projects resolve compatible versions under their own lockfiles.
+
+### Unified recursion API
+
+#### Recursive verification
+
+For most use cases, use the **unified API**: a single owner type works for both uni-stark (e.g. Keccak) and batch-stark (e.g. Fibonacci) proofs. Implement [`FriRecursionConfig`] for your config (or a wrapper that holds FRI verifier params), then construct a [`PreparedLayer`] for repeated proving. Use [`build_and_prove_next_layer`] for a one-shot step.
+
+[`FriRecursionConfig`]: https://docs.rs/p3-recursion/latest/p3_recursion/trait.FriRecursionConfig.html
+[`prove_next_layer`]: https://docs.rs/p3-recursion/latest/p3_recursion/fn.prove_next_layer.html
+[`build_and_prove_next_layer`]: https://docs.rs/p3-recursion/latest/p3_recursion/fn.build_and_prove_next_layer.html
+
+```rust
+use p3_recursion::{
+    BatchOnly, FriRecursionBackend, FriRecursionConfig, PreparedInput, PreparedLayer,
+    PreparedSource, ProveNextLayerParams, RecursionInput,
+};
+
+// First layer: recurse on a uni-stark proof (e.g. Keccak), retaining the owner for reuse.
+let source = PreparedSource::UniStark {
+    proof: &base_proof,
+    air: &keccak_air,
+    public_inputs: &pis,
+    preprocessed_commit: None,
+};
+let backend = FriRecursionBackend::new(poseidon2_config).for_extension_degree::<4>();
+let params = ProveNextLayerParams { table_packing, constraint_profile };
+let owner = PreparedLayer::new(source, config.clone(), backend.clone(), params.clone())?;
+let output = owner.prove(PreparedInput::UniStark {
+    proof: &base_proof,
+    public_inputs: &pis,
+    preprocessed_commit: None,
+})?;
+
+// Next layers: prepare an owner from the previous batch proof, then check before each reuse.
+let RecursionInput::BatchStark { table_public_inputs, .. } =
+    output.into_recursion_input::<BatchOnly>() else { unreachable!() };
+let owner = PreparedLayer::new(
+    PreparedSource::batch(&output.0, &output.0.stark_common, &table_public_inputs),
+    config.clone(),
+    backend.clone(),
+    params,
+)?;
+let input = PreparedInput::BatchStark {
+    proof: &output.0,
+    common_data: &output.0.stark_common,
+    table_public_inputs: &table_public_inputs,
+};
+owner.check_input(&input)?;
+let output = owner.prove(input)?;
+```
+
+`PreparedLayer` retains the circuit and prepared prover data. For a changing native contract, construct a new owner explicitly; a matching contract can be checked and proved repeatedly.
+The compatibility check is shape-only: this owner does not bind child proving keys, recursion
+statements, or public claims. For verifier-authoritative reuse, use `TrustedPreparedLayer` or
+`TrustedPreparedAggregation`, supplying a trusted uni-STARK config/AIR and preprocessing
+commitment or a retained batch `CircuitVerifier`. Each proof attempt supplies witness data and
+the expected statement. See the [compiled trusted-owner example](recursion/src/prelude.rs) and
+[trusted layer tests](recursion/tests/prepared_layer.rs).
+
+#### Recursive aggregation
+
+This library also supports 2-to-1 recursive aggregation by building circuits verifying possibly different circuits (for instance 
+`RecursionInput::UniStark` as left child and `RecursionInput::BatchStark` as right child).
+
+```rust
+let input_1 = RecursionInput::UniStark {
+    proof: &base_proof_1,
+    air: &air_1,
+    public_inputs: pis_1.clone(),
+    preprocessed_commit: None,
+};
+let input_2 = RecursionInput::UniStark {
+    proof: &base_proof_2,
+    air: &air_2,
+    public_inputs: pis_2.clone(),
+    preprocessed_commit: None,
+};
+
+let backend = FriRecursionBackend::new(poseidon2_config).for_extension_degree::<4>();
+let params = ProveNextLayerParams { table_packing, constraint_profile };
+let output = build_and_prove_aggregation_layer(
+    &input_1,
+    &input_2,
+    &config,
+    &backend,
+    &params,
+)?;
+```
+
+### Low-level API
+
+For expert control of circuit construction, start with the checked
+[`PcsRecursionBackend` interface](recursion/src/recursion.rs) and
+[`FriRecursionConfig` implementation](recursion/src/builtin_config/fri/recursion.rs).
+FRI private data requires restoring each query's path from the pruned proof and replayed
+opening transcript before filling MMCS witness slots. The [low-level guide](book/src/user_guide/low_level_api.md)
+explains that boundary; the prepared owners handle it for ordinary use.
+
+### Examples
+
+All examples use the unified API (`PreparedLayer`, `PreparedAggregation`, borrowed `PreparedInput`, and the selected PCS backend):
+
+- **`recursive_fibonacci.rs`**: Base layer is a batch-stark circuit (Fibonacci); recursive layers retain a prepared owner and validate each borrowed batch input before proving.
+  ```bash
+  cargo run --profile optimized --example recursive_fibonacci -- --field koala-bear --n 1000 --num-recursive-layers 5
+  ```
+
+- **`recursive_keccak.rs`**: Base layer is a uni-stark Keccak proof; the prepared owner retains the uni-stark AIR for layer 1 and uses borrowed batch inputs for later layers.
+  ```bash
+  cargo run --profile optimized --example recursive_keccak -- --field koala-bear --n 100 --num-recursive-layers 5
+  ```
+
+- **`recursive_aggregation.rs`**: Base layer are dummy batch-stark circuits; recursive levels use prepared aggregation owners and validate both borrowed inputs before folding 2 proofs into 1.
+  ```bash
+  cargo run --profile optimized --example recursive_aggregation -- --field koala-bear --num-recursive-layers 4
+  ```
+
+All three examples take `--pcs <fri|whir>` (default `fri`), `--field <koala-bear|baby-bear|goldilocks>`, `--quintic` (KoalaBear only), and `--hash <poseidon2|poseidon1>` (default `poseidon2`):
+```bash
+cargo run --profile optimized --example recursive_fibonacci -- --field baby-bear --hash poseidon1 --n 1000
+```
+
+WHIR uses the same base computations, recursion depth, table packing, and prepared-owner
+reuse as FRI. `--log-blowup` sets its starting inverse rate, `--query-pow-bits` sets its
+maximum PoW budget, and `--whir-folding-factor` sets the variables folded per round
+(default `4`). `--whir-first-folding-factor` can set a separate initial fold.
+`--whir-first-round-domain-reduction` controls the first intermediate domain shrinkage
+(default `2`, then later domains halve); `1` restores native automatic rates. Larger
+reductions trade smaller prover codewords for more verifier queries.
+The default `--security-level` is `124` for FRI and `66` for WHIR; these are per-error-term
+targets. The WHIR maximum PoW budget defaults to `18` bits, while FRI query PoW remains `15`.
+WHIR debug logs include the composed prescribed-opening bound for each commitment.
+`--max-log-arity`, `--log-final-poly-len`, and `--commit-pow-bits` apply to FRI;
+`--zk`, `--disable-recompose-npo`, and aggregation's `--arity4` require FRI.
+WHIR also supports KoalaBear's quintic extension with `--pcs whir --quintic`,
+using either hash family.
+
+Binary-field support includes native circuit proofs with fixed indexed wiring
+and native Keccak tables. The current `binary_prover` example verifies a binary
+proof inside a prime-field recursion layer; a complete binary-host recursive
+verifier is still being implemented. See the [binary-field guide](book/src/advanced_topics/binary_fields.md)
+for the supported paths and their current limits.
+
+```bash
+cargo run --profile optimized --example recursive_fibonacci -- --pcs whir --n 1000 --num-recursive-layers 2
+cargo run --profile optimized --example recursive_keccak -- --pcs whir --num-hashes 100 --num-recursive-layers 2
+cargo run --profile optimized --example recursive_aggregation -- --pcs whir --num-recursive-layers 2
+```
+
+## API Overview
+
+### Circuit Builder
+
+The `CircuitBuilder<F>` provides a modular API for building circuits:
+
+**Primitive Operations** (always available):
+- `define_const(val)` - Add a constant
+- `public_input()` - Allocate a public input
+- `mul(a, b)` - Multiply two expressions
+- `add(a, b)` / `sub(a, b)` - Arithmetic operations
+- `connect(a, b)` - Constrain two expressions to be equal
+
+**Non-primitive Operations** (require explicit enablement):
+- `enable_poseidon2_perm()` - Enable Poseidon2 permutation operations
+- Operations must be explicitly enabled via `enable_poseidon2_perm()` before use
+
+### Public Inputs
+
+Public inputs must be provided in the **exact order** the circuit allocated them. Use the builder APIs to ensure correctness:
+
+```rust
+use p3_recursion::public_inputs::PublicInputBuilder;
+
+let mut builder = PublicInputBuilder::new();
+builder
+    .add_proof_values(proof_values)
+    .add_challenge(alpha)
+    .add_challenges(betas);
+let public_inputs = builder.build();
+```
+
+For batch verification, use `BatchStarkVerifierInputsBuilder::pack_public_values()` which handles the packing automatically.
+
+## Architecture
+
+### Components
+
+1. **Circuit Builder** (`p3_circuit`): Expression graph builder with primitive and non-primitive operations
+2. **Circuit Prover** (`p3_circuit_prover`): Generates STARK proofs for circuits
+3. **Recursive Verifier** (`p3_recursion::verifier`): Verifies STARK proofs inside circuits
+4. **FRI PCS** (`p3_recursion::pcs::fri`): FRI polynomial commitment scheme verification in-circuit
+
+### Recursion Flow
+
+1. **Base Layer**: Prove a computation using Plonky3 STARK
+2. **Recursive Layer**: Build a verification circuit that checks the base proof
+3. **Prove Recursive Layer**: Prove the verification circuit itself
+4. **Repeat**: Continue recursion for additional layers
+
+Each recursive layer verifies the previous layer's proof, creating a chain of proofs.
+
+## Performance Considerations
+
+### Table Packing
+
+The `TablePacking` configuration significantly impacts performance.
+Choose lane counts that fit best your circuit size:
+
+```rust
+TablePacking::new(2, 5)  // public, alu lanes
+```
+
+### FRI Parameters
+
+FRI parameters affect proof size and verification cost:
+- `log_blowup`: LDE blowup factor (typically 3)
+- `max_log_arity`: Maximum folding arity (typically 4)
+- `log_final_poly_len`: Final polynomial size (typically 5)
+- `query_pow_bits`: PoW bits for query phase (typically 16)
+
+For intermediate recursive layers, consider relaxed parameters (fewer queries, higher PoW bits).
+
+## Build Profiles and Compile Features
+
+### Build profiles
+
+Two custom profiles are defined in the workspace `Cargo.toml`:
+
+| Profile | Based on | Description |
+|---------|----------|-------------|
+| `optimized` | `release` | Thin LTO, 16 codegen units, `opt-level = 3`. Use for benchmarks and performance runs. |
+| `profiling` | `release` | Like `release` but with debug symbols (`debug = true`) for CPU profilers (`perf`, Instruments, `samply`). |
+
+```bash
+cargo run --profile optimized --example recursive_fibonacci --features parallel
+cargo run --profile profiling  --example recursive_fibonacci --features parallel
+```
+
+### Compile features
+
+| Crate | Feature | Description |
+|-------|---------|-------------|
+| `p3-circuit` | `debugging` | Builder allocation logs and compiled source provenance for owned runner diagnostics. |
+| `p3-circuit` | `profiling` | Operation-count profiling (implies `debugging`) — tracks `add`/`mul`/`const`/NPO counts globally and per named scope via `OpCounts`. |
+| `p3-circuit-prover` | `parallel` | Multi-threaded trace generation via Rayon. Strongly recommended for benchmarks and production. |
+
+See [Debugging](https://Plonky3.github.io/Plonky3-recursion/advanced_topics/debugging.html) in the book for full details.
+
+## Current Limitations
+
+- **Fixed Configurations**: Field extensions are currently not fully parametrizable.
+
+## Documentation
+
+Documentation is still incomplete and will be improved over time.
+
+- **[Plonky3 Recursion Book](https://Plonky3.github.io/Plonky3-recursion/)**: Comprehensive walkthrough of the recursion approach
+- **API Documentation**: `cargo doc --open` for full API reference
+- **Examples**: See `recursion/examples/` for working code
+
+## Modular Circuit Builder
+
+The `CircuitBuilder<F>` supports both primitive and non-primitive operations. Primitive ops like `Const`, `Public`, `Add` are always available.
+
+Non-primitive operations (e.g. Poseidon2 permutations) must be explicitly enabled on the builder before use. Attempting to use a non-primitive operation that hasn't been enabled will result in a runtime error.
+
+## License
+
+Licensed under either of
+
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

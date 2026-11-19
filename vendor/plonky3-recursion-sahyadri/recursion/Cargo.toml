@@ -1,0 +1,341 @@
+[package]
+name = "p3-recursion"
+description.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+# Share integration fixture types across a small number of test crates.
+autotests = false
+
+[dependencies]
+p3-blake3-air = "0.8.0"
+p3-maybe-rayon.workspace = true
+p3-poseidon2b = { workspace = true }
+
+# Other dependencies
+hashbrown.workspace = true
+itertools.workspace = true
+# Plonky3 dependencies
+p3-air.workspace = true
+p3-baby-bear.workspace = true
+p3-batch-stark.workspace = true
+p3-binary-dft.workspace = true
+p3-binary-field.workspace = true
+p3-binary-pcs.workspace = true
+p3-blake3.workspace = true
+p3-bus.workspace = true
+p3-challenger.workspace = true
+
+# Local dependencies
+p3-circuit.workspace = true
+p3-circuit-prover.workspace = true
+p3-commit.workspace = true
+p3-dft.workspace = true
+p3-field.workspace = true
+p3-fri.workspace = true
+p3-goldilocks.workspace = true
+p3-keccak.workspace = true
+p3-koala-bear.workspace = true
+p3-lookup.workspace = true
+p3-matrix.workspace = true
+p3-merkle-tree.workspace = true
+p3-multi-stark.workspace = true
+p3-multilinear-util.workspace = true
+p3-poseidon2-air.workspace = true
+p3-poseidon2-circuit-air.workspace = true
+p3-sumcheck.workspace = true
+p3-symmetric.workspace = true
+p3-uni-stark.workspace = true
+p3-util.workspace = true
+p3-whir.workspace = true
+postcard = { version = "1.1.3", features = ["alloc"] }
+rand = { workspace = true, features = ["std_rng"] }
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+unroll.workspace = true
+
+[dev-dependencies]
+blake3 = "1.5"
+clap.workspace = true
+libmimalloc-sys.workspace = true
+mimalloc.workspace = true
+p3-air.workspace = true
+p3-challenger.workspace = true
+p3-dft.workspace = true
+p3-goldilocks.workspace = true
+p3-keccak-air.workspace = true
+p3-matrix.workspace = true
+p3-poseidon2.workspace = true
+p3-test-utils.workspace = true
+p3-util.workspace = true
+p3-blake3-air = "0.8.0"
+proptest.workspace = true
+rand.workspace = true
+rayon.workspace = true
+tracing-forest = { workspace = true, features = ["smallvec"] }
+tracing-subscriber = { workspace = true, features = ["std", "env-filter"] }
+
+[features]
+default = ["frost-gkr"]
+std = []
+frost-gkr = []
+parallel = [
+    "p3-maybe-rayon/parallel",
+    "p3-circuit/parallel",
+    "p3-circuit-prover/parallel",
+    "p3-poseidon2-circuit-air/parallel",
+]
+
+[[test]]
+name = "binary_boolean"
+path = "tests/suites/binary_boolean.rs"
+
+[[test]]
+name = "binary_components"
+path = "tests/suites/binary_components.rs"
+
+[[test]]
+name = "binary_poly"
+path = "tests/suites/binary_poly.rs"
+
+[[test]]
+name = "binary_stark"
+path = "tests/suites/binary_stark.rs"
+
+[[test]]
+name = "fri_recursion"
+path = "tests/suites/fri_recursion.rs"
+
+[[test]]
+name = "native_recursion"
+path = "tests/suites/native_recursion.rs"
+
+[[test]]
+name = "prepared_recursion"
+path = "tests/suites/prepared_recursion.rs"
+
+[[test]]
+name = "protocol_contracts"
+path = "tests/suites/protocol_contracts.rs"
+
+[[test]]
+name = "whir_recursion"
+path = "tests/suites/whir_recursion.rs"
+
+[[test]]
+name = "whir_quintic"
+path = "tests/whir_quintic.rs"
+
+[lints]
+workspace = true
+
+[[test]]
+name = "day4_probe"
+path = "tests/day4_probe.rs"
+
+[[test]]
+name = "day4_single_air_proof"
+path = "tests/day4_single_air_proof.rs"
+
+[[test]]
+name = "day4_three_air_proofs"
+path = "tests/day4_three_air_proofs.rs"
+[[test]]
+name = "day5_multi_air_whir"
+path = "tests/day5_multi_air_whir.rs"
+[[test]]
+name = "day6_chain_scale"
+path = "tests/day6_chain_scale.rs"
+
+[[test]]
+name = "blake3_bridge_test"
+path = "tests/blake3_bridge_test.rs"
+
+[[test]]
+name = "blake3_goldilocks_bridge"
+path = "tests/blake3_goldilocks_bridge.rs"
+
+[[test]]
+name = "fri_verifier_multi_stark"
+path = "tests/fri_verifier_multi_stark.rs"
+
+[[test]]
+name = "fri_verifier_v2_scale"
+path = "tests/fri_verifier_v2_scale.rs"
+
+[[test]]
+name = "fri_verifier_from_real_proof"
+path = "tests/fri_verifier_from_real_proof.rs"
+
+[dependencies.sahyadri-fri-binius]
+path = "../../sahyadri-final/sahyadri/crates/sahyadri-fri-binius"
+
+[[test]]
+name = "pathc_probe"
+path = "tests/pathc_probe.rs"
+
+[[test]]
+name = "phase3e_trace_builder"
+path = "tests/phase3e_trace_builder.rs"
+
+[[test]]
+name = "phase3e_multi_stark_proof"
+path = "tests/phase3e_multi_stark_proof.rs"
+
+[[test]]
+name = "phase3e_simple"
+path = "tests/phase3e_simple.rs"
+
+[[test]]
+name = "phase3e_verify"
+path = "tests/phase3e_verify.rs"
+
+[[test]]
+name = "phase3d2d_combined"
+path = "tests/phase3d2d_combined.rs"
+
+[[test]]
+name = "phase3d2d_depth8"
+path = "tests/phase3d2d_depth8.rs"
+
+[[test]]
+name = "phase3d2d_depth16"
+path = "tests/phase3d2d_depth16.rs"
+
+[[test]]
+name = "phase3f_real_scale"
+path = "tests/phase3f_real_scale.rs"
+
+[[test]]
+name = "phase_c1_5_combined"
+path = "tests/phase_c1_5_combined.rs"
+
+[[test]]
+name = "phase_t1_1_aggregation"
+path = "tests/phase_t1_1_aggregation.rs"
+
+[[test]]
+name = "phase_t1_2a_tree_loop"
+path = "tests/phase_t1_2a_tree_loop.rs"
+
+[[test]]
+name = "t1_4b2c_blake3_transcript_prove"
+path = "tests/t1_4b2c_blake3_transcript_prove.rs"
+
+[[test]]
+name = "t1_4b2c_bus_integration"
+path = "tests/t1_4b2c_bus_integration.rs"
+
+[[test]]
+name = "t1_5_probe_plonky3_bus_verifier"
+path = "tests/t1_5_probe_plonky3_bus_verifier.rs"
+
+[[test]]
+name = "t1_5a_sc_fri_coexist"
+path = "tests/t1_5a_sc_fri_coexist.rs"
+
+[[test]]
+name = "t1_5bc_three_air_coexist"
+path = "tests/t1_5bc_three_air_coexist.rs"
+
+[[test]]
+name = "t1_5d_proof_extraction"
+path = "tests/t1_5d_proof_extraction.rs"
+
+[[test]]
+name = "t1_5d_step34_public_binding"
+path = "tests/t1_5d_step34_public_binding.rs"
+
+[[test]]
+name = "pathA_real_proof_integration"
+path = "tests/pathA_real_proof_integration.rs"
+
+[[test]]
+name = "pathA_three_air_assembly"
+path = "tests/pathA_three_air_assembly.rs"
+
+[[test]]
+name = "t1_3_scale_loop"
+path = "tests/t1_3_scale_loop.rs"
+
+[[test]]
+name = "t1_2b_complete"
+path = "tests/t1_2b_complete.rs"
+
+[[test]]
+name = "t1_2b_v2_real_proof"
+path = "tests/t1_2b_v2_real_proof.rs"
+
+[[test]]
+name = "t1_3_real_leaves_scale"
+path = "tests/t1_3_real_leaves_scale.rs"
+
+[[test]]
+name = "t1_3_real_4444_e2e"
+path = "tests/t1_3_real_4444_e2e.rs"
+
+[[test]]
+name = "t1_4c_s2_poseidon2b_binarypcs"
+path = "tests/t1_4c_s2_poseidon2b_binarypcs.rs"
+
+[[test]]
+name = "t1_2b_poseidon2b"
+path = "tests/t1_2b_poseidon2b.rs"
+
+[[test]]
+name = "t1_4c_s4_sub3_merkle_wire"
+path = "tests/t1_4c_s4_sub3_merkle_wire.rs"
+
+[[test]]
+name = "t1_4c_s5_combined"
+path = "tests/t1_4c_s5_combined.rs"
+
+[[test]]
+name = "t1_4c_s7_tree_agg"
+path = "tests/t1_4c_s7_tree_agg.rs"
+
+[[test]]
+name = "t1_4c_s7_v2_real"
+path = "tests/t1_4c_s7_v2_real.rs"
+
+[[test]]
+name = "t1_4c_s8_bridge_gate"
+path = "tests/t1_4c_s8_bridge_gate.rs"
+
+[[test]]
+name = "t1_4c_s8_bridge_v2"
+path = "tests/t1_4c_s8_bridge_v2.rs"
+
+[[test]]
+name = "t1_4c_s8_bridge_v2sc"
+path = "tests/t1_4c_s8_bridge_v2sc.rs"
+
+[[test]]
+name = "t1_4c_s8_merkle_path_2f"
+path = "tests/t1_4c_s8_merkle_path_2f.rs"
+
+[[test]]
+name = "t1_4c_iso_p2b"
+path = "tests/t1_4c_iso_p2b.rs"
+
+[[test]]
+name = "s1_pathb_recursive_compose"
+path = "tests/s1_pathb_recursive_compose.rs"
+
+[[test]]
+name = "s2_eight_leaf_tree"
+path = "tests/s2_eight_leaf_tree.rs"
+
+[[test]]
+name = "s3_cached_scale"
+path = "tests/s3_cached_scale.rs"
+
+[[test]]
+name = "s3b_batched_scale"
+path = "tests/s3b_batched_scale.rs"
