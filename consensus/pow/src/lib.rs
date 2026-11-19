@@ -13,10 +13,21 @@ use crate::matrix::Matrix;
 use crate::memory_loop::MemoryLoop;
 use sahyadri_consensus_core::{BlockLevel, hashing, header::Header};
 use sahyadri_hashes::PowHash;
+use sahyadri_hashes::Hash;
+use std::sync::{Mutex, OnceLock};
+use std::collections::HashMap;
+
+const POW_CACHE_MAX: usize = 10_000;
+
+fn pow_cache() -> &'static Mutex<HashMap<(Hash, u64), (bool, Uint256)>> {
+    static CACHE: OnceLock<Mutex<HashMap<(Hash, u64), (bool, Uint256)>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
 use sahyadri_math::Uint256;
 
 /// State is an intermediate data structure with pre-computed values to speed up mining.
 pub struct State {
+    header_hash: Hash,
     pub(crate) matrix: Matrix,
     pub(crate) target: Uint256,
     // PRE_POW_HASH || TIME || 32 zero byte padding; without NONCE
@@ -33,8 +44,9 @@ impl State {
         // PRE_POW_HASH || TIME || 32 zero byte padding || NONCE
         let hasher = PowHash::new(pre_pow_hash, header.timestamp);
         let matrix = Matrix::generate(pre_pow_hash);
+        let header_hash = header.hash;
 
-        Self { matrix, target, hasher, memory_loop: MemoryLoop::new(&pre_pow_hash) }
+        Self { header_hash, matrix, target, hasher, memory_loop: MemoryLoop::new(&pre_pow_hash) }
     }
 
     #[inline]
@@ -50,9 +62,28 @@ impl State {
     #[inline]
     #[must_use]
     pub fn check_pow(&self, nonce: u64) -> (bool, Uint256) {
+        // Check the PoW verification cache first. Avoids recomputing the
+        // 1.05M-hash PoW when the same header+nonce is seen from multiple peers.
+        let cache_key = (self.header_hash, nonce);
+        {
+            let cache = pow_cache().lock().unwrap();
+            if let Some(&result) = cache.get(&cache_key) {
+                return result;
+            }
+        }
+
         let pow = self.calculate_pow(nonce);
-        // The pow hash must be less or equal than the claimed target.
-        (pow <= self.target, pow)
+        let result = (pow <= self.target, pow);
+
+        // Store in cache. Clear on overflow (simple eviction).
+        {
+            let mut cache = pow_cache().lock().unwrap();
+            if cache.len() >= POW_CACHE_MAX {
+                cache.clear();
+            }
+            cache.insert(cache_key, result);
+        }
+        result
     }
 }
 

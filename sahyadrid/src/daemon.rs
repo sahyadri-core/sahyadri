@@ -764,8 +764,8 @@ Do you confirm? (y/n)";
     .for_each(|server| async_runtime.register(server));
 
     // ─── SyncWave fast bootstrap (opt-in) ───
-    // Runs synchronously before the node starts serving. On error, logs and panics
-    // — an operator who opted in expects a working bootstrap.
+    // Runs synchronously before the node starts serving. On error, logs and
+    // falls back to regular IBD — does not panic.
     if let Some(peer_url) = args.sync_wave.clone() {
         info!("SyncWave: bootstrapping from {}", peer_url);
 
@@ -773,7 +773,8 @@ Do you confirm? (y/n)";
             Some(h) => match h.parse::<Hash>() {
                 Ok(h) => Some(h),
                 Err(e) => {
-                    panic!("SyncWave: invalid checkpoint hash '{}': {}", h, e);
+                    log::error!("SyncWave: invalid checkpoint hash '{}': {} — skipping SyncWave, falling back to IBD", h, e);
+                    None
                 }
             },
             None => None,
@@ -800,10 +801,10 @@ Do you confirm? (y/n)";
         );
 
         if !insecure && checkpoint.is_none() {
-            panic!(
-                "SyncWave: --sync-wave-checkpoint (or SAHYADRI_CHECKPOINT_HASH) is required. \n\
-                 Get the hash from the archival node's log line \"checkpoint block=<hash> height=<n>\".\n\
-                 For local testing only, set SAHYADRI_SYNC_INSECURE=1 to bypass."
+            log::error!(
+                "SyncWave: --sync-wave-checkpoint (or SAHYADRI_CHECKPOINT_HASH) is required. \
+                 Skipping SyncWave, falling back to IBD. \
+                 For local testing, set SAHYADRI_SYNC_INSECURE=1 to bypass."
             );
         }
 
@@ -822,13 +823,19 @@ Do you confirm? (y/n)";
             .build()
             .expect("SyncWave: failed to create tokio runtime");
 
-        let result = rt.block_on(
-            crate::sync_wave_bootstrap::bootstrap_from_peer(config, &*session)
-        );
+        // 5-minute deadline. A malicious or slow seed can hang the node
+        // indefinitely without this. On timeout, fall back to regular IBD.
+        let result = rt.block_on(async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(300),
+                crate::sync_wave_bootstrap::bootstrap_from_peer(config, &*session),
+            ).await
+        });
 
         match result {
-            Ok(_) => info!("SyncWave: bootstrap complete"),
-            Err(e) => panic!("SyncWave: bootstrap failed: {}", e),
+            Ok(Ok(_)) => info!("SyncWave: bootstrap complete"),
+            Ok(Err(e)) => log::error!("SyncWave: bootstrap failed: {} — falling back to IBD", e),
+            Err(_) => log::error!("SyncWave: bootstrap timed out (300s) — falling back to IBD"),
         }
     }
 

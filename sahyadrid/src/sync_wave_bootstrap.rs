@@ -126,6 +126,24 @@ pub async fn bootstrap_from_peer(
         metadata.total_chunks
     );
 
+    // ─── 2a. Clamp peer-controlled allocation sizes ───
+    // A malicious seed can declare huge counts to OOM the node.
+    // Reject metadata that exceeds sane bounds.
+    const MAX_SMT_NODES: u64 = 50_000_000;
+    const MAX_ACCOUNTS: u64 = 50_000_000;
+    const MAX_DID_STATES: u64 = 10_000_000;
+    const MAX_CHUNKS: u32 = 10_000;
+
+    if metadata.total_smt_nodes > MAX_SMT_NODES
+        || metadata.total_accounts > MAX_ACCOUNTS
+        || metadata.total_did_states > MAX_DID_STATES
+        || metadata.total_chunks > MAX_CHUNKS
+    {
+        return Err(SyncWaveBootstrapError::Rpc(
+            "metadata sizes exceed safety limits — possible malicious seed".into(),
+        ));
+    }
+
     // ─── 2b. Enforce checkpoint anchoring ───
     if config.insecure {
         log::warn!(
