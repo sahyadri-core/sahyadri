@@ -83,6 +83,16 @@ impl ConsensusApi for ConsensusMock {
         Ok(None)
     }
 
+    fn get_chain_proof(
+        &self,
+        _block_hash: sahyadri_consensus_core::Hash,
+    ) -> Result<
+        Option<sahyadri_consensus_core::api::ChainProofDto>,
+        sahyadri_consensus_core::errors::consensus::ConsensusError,
+    > {
+        Ok(None)
+    }
+
     fn verify_and_insert_block_proof(
         &self,
         _block_hash: sahyadri_consensus_core::Hash,

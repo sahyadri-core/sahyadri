@@ -1,4 +1,6 @@
 #![allow(unused_imports)]  // COINBASE_TRANSACTION_INDEX and unix_now are unused while the template-modification stub is active.
+
+use sahyadri_consensus_core::tx::{Transaction, TransactionId};
 use super::errors::BuilderResult;
 use sahyadri_consensus_core::{
     api::ConsensusApi,
@@ -89,31 +91,61 @@ impl BlockTemplateBuilder {
         Ok(consensus.build_block_template(miner_data.clone(), selector, build_mode)?)
     }
 
-    /// modify_block_template clones an existing block template, modifies it to the requested coinbase data and updates the timestamp
+    /// modify_block_template rebuilds the block with the new miner data while
+    /// preserving the original template's transactions. Produces a fully
+    /// consistent template with the correct account_commitment by delegating
+    /// to build_block_template.
     pub(crate) fn modify_block_template(
-        _consensus: &dyn ConsensusApi,
-        _new_miner_data: &MinerData,
-        _block_template_to_modify: &BlockTemplate,
+        consensus: &dyn ConsensusApi,
+        new_miner_data: &MinerData,
+        block_template_to_modify: &BlockTemplate,
     ) -> BuilderResult<BlockTemplate> {
-        // Previously swapped the coinbase payload but
-        // only called `header.finalize()` — the header's account_commitment
-        // field, which is part of the hash preimage and depends on coinbase
-        // contents, was left stale. Every block mined on such a template was
-        // rejected by verify_block_state with BadAccountCommitment, blocking
-        // external miners (pools, ASICs) from producing valid blocks entirely.
-        //
-        // The proper fix requires a new ConsensusApi::recompute_account_commitment
-        // method (deferred to a follow-up commit) that recomputes the commitment
-        // from the modified coinbase using parent_root + DAA + subsidy schedule.
-        //
-        // Until then: fail-closed. External miners MUST call build_block_template
-        // with their own MinerData — that path produces a fully-consistent
-        // template including the correct account_commitment.
-        Err(super::errors::BuilderError::NotSupported(
-            "modify_block_template temporarily disabled. \
-             External miners: call build_block_template with your own MinerData \
-             instead — it produces a fully-consistent template with the correct \
-             account_commitment.".into(),
-        ))
+        let original_txs: Vec<Transaction> = block_template_to_modify
+            .block
+            .transactions
+            .iter()
+            .skip(1)
+            .cloned()
+            .collect();
+
+        let selector = Box::new(PreselectedTxSelector::new(original_txs));
+
+        consensus
+            .build_block_template(
+                new_miner_data.clone(),
+                selector,
+                TemplateBuildMode::Standard,
+            )
+            .map_err(Into::into)
+    }
+}
+
+/// Transaction selector that returns a pre-selected batch of transactions.
+/// Used by modify_block_template to preserve the original template's txs
+/// while rebuilding the coinbase for a new miner.
+struct PreselectedTxSelector {
+    txs: Vec<Transaction>,
+    consumed: bool,
+}
+
+impl PreselectedTxSelector {
+    fn new(txs: Vec<Transaction>) -> Self {
+        Self { txs, consumed: false }
+    }
+}
+
+impl TemplateTransactionSelector for PreselectedTxSelector {
+    fn select_transactions(&mut self) -> Vec<Transaction> {
+        if self.consumed {
+            return Vec::new();
+        }
+        self.consumed = true;
+        std::mem::take(&mut self.txs)
+    }
+
+    fn reject_selection(&mut self, _tx_id: TransactionId) {}
+
+    fn is_successful(&self) -> bool {
+        true
     }
 }
