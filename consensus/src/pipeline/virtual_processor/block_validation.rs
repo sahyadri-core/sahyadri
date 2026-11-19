@@ -3,7 +3,7 @@ use crate::{
     errors::{
         BlockProcessResult,
         RuleError::{
-            AccountCommitmentComputeFailed, BadAccountCommitment,
+            AccountCommitmentComputeFailed, BadAccountCommitment, BadAcceptedIDMerkleRoot,
             InvalidTransactionsInBlockContext, WrongHeaderPruningPoint,
         },
     },
@@ -305,12 +305,12 @@ impl VirtualStateProcessor {
         trace!("correct commitment: {}, {}", header.hash, expected_commitment);
 
         // Verify header accepted_id_merkle_root
-        let _expected_accepted_id_merkle_root =
+        let expected_accepted_id_merkle_root =
             self.calc_accepted_id_merkle_root(ctx.accepted_tx_ids.iter().copied(), ctx.selected_parent());
 
-        // if expected_accepted_id_merkle_root != header.accepted_id_merkle_root {
-        // return Err(BadAcceptedIDMerkleRoot(header.hash, header.accepted_id_merkle_root, expected_accepted_id_merkle_root));
-        // }
+        if expected_accepted_id_merkle_root != header.accepted_id_merkle_root {
+        return Err(BadAcceptedIDMerkleRoot(header.hash, header.accepted_id_merkle_root, expected_accepted_id_merkle_root));
+        }
 
         let txs = self.block_transactions_store.get(header.hash).unwrap();
 
