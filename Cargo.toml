@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["vendor/plonky3-recursion-sahyadri"]
 members = [
     "components/proof_prover",
     "daemon",
