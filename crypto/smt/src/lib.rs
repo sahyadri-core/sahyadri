@@ -176,6 +176,13 @@ pub fn hash_key(data: &[u8]) -> H256 {
     let hasher = make_poseidon2_hasher();
     let domain = key_domain();
 
+    // Absorb the original byte length to prevent zero-padding aliasing.
+    // Without this, [0x01, 0x02] and [0x01, 0x02, 0x00] produce the same
+    // hash after padding to 32 bytes — distinct account keys would collide.
+    let data_len = data.len() as u64;
+    let mut len_bytes = [0u8; 32];
+    len_bytes[..8].copy_from_slice(&data_len.to_le_bytes());
+
     // Pad input to multiple of 32 bytes; ensure at least one chunk.
     let mut padded = data.to_vec();
     while padded.len() % 32 != 0 {
@@ -185,8 +192,11 @@ pub fn hash_key(data: &[u8]) -> H256 {
         padded.resize(32, 0);
     }
 
-    let mut input: Vec<Goldilocks> = Vec::with_capacity(4 + (padded.len() / 32) * 4);
+    let mut input: Vec<Goldilocks> = Vec::with_capacity(4 + 4 + (padded.len() / 32) * 4);
     input.extend_from_slice(&domain);
+    // Include the original length as 4 field elements (keeps total
+    // a multiple of the rate-4 sponge).
+    input.extend_from_slice(&bytes_to_goldilocks(&len_bytes));
     for chunk in padded.chunks(32) {
         let mut arr = [0u8; 32];
         arr.copy_from_slice(chunk);

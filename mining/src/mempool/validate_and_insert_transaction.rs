@@ -109,6 +109,22 @@ impl Mempool {
                 sender_address = faster_hex::hex_string(&full_script);
             }
 
+            // For DID operations (DCRT/DUPD/DDEC), there are no UTXO entries.
+            // Derive the sender from the payload so each DID gets its own
+            // bucket instead of all DID ops sharing one empty-string bucket.
+            if sender_address.is_empty() && transaction.tx.payload.len() >= 4 {
+                let prefix = &transaction.tx.payload[..4];
+                if prefix == b"DCRT" || prefix == b"DUPD" || prefix == b"DDEC" {
+                    // Use the first 64 bytes of the payload as a sender
+                    // identifier. This includes the DID string, so different
+                    // DIDs get different buckets.
+                    let hashable_len = transaction.tx.payload.len().min(64);
+                    sender_address = faster_hex::hex_string(
+                        &transaction.tx.payload[..hashable_len],
+                    );
+                }
+            }
+
             // 3. Count Pending Transactions for this Sender
             let pending_count = self.transaction_pool.count_txs_by_sender(&sender_address);
 

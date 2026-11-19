@@ -20,7 +20,10 @@ pub struct TransactionValidator {
     max_signature_script_len: usize,
     max_script_public_key_len: usize,
     coinbase_payload_script_public_key_max_len: u8,
-    _coinbase_maturity: u64,
+    /// Coinbase maturity window in blocks. Configured but not yet enforced
+    /// in the account model — enforcing it requires tracking unmaturred rewards
+    /// per account (pending_rewards field on AccountState).
+    coinbase_maturity: u64,
     _sahyadri_consensus_k: KType,
     sig_cache: Cache<SigCacheKey, bool>,
 
@@ -45,7 +48,7 @@ impl TransactionValidator {
             max_signature_script_len,
             max_script_public_key_len,
             coinbase_payload_script_public_key_max_len,
-            _coinbase_maturity: coinbase_maturity,
+            coinbase_maturity,
             _sahyadri_consensus_k: sahyadri_consensus_k,
             sig_cache: Cache::with_counters(10_000, counters),
             account_store, // <--- SAVED IT
@@ -69,10 +72,19 @@ impl TransactionValidator {
             max_signature_script_len,
             max_script_public_key_len,
             coinbase_payload_script_public_key_max_len,
-            _coinbase_maturity: coinbase_maturity,
+            coinbase_maturity,
             _sahyadri_consensus_k: sahyadri_consensus_k,
             sig_cache: Cache::with_counters(10_000, counters),
             account_store, // <--- SAVED IT
         }
+    }
+}
+
+impl TransactionValidator {
+    /// Returns the configured coinbase maturity window in blocks.
+    /// Maturity enforcement is not yet implemented in the account model.
+    /// Full remediation requires tracking unmaturred rewards per account.
+    pub fn coinbase_maturity(&self) -> u64 {
+        self.coinbase_maturity
     }
 }

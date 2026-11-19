@@ -338,7 +338,7 @@ fn verify_account_tx_signature(tx: &Transaction) -> TxResult<()> {
     }
     let signable_payload = &tx.payload[..sig_start];
     
-    let sighash = tx.compute_account_tx_sighash(signable_payload);
+    let sighash = tx.compute_account_tx_sighash(signable_payload, b"sahyadri");
     
     let sig = DilithiumSignature::from_slice(sig_bytes);
     let valid = DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE);

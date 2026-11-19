@@ -233,9 +233,10 @@ impl Transaction {
     /// to the previous blocks' miners, and specifies the script_pub_key that will be used to pay the current
     /// miner in future blocks.
     /// Computes the exact SHA-256 sighash for an Account-based transaction
-    pub fn compute_account_tx_sighash(&self, signable_payload: &[u8]) -> [u8; 32] {
+    pub fn compute_account_tx_sighash(&self, signable_payload: &[u8], network_prefix: &[u8]) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(b"SAHYADRI_ACCOUNT_TX_V1");
+        hasher.update(network_prefix);
         hasher.update(self.version.to_le_bytes());
         for output in &self.outputs {
             hasher.update(output.value.to_le_bytes());
@@ -624,10 +625,11 @@ impl FlashTransaction {
         sahyadri_hashes::Hash::from_bytes(out)
     }
 
-    pub fn sighash(&self) -> [u8; 32] {
+    pub fn sighash(&self, network_prefix: &[u8]) -> [u8; 32] {
         use sha3::{Digest, Sha3_256};
         let mut h = Sha3_256::new();
         h.update(b"SAHYADRI_FLASH_TX_V1");
+        h.update(network_prefix);
         h.update(self.version.to_le_bytes());
         h.update(&self.pubkey);
         h.update(&self.recipient);

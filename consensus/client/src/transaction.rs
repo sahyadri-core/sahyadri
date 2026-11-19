@@ -164,7 +164,7 @@ impl Transaction {
         let tx: cctx::Transaction = self.into();
         
         // 3. Compute Sighash
-        let sighash = tx.compute_account_tx_sighash(&payload_bytes);
+        let sighash = tx.compute_account_tx_sighash(&payload_bytes, b"sahyadri");
         
         // 4. Return as Hex String (Guaranteed to cross WASM boundary)
         sighash.to_vec().to_hex()

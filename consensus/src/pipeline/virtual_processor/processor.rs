@@ -954,7 +954,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
 
                                 // 3.
                                      {
-                                         if let Err(e) = self.account_store.update_balance_batch(&mut batch, &coinbase_data.miner_data.script_public_key, miner_reward as i64) {
+                                         if let Err(e) = self.account_store.update_balance_batch(&mut batch, &coinbase_data.miner_data.script_public_key, i64::try_from(miner_reward).unwrap_or(i64::MAX)) {
                                              log::error!("SAHYADRI: CRITICAL — failed to credit miner reward: {:?}", e);
                                              continue;
                                          }
@@ -964,7 +964,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                                 if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut treasury_pubkey_bytes).is_ok() {
                                     let treasury_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, treasury_pubkey_bytes);
                                     {
-                                        if let Err(e) = self.account_store.update_balance_batch(&mut batch, &treasury_spk, dev_fee as i64) {
+                                        if let Err(e) = self.account_store.update_balance_batch(&mut batch, &treasury_spk, i64::try_from(dev_fee).unwrap_or(i64::MAX)) {
                                             log::error!("SAHYADRI: CRITICAL — failed to credit treasury: {:?}", e);
                                         }
                                     }
@@ -1087,7 +1087,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         if let Err(e) = self.account_store.update_balance_batch(
                             &mut batch,
                             &sender_spk,
-                            -(total_spent as i64),
+                            -(i64::try_from(total_spent).unwrap_or(i64::MAX)),
                         ) {
                             log::error!("SAHYADRI: CRITICAL — failed to debit sender: {:?}", e);
                             continue;
@@ -1095,7 +1095,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
 
                         // 2. Credit receiver(s)
                         for output in tx.outputs.iter() {
-                            let amount = output.value as i64;
+                            let amount = i64::try_from(output.value).unwrap_or(i64::MAX);
                             if let Err(e) = self.account_store.update_balance_batch(
                                 &mut batch,
                                 &output.script_public_key,
@@ -2221,7 +2221,7 @@ fn generate_root_proof_for_block(
 
         if let Some(flash) = FlashTransaction::from_transaction(tx) {
             log::info!("SAHYADRI worker: decoded FlashTransaction OK");
-            let msg = flash.sighash();
+            let msg = flash.sighash(b"sahyadri");
             if let Err(e) = batch.add_and_verify(&msg, &flash.signature, &flash.pubkey) {
                 log::warn!("SAHYADRI: add_and_verify failed (flash): {e:?}");
             }
@@ -2245,7 +2245,7 @@ fn generate_root_proof_for_block(
             continue;
         }
 
-        let sighash = tx.compute_account_tx_sighash(signable);
+        let sighash = tx.compute_account_tx_sighash(signable, b"sahyadri");
         if let Err(e) = batch.add_and_verify(&sighash, sig_bytes, pubkey) {
             log::warn!("SAHYADRI: add_and_verify failed (account): {e:?}");
         }
@@ -2515,7 +2515,7 @@ mod root_proof_tests {
             };
 
             // sighash → hex string (sign_message takes &str)
-            let sighash = flash.sighash();
+            let sighash = flash.sighash(b"sahyadri");
             let sig = sahyadri_dilithium::sign_bytes(&sighash, &kp)
                 .expect("sign flash tx sighash");
             flash.signature = sig.as_bytes().to_vec();

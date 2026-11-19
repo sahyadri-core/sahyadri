@@ -166,7 +166,7 @@ impl TransactionValidator {
 
         // ── 5. Signature verification (expensive, last before balance) ──
         let sig = DilithiumSignature::from_slice(&tx.signature);
-        let sighash = tx.sighash();
+        let sighash = tx.sighash(b"sahyadri");
         let is_valid = DilithiumKeyPair::verify(&tx.pubkey, &sig, &sighash, b"", SAHYADRI_MODE);
         if !is_valid {
             return Err(TxRuleError::Message(
@@ -235,7 +235,7 @@ impl TransactionValidator {
             }
 
             let sig = DilithiumSignature::from_slice(&tx.signature);
-            let sighash = tx.sighash();
+            let sighash = tx.sighash(b"sahyadri");
             let is_valid = DilithiumKeyPair::verify(&tx.pubkey, &sig, &sighash, b"", SAHYADRI_MODE);
             if !is_valid {
                 return Err(TxRuleError::Message(
