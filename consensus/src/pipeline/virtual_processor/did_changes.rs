@@ -135,13 +135,6 @@ fn rd_str(p: &[u8], o: &mut usize) -> Option<String> {
     let n = rd_u32(p, o)?;
     String::from_utf8(rd_bytes(p, o, n)?.to_vec()).ok()
 }
-fn last_u64(body: &[u8], min_start: usize) -> Option<u64> {
-    let start = body.len().checked_sub(8)?;
-    if start < min_start {
-        return None;
-    }
-    Some(u64::from_le_bytes(body[start..].try_into().ok()?))
-}
 
 /// `sig_size` = SIG_SIZE of the Dilithium mode used by the node.
 pub fn parse_did_op(payload: &[u8], sig_size: usize) -> Option<DidOp> {
@@ -158,17 +151,26 @@ pub fn parse_did_op(payload: &[u8], sig_size: usize) -> Option<DidOp> {
             let csm_address = rd_str(body, &mut o)?;
             let document = rd_str(body, &mut o)?;
             let timestamp = u64::from_le_bytes(rd_bytes(body, &mut o, 8)?.try_into().ok()?);
+            if o != body.len() {
+                return None;
+            }
             Some(DidOp::Create { pubkey, did, csm_address, document, timestamp, sig })
         }
         b"DUPD" => {
             let did = rd_str(body, &mut o)?;
             let document = rd_str(body, &mut o)?;
-            let timestamp = last_u64(body, o)?;
+            let timestamp = u64::from_le_bytes(rd_bytes(body, &mut o, 8)?.try_into().ok()?);
+            if o != body.len() {
+                return None;
+            }
             Some(DidOp::Update { did, document, timestamp, sig })
         }
         b"DDEC" => {
             let did = rd_str(body, &mut o)?;
-            let timestamp = last_u64(body, o)?;
+            let timestamp = u64::from_le_bytes(rd_bytes(body, &mut o, 8)?.try_into().ok()?);
+            if o != body.len() {
+                return None;
+            }
             Some(DidOp::Deactivate { did, timestamp, sig })
         }
         _ => None,
@@ -394,5 +396,34 @@ mod tests {
         )
         .unwrap();
         assert_eq!(r1, r2);
+    }
+}
+
+#[cfg(test)]
+mod strict_parse_tests {
+    use super::*;
+
+    fn enc_str(v: &mut Vec<u8>, s: &str) {
+        v.extend_from_slice(&(s.len() as u32).to_le_bytes());
+        v.extend_from_slice(s.as_bytes());
+    }
+
+    #[test]
+    fn dupd_roundtrip_and_junk_rejected() {
+        let sig = [7u8; 8];
+        let mut ok = b"DUPD".to_vec();
+        enc_str(&mut ok, "did:csm:abc");
+        enc_str(&mut ok, "{\"a\":1}");
+        ok.extend_from_slice(&42u64.to_le_bytes());
+        ok.extend_from_slice(&sig);
+        assert!(matches!(parse_did_op(&ok, 8), Some(DidOp::Update { timestamp: 42, .. })));
+
+        let mut bad = b"DUPD".to_vec();
+        enc_str(&mut bad, "did:csm:abc");
+        enc_str(&mut bad, "{\"a\":1}");
+        bad.push(0xFF); // junk between document and timestamp
+        bad.extend_from_slice(&42u64.to_le_bytes());
+        bad.extend_from_slice(&sig);
+        assert!(parse_did_op(&bad, 8).is_none());
     }
 }

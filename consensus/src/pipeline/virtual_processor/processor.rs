@@ -2569,10 +2569,9 @@ mod async_proof_worker_tests {
     /// It should NOT block on the 14-23s proof generation.
     #[test]
     fn spawn_returns_immediately() {
-        use std::time::{Duration, Instant};
 
         // Build a fake block hash — function should enqueue and return.
-        let block_hash = sahyadri_hashes::Hash::from_bytes([0xAA; 32]);
+        let _block_hash = sahyadri_hashes::Hash::from_bytes([0xAA; 32]);
 
         // We can't easily mock stores here, so just verify the
         // signature is non-blocking by checking that a call to
@@ -2583,7 +2582,8 @@ mod async_proof_worker_tests {
         //
         // Assertion: spawn_root_proof_for_block's return type is ()
         // (no Result, no proof bytes returned = doesn't wait).
-        fn assert_returns_unit(_: ()) {}
+        #[allow(dead_code)]
+    fn assert_returns_unit(_: ()) {}
         // Uncomment after adding proper mocks:
         // assert_returns_unit(spawn_root_proof_for_block(...));
     }

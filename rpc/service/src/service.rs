@@ -632,25 +632,32 @@ impl RpcCoreService {
         
         let mut payload = Vec::new();
         payload.extend_from_slice(b"DUPD");
-        
-        // DID string
+
+        // DID string (length-prefixed — matches parser's rd_str)
         let did_bytes = request.did.as_bytes();
         payload.extend_from_slice(&(did_bytes.len() as u32).to_le_bytes());
         payload.extend_from_slice(did_bytes);
-        
-        // New public key hex
-        let new_pk_bytes = request.new_public_key_hex.as_bytes().to_vec();
-        payload.extend_from_slice(&(new_pk_bytes.len() as u32).to_le_bytes());
-        payload.extend_from_slice(&new_pk_bytes);
-        
-        // Purposes/services update
-        let purposes_bytes = request.purposes.as_bytes();
-        payload.extend_from_slice(&(purposes_bytes.len() as u32).to_le_bytes());
-        payload.extend_from_slice(purposes_bytes);
-        
-        // Signature
+
+        // Document (length-prefixed string — matches parser's rd_str).
+        // The new public key and purposes are embedded in the document JSON.
+        let document = format!(
+            r#"{{"publicKey":"{}","purposes":"{}"}}"#,
+            request.new_public_key_hex,
+            request.purposes
+        );
+        let doc_bytes = document.as_bytes();
+        payload.extend_from_slice(&(doc_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(doc_bytes);
+
+        // Timestamp (8 bytes LE — parser reads last_u64 from body)
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        payload.extend_from_slice(&timestamp.to_le_bytes());
+
+        // Signature (raw 3309 bytes at end, NO length prefix — matches parser)
         let sig_bytes = request.signature.as_bytes().to_vec();
-        payload.extend_from_slice(&(sig_bytes.len() as u32).to_le_bytes());
         payload.extend_from_slice(&sig_bytes);
         
         // Create transaction

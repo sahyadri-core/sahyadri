@@ -70,14 +70,18 @@ impl TransactionValidator {
         let sender_spk = self.extract_sender(tx)?;
         let account_state = self.account_store.get(&sender_spk).map_err(|_| TxRuleError::Unknown)?;
 
-        let total_out: u64 = tx.outputs().iter().map(|out| out.value).sum();
+        let total_out: u64 = tx.outputs().iter().try_fold(0u64, |acc, out| acc.checked_add(out.value)).ok_or(TxRuleError::OutputsValueOverflow)?;
         let gas = tx.tx().gas;
 
         // --- SAHYADRI MINIMUM FEE ENFORCEMENT ---
         // Mass-based fee is enforced at mempool level (check_transaction_standard.rs)
         const MIN_FEE_KANA: u64 = 1000; // 0.00001 CSM
+        const MAX_GAS_KANA: u64 = 1_000_000_000; // 10 CSM — reasonable max fee
         if gas < MIN_FEE_KANA {
             return Err(TxRuleError::ZeroFee);
+        }
+        if gas > MAX_GAS_KANA {
+            return Err(TxRuleError::Message("gas exceeds maximum".to_string()));
         }
         // -------------------------------------------
 

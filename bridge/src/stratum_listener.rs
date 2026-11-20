@@ -94,12 +94,44 @@ impl StratumListener {
             }
         });
 
+        // Connection cap to prevent slow-loris memory exhaustion.
+        const MAX_CONNECTIONS: u64 = 100;
+        let conn_count = Arc::new(std::sync::atomic::AtomicU64::new(0));
+
+        // RAII guard: acquire +1, Drop -1 (panic/early-return safe).
+        struct ConnGuard {
+            counter: Arc<std::sync::atomic::AtomicU64>,
+        }
+        impl ConnGuard {
+            fn try_acquire(counter: &Arc<std::sync::atomic::AtomicU64>) -> Option<Self> {
+                let prev = counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if prev >= MAX_CONNECTIONS {
+                    counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                    return None;
+                }
+                Some(Self { counter: counter.clone() })
+            }
+        }
+        impl Drop for ConnGuard {
+            fn drop(&mut self) {
+                self.counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+
         // Accept connections
         loop {
             tokio::select! {
                 result = listener.accept() => {
                     match result {
                         Ok((stream, addr)) => {
+                            let guard = match ConnGuard::try_acquire(&conn_count) {
+                                Some(g) => g,
+                                None => {
+                                    warn!("[CONNECTION] rejecting {}:{} - at capacity", addr.ip(), addr.port());
+                                    drop(stream);
+                                    continue;
+                                }
+                            };
                             let remote_addr = addr.ip().to_string();
                             let remote_port = addr.port();
 
@@ -137,6 +169,7 @@ impl StratumListener {
                             let ctx_clone = ctx.clone();
                             let handler_map = self.config.handler_map.clone();
                             tokio::spawn(async move {
+                                let _hold = guard;
                                 debug!("[CONNECTION] Client listener task started for {}:{}", ctx_clone.remote_addr, ctx_clone.remote_port);
                                 Self::spawn_client_listener(ctx_clone, &handler_map).await;
                                 debug!("[CONNECTION] Client listener task ended");
