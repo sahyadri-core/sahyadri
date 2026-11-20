@@ -1647,7 +1647,7 @@ impl Consensus {
             Ok(Some(h)) => h,
             Ok(None) => return None,
             Err(e) => {
-                log::warn!("DID resolve SMT read failed for {}: {:?}", did, e);
+                log::debug!("DID resolve SMT read failed for {}: {:?}", did, e);
                 return None;
             }
         };
@@ -1657,7 +1657,7 @@ impl Consensus {
         match self.storage.did_states_store.get(doc_hash) {
             Ok(doc) => Some(doc),
             Err(e) => {
-                log::warn!("DID resolve content fetch failed for {}: {:?}", did, e);
+                log::debug!("DID resolve content fetch failed for {}: {:?}", did, e);
                 None
             }
         }

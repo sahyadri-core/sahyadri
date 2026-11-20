@@ -514,7 +514,7 @@ impl<S: DidStore + DidStoreReader> CrestOperations<S> {
         
         // Log reason if provided (for audit trail)
         if let Some(reason) = request.reason {
-            eprintln!("[CREST] Deactivating DID {}: reason={}", request.did, reason);
+            log::debug!("[CREST] Deactivating DID {}: reason={}", request.did, reason);
         }
         
         Ok(current) // Return pre-deactivation state for confirmation
