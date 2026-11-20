@@ -870,16 +870,16 @@ let did_ops: Vec<_> = txs.iter().skip(1)
 
 // Dilithium verify closure
 let did_verify = |pk: &[u8], sig: &[u8], msg: &[u8]| -> bool {
-    log::warn!("DID_DBG verify: pk_len={} sig_len={} msg_len={}", pk.len(), sig.len(), msg.len());
+    log::debug!("DID_DBG verify: pk_len={} sig_len={} msg_len={}", pk.len(), sig.len(), msg.len());
     if sig.len() != SIG_SIZE {
-        log::warn!("DID_DBG verify: sig_len mismatch: {} != {}", sig.len(), SIG_SIZE);
+        log::debug!("DID_DBG verify: sig_len mismatch: {} != {}", sig.len(), SIG_SIZE);
         return false;
     }
     let s = DilithiumSignature::from_slice(sig);
     let result = VERIFY_POOL.install(|| {
         DilithiumKeyPair::verify(pk, &s, msg, b"", SAHYADRI_MODE)
     });
-    log::warn!("DID_DBG verify result: {}", result);
+    log::debug!("DID_DBG verify result: {}", result);
     result
 };
 
@@ -975,7 +975,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                                 log::debug!("SAHYADRI REWARD: Added {} Kana to Miner! (Dev Fee: {})", miner_reward, dev_fee);
                             }
                         } else {
-                            println!("SAHYADRI REWARD ERROR: Failed to decode coinbase payload!");
+                            log::error!("SAHYADRI REWARD ERROR: Failed to decode coinbase payload!");
                         }
                     }
                     // ==========================================
@@ -999,13 +999,41 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         );
 
                         if is_did_tx && tx.payload.len() >= 20 {
+                            // Charge gas fee from sender before DID SMT processing.
+                            // Sender SPK is output[0] (set by RPC builder).
+                            let gas = tx.gas;
+                            if gas > 0 {
+                                let sender_spk = &tx.outputs[0].script_public_key;
+                                let balance = match self.account_store.get_balance(sender_spk) {
+                                    Ok(b) => b,
+                                    Err(e) => {
+                                        log::debug!("DID tx skipped — failed to read balance: {:?}", e);
+                                        continue;
+                                    }
+                                };
+                                if balance < gas {
+                                    log::debug!(
+                                        "DID tx skipped — insufficient balance for gas (have {}, need {})",
+                                        balance, gas
+                                    );
+                                    continue;
+                                }
+                                if let Err(e) = self.account_store.update_balance_batch(
+                                    &mut batch,
+                                    sender_spk,
+                                    -(i64::try_from(gas).unwrap_or(i64::MAX)),
+                                ) {
+                                    log::error!("DID tx — failed to debit gas: {:?}", e);
+                                    continue;
+                                }
+                            }
                             // SAHYADRI Phase B: DID ab SMT path se handle hota hai (did_changes.rs)
                             continue;
                         }
 
                         let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
                         if tx.payload.len() < min_payload {
-                            log::warn!(
+                            log::debug!(
                                 "SAHYADRI: skipping account tx — undersized payload ({} bytes) in commit_virtual_state",
                                 tx.payload.len()
                             );
@@ -1021,8 +1049,8 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         // Defense-in-depth: re-verify Dilithium signature
                         {
                             let signable_payload = &tx.payload[..sig_start];
-                            log::warn!("SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
-                            log::warn!("SENDER PUBKEY LEN: {}", sender_pubkey.len());    
+                            log::debug!("SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
+                            log::debug!("SENDER PUBKEY LEN: {}", sender_pubkey.len());    
                             let sighash = {
                                 let mut h = Sha256::new();
                                 h.update(b"SAHYADRI_ACCOUNT_TX_V1");
@@ -1041,22 +1069,22 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                                 h.update(signable_payload);
                                 h.finalize()
                             };
-                            log::warn!("SAHYADRI SIGHASH: {:02x?}", sighash);
+                            log::debug!("SAHYADRI SIGHASH: {:02x?}", sighash);
                             if let Some(out0) = tx.outputs.first() {
-                                log::warn!("SPK VERSION: {}", out0.script_public_key.version);
+                                log::debug!("SPK VERSION: {}", out0.script_public_key.version);
                             }
-                            log::warn!("NODE SIGHASH: {:02x?}", sighash);
-                            log::warn!("NODE SENDER PUBKEY LEN: {}", sender_pubkey.len());
-                            log::warn!("NODE SENDER PUBKEY FIRST 40: {:02x?}", &sender_pubkey[..20.min(sender_pubkey.len())]);
-                            log::warn!("NODE SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
-                            log::warn!("NODE SIG FIRST 20: {:02x?}", &sig_bytes[..20.min(sig_bytes.len())]);
+                            log::debug!("NODE SIGHASH: {:02x?}", sighash);
+                            log::debug!("NODE SENDER PUBKEY LEN: {}", sender_pubkey.len());
+                            log::debug!("NODE SENDER PUBKEY FIRST 40: {:02x?}", &sender_pubkey[..20.min(sender_pubkey.len())]);
+                            log::debug!("NODE SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
+                            log::debug!("NODE SIG FIRST 20: {:02x?}", &sig_bytes[..20.min(sig_bytes.len())]);
 
                             let sig = DilithiumSignature::from_slice(sig_bytes);
                             let is_valid = VERIFY_POOL.install(|| {
                                 DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE)
                             });
                             if !is_valid {
-                                log::warn!("SAHYADRI: skipping account tx — invalid signature in commit_virtual_state");
+                                log::debug!("SAHYADRI: skipping account tx — invalid signature in commit_virtual_state");
                                 continue;
                             }
                         }
@@ -1070,12 +1098,12 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         let balance = match self.account_store.get_balance(&sender_spk) {
                             Ok(b) => b,
                             Err(e) => {
-                                log::warn!("SAHYADRI: skipping account tx — failed to read balance: {:?}", e);
+                                log::debug!("SAHYADRI: skipping account tx — failed to read balance: {:?}", e);
                                 continue;
                             }
                         };
                         if balance < total_spent {
-                            log::warn!(
+                            log::debug!(
                                 "SAHYADRI: skipping invalid account tx — insufficient balance (have {}, need {})",
                                 balance, total_spent
                             );
@@ -1159,7 +1187,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                                 }
                             }
                             Err(e) => {
-                                log::warn!(
+                                log::debug!(
                                     "SAHYADRI: flash batch rejected in block {:?}: {:?}",
                                     hash,
                                     e
@@ -1722,7 +1750,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         } else {
                             actual_flash_txs.truncate(new_len);
                         }
-                        log::warn!(
+                        log::debug!(
                             "{}→{} flash txs after {:?}",
                             prev_len, actual_flash_txs.len(), e
                         );
@@ -1768,7 +1796,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         };
         let dropped_m01 = txs.len().saturating_sub(truncated_txs_m01.len());
         if dropped_m01 > 0 {
-            log::warn!(
+            log::debug!(
                 "truncated block txs {} -> {} (dropped {} flash txs to match surviving subset)",
                 txs.len(), truncated_txs_m01.len(), dropped_m01
             );

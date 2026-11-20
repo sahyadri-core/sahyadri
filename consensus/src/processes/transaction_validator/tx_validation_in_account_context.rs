@@ -234,11 +234,11 @@ impl TransactionValidator {
             let id = tx.flash_id();
 
             if !seen.insert(id) {
-                log::warn!("duplicate flash_id in batch, skipping: {:?}", id);
+                log::debug!("duplicate flash_id in batch, skipping: {:?}", id);
                 continue;
             }
             if block_daa_score > tx.expiry_daa_score {
-                log::warn!("flash tx expired, skipping: {:?}", id);
+                log::debug!("flash tx expired, skipping: {:?}", id);
                 continue;
             }
             if tx.fee < FLASH_MIN_FEE_KANA {
@@ -298,13 +298,13 @@ impl TransactionValidator {
 
             // (a) within-batch duplicate
             if !seen.insert(id) {
-                log::warn!("SAHYADRI: duplicate flash_id in batch, skipping: {:?}", id);
+                log::debug!("SAHYADRI: duplicate flash_id in batch, skipping: {:?}", id);
                 continue;
             }
 
             // (b) expired
             if block_daa_score > tx.expiry_daa_score {
-                log::warn!(
+                log::debug!(
                     "SAHYADRI: flash tx expired (block_daa={} > expiry={}), skipping: {:?}",
                     block_daa_score, tx.expiry_daa_score, id
                 );
@@ -318,7 +318,7 @@ impl TransactionValidator {
                 .get(&sender_spk)
                 .map_err(|_| TxRuleError::Unknown)?;
             if account.is_flash_replay(&id) {
-                log::warn!("SAHYADRI: flash tx already applied by parallel block, skipping: {:?}", id);
+                log::debug!("SAHYADRI: flash tx already applied by parallel block, skipping: {:?}", id);
                 continue;
             }
 

@@ -509,7 +509,7 @@ impl RpcCoreService {
         &self,
         request: SubmitDidCreateRequest,
     ) -> RpcResult<SubmitDidCreateResponse> {
-        eprintln!("[DID CREATE] Creating DID transaction for did={}", request.did);
+        log::debug!("[DID CREATE] Creating DID transaction for did={}", request.did);
 
         // ──── STEP 1: BUILD + VERIFY SIGNATURE ────
         // Decode pubkey and signature from hex
@@ -558,13 +558,13 @@ impl RpcCoreService {
         );
 
         if !is_valid {
-            eprintln!("[DID CREATE] Signature verification FAILED");
+            log::debug!("[DID CREATE] Signature verification FAILED");
             return Ok(SubmitDidCreateResponse {
                 transaction_id: "".to_string(),
                 error: Some("Invalid signature — DID create rejected".to_string()),
             });
         }
-        eprintln!("[DID CREATE] Signature verified");
+        log::debug!("[DID CREATE] Signature verified");
         
         // ──── STEP 2: Build payload (raw bytes, no length prefixes for fixed-size fields) ────
         let mut payload = Vec::new();
@@ -609,10 +609,10 @@ impl RpcCoreService {
             }],
             0,
             sahyadri_consensus_core::subnets::SubnetworkId::from_bytes([b'D', b'I', b'D', b'_', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-            0,
+            1000,
             payload,
         );
-        
+
         let transaction_id = tx.id();
         let session = self.consensus_manager.consensus().unguarded_session();
         self.flow_context.submit_rpc_transaction(&session, tx, Orphan::Forbidden).await.map_err(|err| {
@@ -620,7 +620,7 @@ impl RpcCoreService {
             debug!("{err}");
             err
         })?;
-        
+
         Ok(SubmitDidCreateResponse { transaction_id: transaction_id.to_string(), error: None })
     }
 
@@ -628,7 +628,7 @@ impl RpcCoreService {
         &self,
         request: SubmitDidUpdateRequest,
     ) -> RpcResult<SubmitDidUpdateResponse> {
-        eprintln!("[DID UPDATE] Updating DID transaction for did={}", request.did);
+        log::debug!("[DID UPDATE] Updating DID transaction for did={}", request.did);
         
         let mut payload = Vec::new();
         payload.extend_from_slice(b"DUPD");
@@ -689,7 +689,7 @@ impl RpcCoreService {
         &self,
         request: SubmitDidDeactivateRequest,
     ) -> RpcResult<SubmitDidDeactivateResponse> {
-        eprintln!("[DID DEACTIVATE] Deactivating DID for did={}", request.did);
+        log::debug!("[DID DEACTIVATE] Deactivating DID for did={}", request.did);
         
         let mut payload = Vec::new();
         payload.extend_from_slice(b"DDEC");
@@ -823,7 +823,6 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: GetBlockProofRequest,
     ) -> RpcResult<GetBlockProofResponse> {
-        eprintln!("[DEBUG-BLOCK] handler entered");
         let session = self.consensus_manager.consensus().session().await;
 
         let result = session
@@ -1182,7 +1181,6 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: GetChainProofRequest,
     ) -> RpcResult<GetChainProofResponse> {
-        eprintln!("[DEBUG-CHAIN] handler entered");
         let block_hash: sahyadri_hashes::Hash = request.block_hash;
 
         let session = self.consensus_manager.consensus().session().await;
@@ -1445,7 +1443,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: ResolveDidRequest,
     ) -> RpcResult<ResolveDidResponse> {
-        eprintln!("[RESOLVE DID] Looking up: {}", request.did);
+        log::debug!("[RESOLVE DID] Looking up: {}", request.did);
 
         // Normalize: extract address from DID
         let address_str = if request.did.starts_with("did:sahyadri:") {
@@ -1502,7 +1500,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         _connection: Option<&DynRpcConnection>,
         request: ResolveDidByAddressRequest,
     ) -> RpcResult<ResolveDidByAddressResponse> {
-        eprintln!("[RESOLVE BY ADDRESS] Looking up: {}", request.address);
+        log::debug!("[RESOLVE BY ADDRESS] Looking up: {}", request.address);
 
         let session = self.consensus_manager.consensus().unguarded_session();
 

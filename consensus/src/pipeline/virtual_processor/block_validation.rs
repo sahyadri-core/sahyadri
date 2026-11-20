@@ -403,7 +403,7 @@ impl VirtualStateProcessor {
             return Ok(Vec::new());
         }
         if !self.enable_flash_tx {
-            log::warn!(
+            log::debug!(
                 "block contains {} flash txs but enable_flash_tx=false",
                 raw_flash.len()
             );

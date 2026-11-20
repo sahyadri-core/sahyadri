@@ -182,37 +182,6 @@ pub fn verify(tx: &impl VerifiableTransaction) -> Result<(), Error> {
     Ok(())
 }
 
-/// ZKP-aware batch verification.
-///
-/// If a valid STARK proof is provided and covers this transaction's signatures,
-/// individual Dilithium3 verification is skipped (1000x faster).
-///
-/// Call this instead of `verify()` when ZKP proofs are available.
-#[cfg(feature = "zkp")]
-#[allow(dead_code)]
-pub fn verify_with_zkp(tx: &impl VerifiableTransaction, zkp_proof: Option<&crate::zkp_batch::BlockZkpProof>) -> Result<(), Error> {
-    use crate::zkp_batch::{should_use_zkp, verify_block_zkp};
-
-    // Count sig ops in this transaction
-    let sig_count = tx.populated_inputs().len();
-
-    // If ZKP proof is valid and covers enough sigs, trust it
-    if should_use_zkp(zkp_proof, sig_count) {
-        match verify_block_zkp(zkp_proof.unwrap()) {
-            Ok(true) => return Ok(()),
-            Ok(false) => {
-                // ZKP invalid — fall back to individual verification
-            }
-            Err(_) => {
-                // ZKP error — fall back to individual verification
-            }
-        }
-    }
-
-    // Fall back to individual verification
-    verify(tx)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

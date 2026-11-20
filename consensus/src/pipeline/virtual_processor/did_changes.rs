@@ -240,7 +240,7 @@ pub fn compute_block_did_changes(
                 // Squatting check — csm_address must derive from pubkey
                 let derived = derive_csm_address(pubkey, prefix);
                 if derived != *csm_address {
-                    log::warn!(
+                    log::debug!(
                         "SAHYADRI DID: csm_address mismatch — expected {}, got {}",
                         derived, csm_address
                     );
@@ -254,16 +254,9 @@ pub fn compute_block_did_changes(
                 let binding = did_binding_hash(did, csm_address, &pubkey_hex, document, 1);
                 let binding_hex = faster_hex::hex_string(&binding.as_bytes());
                 let msg = format!("did:create:{}:1:{}", csm_address, binding_hex);
-                log::warn!("DID DEBUG: csm_address=[{}]", csm_address);
-                log::warn!("DID DEBUG: pubkey_hex=[{}]", pubkey_hex);
-                log::warn!("DID DEBUG: document=[{}]", document);
-                log::warn!("DID DEBUG: binding_hex=[{}]", binding_hex);
-                log::warn!("DID DEBUG: msg=[{}]", msg);
                 if !verify(pubkey, sig, msg.as_bytes()) {
-                    log::warn!("DID_DBG verify FAILED for did={}", did);
                     continue;
                 }
-                log::warn!("DID_DBG verify PASSED for did={}", did);
                 touched.insert(
                     did.clone(),
                     DidDocument {

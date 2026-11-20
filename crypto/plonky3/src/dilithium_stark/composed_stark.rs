@@ -114,6 +114,8 @@ fn de(b: &[u8]) -> Result<Proof<DilithiumStarkConfig>, String> {
 
 pub fn prove_signature(w: &DilithiumVerifyWitness) -> Result<DilithiumSigProof, String> {
     let cfg = build_stark_config();
+    // Experimental: public values are empty, so these sub-proofs are not bound to a
+    // public key, message or signature. Not sound as a signature proof; keep it out of consensus.
     let pv: Vec<F> = vec![];
     // 1. Matrix-vector: A * z
     let mv_t = build_matrix_vec_trace(&w.a_matrix, &w.z_coeffs);
@@ -171,7 +173,12 @@ pub fn prove_signature(w: &DilithiumVerifyWitness) -> Result<DilithiumSigProof, 
 
 pub fn verify_signature(p: &DilithiumSigProof) -> Result<bool, String> {
     let cfg = build_stark_config();
+    // Experimental: each sub-proof is checked independently with empty public values.
+    // Nothing ties them together or to a specific public key, message or signature.
     let pv: Vec<F> = vec![];
+    if p.pm_proofs.len() != K || p.norm_proofs.len() != L + K {
+        return Err("unexpected number of sub-proofs".to_string());
+    }
     verify(&cfg, &MatrixVecAir, &de(&p.mv_proof)?, &pv).map_err(|e| format!("{:?}", e))?;
     for (k, b) in p.pm_proofs.iter().enumerate() {
         verify(&cfg, &PolyMultAir, &de(b)?, &pv).map_err(|e| format!("pm{}: {:?}", k, e))?;
@@ -179,9 +186,9 @@ pub fn verify_signature(p: &DilithiumSigProof) -> Result<bool, String> {
     verify(&cfg, &SubAir, &de(&p.sub_proof)?, &pv).map_err(|e| format!("{:?}", e))?;
     for (j, b) in p.norm_proofs.iter().enumerate() {
         verify(&cfg, &RejectionAir, &de(b)?, &pv).map_err(|e| format!("nm{}: {:?}", j, e))?;
-        verify(&cfg, &super::fiat_shamir_stark::FiatShamirAir, &de(&p.fiat_shamir_proof)?, &pv)
-            .map_err(|e| format!("fiat_shamir: {:?}", e))?;
     }
+    verify(&cfg, &super::fiat_shamir_stark::FiatShamirAir, &de(&p.fiat_shamir_proof)?, &pv)
+        .map_err(|e| format!("fiat_shamir: {:?}", e))?;
     Ok(true)
 }
 
