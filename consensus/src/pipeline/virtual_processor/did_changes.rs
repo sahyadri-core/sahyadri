@@ -427,3 +427,82 @@ mod strict_parse_tests {
         assert!(parse_did_op(&bad, 8).is_none());
     }
 }
+
+#[cfg(test)]
+mod golden_wire_tests {
+    use super::*;
+
+    // Shared golden vector (the RPC builder test must produce exactly these bytes):
+    // "DUPD" | u32le(11) "did:csm:abc" | u32le(7) {"a":1} | u64le(42) | sig = 8 x 0x07
+    const DUPD_GOLDEN_HEX: &str = concat!(
+        "44555044", "0b000000", "6469643a63736d3a616263",
+        "07000000", "7b2261223a317d", "2a00000000000000", "0707070707070707"
+    );
+
+    fn enc_str(v: &mut Vec<u8>, s: &str) {
+        v.extend_from_slice(&(s.len() as u32).to_le_bytes());
+        v.extend_from_slice(s.as_bytes());
+    }
+
+    #[test]
+    fn dupd_golden_vector_parses() {
+        let p = hex_to_bytes(DUPD_GOLDEN_HEX).unwrap();
+        match parse_did_op(&p, 8) {
+            Some(DidOp::Update { did, document, timestamp, sig }) => {
+                assert_eq!(did, "did:csm:abc");
+                assert_eq!(document, r#"{"a":1}"#);
+                assert_eq!(timestamp, 42);
+                assert_eq!(sig, vec![7u8; 8]);
+            }
+            other => panic!("unexpected parse result: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn ddec_roundtrip_and_junk_rejected() {
+        let sig = [7u8; 8];
+        let mut ok = b"DDEC".to_vec();
+        enc_str(&mut ok, "did:csm:abc");
+        ok.extend_from_slice(&42u64.to_le_bytes());
+        ok.extend_from_slice(&sig);
+        assert!(matches!(parse_did_op(&ok, 8), Some(DidOp::Deactivate { timestamp: 42, .. })));
+
+        let mut bad = b"DDEC".to_vec();
+        enc_str(&mut bad, "did:csm:abc");
+        bad.push(0xFF);
+        bad.extend_from_slice(&42u64.to_le_bytes());
+        bad.extend_from_slice(&sig);
+        assert!(parse_did_op(&bad, 8).is_none());
+    }
+
+    #[test]
+    fn dcrt_roundtrip_and_junk_rejected() {
+        let sig = [7u8; 8];
+        let build = |junk: bool| {
+            let mut p = b"DCRT".to_vec();
+            enc_str(&mut p, "did:csm:abc");
+            p.extend_from_slice(&vec![9u8; PUBKEY_BYTES]);
+            enc_str(&mut p, "csm1addr");
+            enc_str(&mut p, r#"{"a":1}"#);
+            p.extend_from_slice(&42u64.to_le_bytes());
+            if junk {
+                p.push(0xFF);
+            }
+            p.extend_from_slice(&sig);
+            p
+        };
+        assert!(matches!(parse_did_op(&build(false), 8), Some(DidOp::Create { timestamp: 42, .. })));
+        assert!(parse_did_op(&build(true), 8).is_none());
+    }
+
+    #[test]
+    fn truncated_and_oversized_length_rejected() {
+        let sig = [7u8; 8];
+        let mut p = b"DUPD".to_vec();
+        p.extend_from_slice(&u32::MAX.to_le_bytes()); // declared len >> payload
+        p.extend_from_slice(b"abc");
+        p.extend_from_slice(&sig);
+        assert!(parse_did_op(&p, 8).is_none());
+        assert!(parse_did_op(b"DUP", 8).is_none());
+    }
+}

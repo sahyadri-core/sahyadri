@@ -31,6 +31,26 @@ pub enum TxValidationFlags {
     SkipMassCheck,
 }
 
+/// Minimum fee (0.00001 CSM) and maximum gas (10 CSM) in kana.
+pub(crate) const MIN_FEE_KANA: u64 = 1000;
+pub(crate) const MAX_GAS_KANA: u64 = 1_000_000_000;
+
+/// Pure fee/overflow rules for account txs. Returns `(total_out, total_required)`.
+/// Order matters (errors are consensus-visible): outputs overflow, then gas bounds, then out+gas overflow.
+pub(crate) fn check_gas_and_required(mut outputs: impl Iterator<Item = u64>, gas: u64) -> TxResult<(u64, u64)> {
+    let total_out: u64 = outputs
+        .try_fold(0u64, |acc, v| acc.checked_add(v))
+        .ok_or(TxRuleError::OutputsValueOverflow)?;
+    if gas < MIN_FEE_KANA {
+        return Err(TxRuleError::ZeroFee);
+    }
+    if gas > MAX_GAS_KANA {
+        return Err(TxRuleError::Message("gas exceeds maximum".to_string()));
+    }
+    let total_required = total_out.checked_add(gas).ok_or(TxRuleError::InputAmountOverflow)?;
+    Ok((total_out, total_required))
+}
+
 impl TransactionValidator {
     pub fn validate_populated_transaction_and_get_fee(
         &self,
@@ -70,22 +90,9 @@ impl TransactionValidator {
         let sender_spk = self.extract_sender(tx)?;
         let account_state = self.account_store.get(&sender_spk).map_err(|_| TxRuleError::Unknown)?;
 
-        let total_out: u64 = tx.outputs().iter().try_fold(0u64, |acc, out| acc.checked_add(out.value)).ok_or(TxRuleError::OutputsValueOverflow)?;
         let gas = tx.tx().gas;
-
-        // --- SAHYADRI MINIMUM FEE ENFORCEMENT ---
-        // Mass-based fee is enforced at mempool level (check_transaction_standard.rs)
-        const MIN_FEE_KANA: u64 = 1000; // 0.00001 CSM
-        const MAX_GAS_KANA: u64 = 1_000_000_000; // 10 CSM — reasonable max fee
-        if gas < MIN_FEE_KANA {
-            return Err(TxRuleError::ZeroFee);
-        }
-        if gas > MAX_GAS_KANA {
-            return Err(TxRuleError::Message("gas exceeds maximum".to_string()));
-        }
-        // -------------------------------------------
-
-        let total_required = total_out.checked_add(gas).ok_or(TxRuleError::InputAmountOverflow)?;
+        // Fee/overflow rules live in a pure fn so they are unit-tested (gas_rules_tests).
+        let (total_out, total_required) = check_gas_and_required(tx.outputs().iter().map(|o| o.value), gas)?;
 
         if account_state.balance < total_required {
             return Err(TxRuleError::SpendTooHigh(total_out, account_state.balance));
@@ -353,3 +360,45 @@ impl TransactionValidator {
     }
 }
 
+#[cfg(test)]
+mod gas_rules_tests {
+    use super::*;
+
+    fn run(outs: &[u64], gas: u64) -> TxResult<(u64, u64)> {
+        check_gas_and_required(outs.iter().copied(), gas)
+    }
+
+    #[test]
+    fn gas_at_bounds_accepted() {
+        assert_eq!(run(&[10], MIN_FEE_KANA).unwrap(), (10, 10 + MIN_FEE_KANA));
+        assert_eq!(run(&[10], MAX_GAS_KANA).unwrap(), (10, 10 + MAX_GAS_KANA));
+    }
+
+    #[test]
+    fn gas_below_min_rejected() {
+        assert!(matches!(run(&[10], MIN_FEE_KANA - 1), Err(TxRuleError::ZeroFee)));
+        assert!(matches!(run(&[10], 0), Err(TxRuleError::ZeroFee)));
+    }
+
+    #[test]
+    fn gas_above_max_rejected() {
+        assert!(matches!(run(&[10], MAX_GAS_KANA + 1), Err(TxRuleError::Message(_))));
+        assert!(matches!(run(&[10], u64::MAX), Err(TxRuleError::Message(_))));
+    }
+
+    #[test]
+    fn outputs_sum_overflow_rejected() {
+        assert!(matches!(run(&[u64::MAX, 1], MIN_FEE_KANA), Err(TxRuleError::OutputsValueOverflow)));
+        assert!(matches!(
+            run(&[u64::MAX / 2 + 1, u64::MAX / 2 + 1], MIN_FEE_KANA),
+            Err(TxRuleError::OutputsValueOverflow)
+        ));
+    }
+
+    #[test]
+    fn outputs_plus_gas_overflow_rejected() {
+        assert!(matches!(run(&[u64::MAX], MIN_FEE_KANA), Err(TxRuleError::InputAmountOverflow)));
+        assert!(matches!(run(&[u64::MAX - MIN_FEE_KANA + 1], MIN_FEE_KANA), Err(TxRuleError::InputAmountOverflow)));
+        assert_eq!(run(&[u64::MAX - MIN_FEE_KANA], MIN_FEE_KANA).unwrap().1, u64::MAX);
+    }
+}

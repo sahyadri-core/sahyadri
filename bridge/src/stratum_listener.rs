@@ -98,23 +98,60 @@ impl StratumListener {
         const MAX_CONNECTIONS: u64 = 100;
         let conn_count = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
-        // RAII guard: acquire +1, Drop -1 (panic/early-return safe).
+        // Per-IP cap so one host cannot fill every slot (loopback exempt).
+        const MAX_CONNECTIONS_PER_IP: u32 = 20;
+        type IpCounts = Arc<std::sync::Mutex<std::collections::HashMap<std::net::IpAddr, u32>>>;
+        let ip_counts: IpCounts = Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+
+        // RAII guard: global +1 and per-IP +1 on acquire, both released on Drop
+        // (panic/early-return safe).
         struct ConnGuard {
             counter: Arc<std::sync::atomic::AtomicU64>,
+            ip_counts: IpCounts,
+            ip: std::net::IpAddr,
         }
         impl ConnGuard {
-            fn try_acquire(counter: &Arc<std::sync::atomic::AtomicU64>) -> Option<Self> {
+            fn try_acquire(
+                counter: &Arc<std::sync::atomic::AtomicU64>,
+                ip_counts: &IpCounts,
+                ip: std::net::IpAddr,
+            ) -> Option<Self> {
                 let prev = counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if prev >= MAX_CONNECTIONS {
                     counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                     return None;
                 }
-                Some(Self { counter: counter.clone() })
+                let admitted = {
+                    let mut map = ip_counts.lock().unwrap_or_else(|e| e.into_inner());
+                    let n = map.entry(ip).or_insert(0);
+                    if !ip.is_loopback() && *n >= MAX_CONNECTIONS_PER_IP {
+                        false
+                    } else {
+                        *n += 1;
+                        true
+                    }
+                };
+                if !admitted {
+                    counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                    return None;
+                }
+                Some(Self { counter: counter.clone(), ip_counts: ip_counts.clone(), ip })
             }
         }
         impl Drop for ConnGuard {
             fn drop(&mut self) {
                 self.counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                let mut map = self.ip_counts.lock().unwrap_or_else(|e| e.into_inner());
+                let remove = match map.get_mut(&self.ip) {
+                    Some(n) => {
+                        *n = n.saturating_sub(1);
+                        *n == 0
+                    }
+                    None => false,
+                };
+                if remove {
+                    map.remove(&self.ip);
+                }
             }
         }
 
@@ -124,7 +161,7 @@ impl StratumListener {
                 result = listener.accept() => {
                     match result {
                         Ok((stream, addr)) => {
-                            let guard = match ConnGuard::try_acquire(&conn_count) {
+                            let guard = match ConnGuard::try_acquire(&conn_count, &ip_counts, addr.ip()) {
                                 Some(g) => g,
                                 None => {
                                     warn!("[CONNECTION] rejecting {}:{} - at capacity", addr.ip(), addr.port());
