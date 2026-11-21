@@ -62,7 +62,7 @@ pub fn account_key_hash(spk: &ScriptPublicKey) -> H256 {
 }
 
 /// Read the current account state via SMT → state_hash → state_store.
-fn read_account_state(
+pub(crate) fn read_account_state(
     smt_overlay: &impl NodeStore,
     state_store: &dyn AccountStatesStoreReader,
     root: H256,

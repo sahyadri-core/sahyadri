@@ -764,14 +764,14 @@ mod tests {
         
         let (crest, _legacy) = ops.create_identity(request).expect("Create should succeed");
         
-        assert_eq!(crest.id, "did:sahadri:test123");
+        assert_eq!(crest.id, "did:sahyadri:test123");
         assert_eq!(crest.csm_address, "sahyadri:qtest");
         assert!(crest.active());
         assert_eq!(crest.version_id, 1);
         
         // Resolve should work
-        let resolved = ops.resolve("did:sahadri:test123").expect("Resolve should succeed");
-        assert_eq!(resolved.id, "did:sahadri:test123");
+        let resolved = ops.resolve("did:sahyadri:test123").expect("Resolve should succeed");
+        assert_eq!(resolved.id, "did:sahyadri:test123");
     }
     
     #[test]

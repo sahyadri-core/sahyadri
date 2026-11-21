@@ -23,7 +23,7 @@ use crate::{
         stores::{
             DB,
             acceptance_data::{AcceptanceDataStoreReader, DbAcceptanceDataStore},
-            account_store::{AccountStore, AccountStoreReader, DbAccountStore},
+            account_store::{AccountStore, DbAccountStore},
             account_roots::{AccountRootsStore, DbAccountRootsStore},
             account_states::{AccountStatesStore, DbAccountStatesStore},
             smt_nodes::DbSmtNodeStore,
@@ -104,7 +104,6 @@ pub(super) const SAHYADRI_TREASURY_PUBKEY_HEX: &str = "2d980235b2e054a227bed91b2
 use sahyadri_hashes::Hash;
 use sahyadri_muhash::MuHash;
 use sahyadri_notify::{events::EventType, notifier::Notify};
-use sha2::{Digest, Sha256};
 
 use super::errors::{PruningImportError, PruningImportResult};
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
@@ -124,22 +123,6 @@ use std::{
     sync::{Arc, atomic::Ordering},
 };
 
-/// Convert sender pubkey (1952 bytes) to P2PKH script.
-/// Matches SDK's pubkeyToAddress: sha3(pubkey)[..20] with 0x14/0xac wrapper.
-fn pubkey_to_p2pkh_spk(pubkey: &[u8]) -> sahyadri_consensus_core::tx::ScriptPublicKey {
-    use sha3::{Digest, Sha3_256};
-    let mut hasher = Sha3_256::new();
-    hasher.update(pubkey);
-    let hash = hasher.finalize();
-    let hash20 = &hash[..20];
-
-    let mut script = Vec::with_capacity(22);
-    script.push(0x14);
-    script.extend_from_slice(hash20);
-    script.push(0xac);
-
-    sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, script)
-}
 
 pub struct VirtualStateProcessor {
     // Channels
@@ -723,133 +706,67 @@ impl VirtualStateProcessor {
         // SAHYADRI ACCOUNT MODEL: TRANSACTION EXECUTION ENGINE
         // ---------------------------------------------------------
 
-        // 1. REORG HANDLING: Deduct everything from blocks that are removed from the main chain
-        for &hash in chain_path.removed.iter() {
-            if let Ok(txs) = self.block_transactions_store.get(hash) {
-                for (i, tx) in txs.iter().enumerate() {
-                    // ──── FLASH TX BYPASS ────
-                    // FlashTransactions use the FLASH_V1 prefix. Their payload
-                    // layout is incompatible with the legacy account-tx format
-                    // below. State unwind for flash txs is handled exclusively
-                    // by reorg_flash_block() at the end of this removed-block
-                    // iteration.
-                    if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
-                        continue;
-                    }
-                    // ─────────────────────────
-
-                    // reverse coinbase subsidy.
-                    // The apply path (processor.rs) credits the miner
-                    // and treasury via `calc_block_subsidy`, NOT via tx.outputs.
-                    // Without this reversal, orphaned-block rewards accumulate
-                    // across reorgs — money duplication independent of the
-                    // sign-flip vector below.
-                    if i == 0 {
-                        if let Ok(cb) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
-                            let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
-                            let total = self.coinbase_manager.calc_block_subsidy(daa);
-                            let dev = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total / 20 };
-                            let miner_amt = total.saturating_sub(dev);
-                            // i64::try_from guard — subsidy bounded by MAX_KANA
-                            // (~2.1e15), cannot fail in practice; defense in depth.
-                            if let Ok(amt) = i64::try_from(miner_amt) {
-                                if let Err(e) = self.account_store.update_balance_batch(
-                                    &mut batch, &cb.miner_data.script_public_key, -amt,
-                                ) {
-                                    log::error!("failed to reverse miner reward: {:?}", e);
+        // 1. REORG: restore the live account store, for every account a removed block
+        //    touched, to its committed state at the fork point. Added blocks below then
+        //    write their own committed SMT states, so the live store always equals the
+        //    SMT state and no balance arithmetic is replayed.
+        if let Some(&oldest_removed) = chain_path.removed.last() {
+            let fork_root = self
+                .sahyadri_consensus_store
+                .get_data(oldest_removed)
+                .ok()
+                .and_then(|d| {
+                    let sp = d.selected_parent;
+                    self.headers_store.get_header(sp).ok().map(|h| self.parent_account_root(sp, &h))
+                });
+            match fork_root {
+                None => {
+                    log::error!("SAHYADRI: reorg reset skipped, fork point state unavailable for {}", oldest_removed);
+                }
+                Some(fork_root) => {
+                    let mut touched: std::collections::HashSet<sahyadri_consensus_core::tx::ScriptPublicKey> =
+                        std::collections::HashSet::new();
+                    for &rh in chain_path.removed.iter() {
+                        if let Ok(rtxs) = self.block_transactions_store.get(rh) {
+                            if let Some(cb_tx) = rtxs.first() {
+                                if let Ok(cb) = self.coinbase_manager.deserialize_coinbase_payload(&cb_tx.payload) {
+                                    touched.insert(cb.miner_data.script_public_key.clone());
                                 }
                             }
-                            if dev > 0 {
-                                let mut tbytes = vec![0u8; PUBKEY_SIZE];
-                                if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut tbytes).is_ok() {
-                                    let tspk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, tbytes);
-                                    if let Ok(amt) = i64::try_from(dev) {
-                                        if let Err(e) = self.account_store.update_balance_batch(
-                                            &mut batch, &tspk, -amt,
-                                        ) {
-                                            log::error!("failed to reverse treasury fee: {:?}", e);
-                                        }
-                                    }
+                            for rtx in rtxs.iter().skip(1) {
+                                if let Some(f) = sahyadri_consensus_core::tx::FlashTransaction::from_transaction(rtx) {
+                                    touched.insert(crate::pipeline::virtual_processor::flash_tx::flash_pubkey_to_spk(&f.pubkey));
+                                    touched.insert(crate::pipeline::virtual_processor::flash_tx::hash20_to_p2pkh_spk(&f.recipient));
                                 }
                             }
                         }
-                        continue;  // coinbase has empty outputs — no other work
                     }
-
-                    // output-reversal and sender-refund
-                    // REMOVED. The account model applies transactions via balance
-                    // arithmetic (coinbase via subsidy, reversed above; flash via
-                    // apply_flash_tx; DID via state update), never via
-                    // Transaction.outputs. The removed loop cast output.value as
-                    // i64 and negated it — sign-flipping for values >= 2^63
-                    // (i64::MIN wrap), the audit's money-minting vector.
-                    //
-                    // The removed refund block was gated on get_last_tx_id, which
-                    // is a permanent stub (always zero) — so refunds never executed
-                    // and senders' funds were destroyed on every reorg anyway.
-                    //
-                    // Neither path is reachable in production: account-tx is
-                    // disabled ; DID ops touch DID state (unwound
-                    // separately); flash is handled by reorg_flash_block below.
-                }
-
-                // ──── FLASH TX REORG HOOK ────
-                // Per-block unwind: only removes flash entries whose block_hash matches
-                if self.enable_flash_tx {
-                    let flash_txs: Vec<sahyadri_consensus_core::tx::FlashTransaction> = txs
-                        .iter()
-                        .filter_map(|tx| sahyadri_consensus_core::tx::FlashTransaction::from_transaction(tx))
-                        .collect();
-                    if !flash_txs.is_empty() {
-                        match crate::pipeline::virtual_processor::flash_tx::reorg_flash_block(
-                            &self.account_store,
-                            &mut batch,
-                            hash,
-                            &flash_txs,
+                    if !SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() {
+                        let mut tbytes = vec![0u8; PUBKEY_SIZE];
+                        if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut tbytes).is_ok() {
+                            touched.insert(sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, tbytes));
+                        }
+                    }
+                    let reset_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
+                    let reset_overlay = sahyadri_smt::OverlayStore::new(&reset_base);
+                    for spk in touched.iter() {
+                        match crate::pipeline::virtual_processor::account_changes::read_account_state(
+                            &reset_overlay,
+                            &*self.account_states_store,
+                            fork_root,
+                            spk,
                         ) {
-                            Ok(fee_reversed) if fee_reversed > 0 => {
-                                // Reverse the fee split that was credited to
-                                // miner and treasury when this block was added.
-                                // Only the fees actually unwound (per-sender
-                                // block-tag check) are reversed here.
-                                let (miner_fee, treasury_fee) = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() {
-                                    (fee_reversed, 0)
-                                } else {
-                                    crate::processes::coinbase::split_transaction_fees(fee_reversed)
-                                };
-                                if let Ok(cb) = self.coinbase_manager.deserialize_coinbase_payload(&txs[0].payload) {
-                                    if let Err(e) = self.account_store.update_balance_batch(
-                                        &mut batch,
-                                        &cb.miner_data.script_public_key,
-                                        -(i64::try_from(miner_fee).unwrap_or(i64::MAX)),
-                                    ) {
-                                        log::error!("SAHYADRI: failed to reverse miner flash fee on reorg: {:?}", e);
-                                    }
-                                }
-                                if treasury_fee > 0 {
-                                    let mut tbytes = vec![0u8; PUBKEY_SIZE];
-                                    if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut tbytes).is_ok() {
-                                        let tspk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, tbytes);
-                                        if let Err(e) = self.account_store.update_balance_batch(
-                                            &mut batch,
-                                            &tspk,
-                                            -(i64::try_from(treasury_fee).unwrap_or(i64::MAX)),
-                                        ) {
-                                            log::error!("SAHYADRI: failed to reverse treasury flash fee on reorg: {:?}", e);
-                                        }
-                                    }
+                            Ok(state) => {
+                                if let Err(e) = self.account_store.set_batch(&mut batch, spk, state) {
+                                    log::error!("SAHYADRI: reorg reset write failed: {:?}", e);
                                 }
                             }
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::error!("SAHYADRI: flash reorg failed for block {:?}: {:?}", hash, e);
-                            }
+                            Err(e) => log::error!("SAHYADRI: reorg reset read failed: {:?}", e),
                         }
                     }
                 }
             }
         }
-
 
         // 2. NEW BLOCKS: Process Miners & User Transactions
         for &hash in chain_path.added.iter() {
@@ -946,6 +863,12 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                 if let Err(e) = self.account_roots_store.insert_batch(&mut batch, hash, final_root) {
                     log::error!("SAHYADRI: account_root persist failed for {}: {:?}", hash, e);
                 }
+                // Live account store mirrors the committed SMT state exactly.
+                for (spk, state) in changes.iter() {
+                    if let Err(e) = self.account_store.set_batch(&mut batch, spk, state.clone()) {
+                        log::error!("SAHYADRI: live account write failed for {}: {:?}", hash, e);
+                    }
+                }
                 // Account states
                 for (_spk, state) in changes {
                     let state_hash = state.content_hash();
@@ -970,289 +893,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
     }
 }
 }
-                for (i, tx) in txs.iter().enumerate() {
-                    // ==========================================
-                    // FIX 1: MINER REWARD
-                    // ==========================================
-                    if i == 0 {
-                        if let Ok(coinbase_data) = self.coinbase_manager.deserialize_coinbase_payload(&tx.payload) {
-                            // 1. 
-                            let daa_for_subsidy = self.headers_store.get_daa_score(hash).unwrap_or(0);
-                            let total_reward = self.coinbase_manager.calc_block_subsidy(daa_for_subsidy);
-                            debug_assert_eq!(
-                                total_reward, coinbase_data.subsidy,
-                                "payload subsidy divergence — validator should have rejected"
-                            );
-                            if total_reward > 0 {
-                                // Reward split (subsidy only).
-                                //
-                                // `total_reward` is the block subsidy from
-                                // `calc_block_subsidy`. Flash transaction fees
-                                // are credited separately, after batch
-                                // validation, from the flash txs that were actually applied.
-                                let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 20 };
-                                let miner_reward = total_reward - dev_fee;
 
-                                // 3.
-                                     {
-                                         if let Err(e) = self.account_store.update_balance_batch(&mut batch, &coinbase_data.miner_data.script_public_key, i64::try_from(miner_reward).unwrap_or(i64::MAX)) {
-                                             log::error!("SAHYADRI: CRITICAL — failed to credit miner reward: {:?}", e);
-                                             continue;
-                                         }
-                                     }
-
-                                let mut treasury_pubkey_bytes = vec![0u8; PUBKEY_SIZE];
-                                if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut treasury_pubkey_bytes).is_ok() {
-                                    let treasury_spk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, treasury_pubkey_bytes);
-                                    {
-                                        if let Err(e) = self.account_store.update_balance_batch(&mut batch, &treasury_spk, i64::try_from(dev_fee).unwrap_or(i64::MAX)) {
-                                            log::error!("SAHYADRI: CRITICAL — failed to credit treasury: {:?}", e);
-                                        }
-                                    }
-                                } else {
-                                    log::error!("SAHYADRI: failed to decode treasury pubkey hex — dev_fee {} NOT credited this block", dev_fee);
-                                }
-
-                                log::debug!("SAHYADRI REWARD: Added {} Kana to Miner! (Dev Fee: {})", miner_reward, dev_fee);
-                            }
-                        } else {
-                            log::error!("SAHYADRI REWARD ERROR: Failed to decode coinbase payload!");
-                        }
-                    }
-                    // ==========================================
-                    // FIX 2: USER TRANSACTIONS
-                    // ==========================================
-                    else {
-                        // ──── FLASH TX BYPASS ────
-                        // FlashTransactions use the FLASH_V1 prefix and are handled
-                        // by the dedicated per-block flash hook below. Skip classical
-                        // account-tx processing entirely (their outputs are empty).
-                        if tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1" {
-                            continue;
-                        }
-                        // ─────────────────────────
-
-                        // SAHYADRI: DID transaction check — must come first
-                        let is_did_tx = tx.payload.len() > 4 && (
-                            &tx.payload[..4] == b"DCRT" ||
-                            &tx.payload[..4] == b"DUPD" ||
-                            &tx.payload[..4] == b"DDEC"
-                        );
-
-                        if is_did_tx && tx.payload.len() >= 20 {
-                            // DID ops are applied through the SMT path (did_changes.rs).
-                            continue;
-                        }
-
-                        // The SMT state transition does not apply plain account transfers. Applying
-                        // them to the live store only would desync it and burn their gas.
-                        const PLAIN_ACCOUNT_TX_APPLIED: bool = false;
-                        if !PLAIN_ACCOUNT_TX_APPLIED {
-                            continue;
-                        }
-
-                        let min_payload = PUBKEY_SIZE + 8 + SIG_SIZE;
-                        if tx.payload.len() < min_payload {
-                            log::debug!(
-                                "SAHYADRI: skipping account tx — undersized payload ({} bytes) in commit_virtual_state",
-                                tx.payload.len()
-                            );
-                            continue;
-                        }
-
-                        let sig_start = tx.payload.len() - SIG_SIZE;
-                        let nonce_start = sig_start - 8;
-                        let sender_pubkey = &tx.payload[..nonce_start];
-                        let sig_bytes = &tx.payload[sig_start..];
-                        let sender_spk = pubkey_to_p2pkh_spk(sender_pubkey);
-
-                        // Defense-in-depth: re-verify Dilithium signature
-                        {
-                            let signable_payload = &tx.payload[..sig_start];
-                            log::debug!("SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
-                            log::debug!("SENDER PUBKEY LEN: {}", sender_pubkey.len());    
-                            let sighash = {
-                                let mut h = Sha256::new();
-                                h.update(b"SAHYADRI_ACCOUNT_TX_V1");
-                                h.update(tx.version.to_le_bytes());
-                                for output in &tx.outputs {
-                                    h.update(output.value.to_le_bytes());
-                                    h.update(output.script_public_key.version.to_le_bytes());
-                                    let s = output.script_public_key.script();
-                                    h.update((s.len() as u64).to_le_bytes());
-                                    h.update(s);
-                                }
-                                h.update(tx.lock_time.to_le_bytes());
-                                h.update(tx.subnetwork_id.as_bytes());
-                                h.update(tx.gas.to_le_bytes());
-                                h.update((signable_payload.len() as u64).to_le_bytes());
-                                h.update(signable_payload);
-                                h.finalize()
-                            };
-                            log::debug!("SAHYADRI SIGHASH: {:02x?}", sighash);
-                            if let Some(out0) = tx.outputs.first() {
-                                log::debug!("SPK VERSION: {}", out0.script_public_key.version);
-                            }
-                            log::debug!("NODE SIGHASH: {:02x?}", sighash);
-                            log::debug!("NODE SENDER PUBKEY LEN: {}", sender_pubkey.len());
-                            log::debug!("NODE SENDER PUBKEY FIRST 40: {:02x?}", &sender_pubkey[..20.min(sender_pubkey.len())]);
-                            log::debug!("NODE SIGNABLE PAYLOAD LEN: {}", signable_payload.len());
-                            log::debug!("NODE SIG FIRST 20: {:02x?}", &sig_bytes[..20.min(sig_bytes.len())]);
-
-                            let sig = DilithiumSignature::from_slice(sig_bytes);
-                            let is_valid = VERIFY_POOL.install(|| {
-                                DilithiumKeyPair::verify(sender_pubkey, &sig, &sighash, b"", SAHYADRI_MODE)
-                            });
-                            if !is_valid {
-                                log::debug!("SAHYADRI: skipping account tx — invalid signature in commit_virtual_state");
-                                continue;
-                            }
-                        }
-
-                        // Verify balance
-                        let mut total_spent: u64 = 0;
-                        for output in tx.outputs.iter() {
-                            total_spent += output.value;
-                        }
-                        total_spent += tx.gas;
-                        let balance = match self.account_store.get_balance(&sender_spk) {
-                            Ok(b) => b,
-                            Err(e) => {
-                                log::debug!("SAHYADRI: skipping account tx — failed to read balance: {:?}", e);
-                                continue;
-                            }
-                        };
-                        if balance < total_spent {
-                            log::debug!(
-                                "SAHYADRI: skipping invalid account tx — insufficient balance (have {}, need {})",
-                                balance, total_spent
-                            );
-                            continue;
-                        }
-
-                        // All checks passed — apply state changes
-                        // 1. Debit sender (outputs + gas)
-                        if let Err(e) = self.account_store.update_balance_batch(
-                            &mut batch,
-                            &sender_spk,
-                            -(i64::try_from(total_spent).unwrap_or(i64::MAX)),
-                        ) {
-                            log::error!("SAHYADRI: CRITICAL — failed to debit sender: {:?}", e);
-                            continue;
-                        }
-
-                        // 2. Credit receiver(s)
-                        for output in tx.outputs.iter() {
-                            let amount = i64::try_from(output.value).unwrap_or(i64::MAX);
-                            if let Err(e) = self.account_store.update_balance_batch(
-                                &mut batch,
-                                &output.script_public_key,
-                                amount,
-                            ) {
-                                log::error!("SAHYADRI: CRITICAL — failed to credit receiver: {:?}", e);
-                                break;
-                            }
-                        }
-
-                        // 4. Record which tx was just applied — for reorg refund safety
-                        if let Err(e) = self.account_store.set_last_tx_id_batch(
-                            &mut batch,
-                            &sender_spk,
-                            tx.id().as_bytes(),
-                        ) {
-                            log::error!("SAHYADRI: failed to record last_applied_tx_id: {:?}", e);
-                        }
-                    }
-                }
-                // ──── FLASH TX APPLY HOOK ────
-                // Per-block: decode all flash txs, batch-validate, then apply.
-                // Balance reservation is handled by validate_flash_batch (per-sender aggregate).
-                if self.enable_flash_tx {
-                    let flash_txs: Vec<sahyadri_consensus_core::tx::FlashTransaction> = txs
-                        .iter()
-                        .filter_map(|tx| sahyadri_consensus_core::tx::FlashTransaction::from_transaction(tx))
-                        .collect();
-
-                    if !flash_txs.is_empty() {
-                        let current_daa = new_virtual_state.daa_score;
-                        match self.transaction_validator.validate_flash_batch(&flash_txs, current_daa) {
-                            Ok(valid_flash_txs) => {
-                                let mut affected_spks: Vec<sahyadri_consensus_core::tx::ScriptPublicKey> = Vec::new();
-                                let mut applied_fee_total: u64 = 0;
-                                for flash_tx in &valid_flash_txs {
-                                    if let Err(e) = crate::pipeline::virtual_processor::flash_tx::apply_flash_tx(
-                                        &self.account_store,
-                                        &mut batch,
-                                        flash_tx,
-                                        hash,
-                                    ) {
-                                        log::error!("SAHYADRI: flash apply failed in block {:?}: {:?}", hash, e);
-                                        continue;
-                                    }
-                                    affected_spks.push(
-                                        crate::pipeline::virtual_processor::flash_tx::flash_pubkey_to_spk(&flash_tx.pubkey),
-                                    );
-                                    affected_spks.push(
-                                        crate::pipeline::virtual_processor::flash_tx::hash20_to_p2pkh_spk(&flash_tx.recipient),
-                                    );
-                                    applied_fee_total = applied_fee_total.saturating_add(flash_tx.fee);
-                                }
-
-                                // Prune expired flash entries on affected accounts
-                                if let Err(e) = crate::pipeline::virtual_processor::flash_tx::prune_flashes_for_accounts(
-                                    &self.account_store,
-                                    &mut batch,
-                                    &affected_spks,
-                                    current_daa,
-                                ) {
-                                    log::error!("SAHYADRI: flash prune failed in block {:?}: {:?}", hash, e);
-                                }
-
-                                // Credit accumulated flash transaction fees
-                                // from the txs that were actually applied. Sender was
-                                // debited by `amount + fee` in apply_flash_tx,
-                                // so this split conserves total supply.
-                                let flash_fee_total: u64 = applied_fee_total;
-                                if flash_fee_total > 0 {
-                                    if let Ok(cb) = self.coinbase_manager.deserialize_coinbase_payload(&txs[0].payload) {
-                                        let (miner_fee, treasury_fee) = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() {
-                                            (flash_fee_total, 0)
-                                        } else {
-                                            crate::processes::coinbase::split_transaction_fees(flash_fee_total)
-                                        };
-                                        if let Err(e) = self.account_store.update_balance_batch(
-                                            &mut batch,
-                                            &cb.miner_data.script_public_key,
-                                            i64::try_from(miner_fee).unwrap_or(i64::MAX),
-                                        ) {
-                                            log::error!("SAHYADRI: failed to credit miner flash fee: {:?}", e);
-                                        }
-                                        if treasury_fee > 0 {
-                                            let mut tbytes = vec![0u8; PUBKEY_SIZE];
-                                            if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut tbytes).is_ok() {
-                                                let tspk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, tbytes);
-                                                if let Err(e) = self.account_store.update_balance_batch(
-                                                    &mut batch,
-                                                    &tspk,
-                                                    i64::try_from(treasury_fee).unwrap_or(i64::MAX),
-                                                ) {
-                                                    log::error!("SAHYADRI: failed to credit treasury flash fee: {:?}", e);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                log::debug!(
-                                    "SAHYADRI: flash batch rejected in block {:?}: {:?}",
-                                    hash,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                }
             }
         }
 
