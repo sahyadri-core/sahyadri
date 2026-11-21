@@ -38,6 +38,12 @@ impl TransactionValidator {
         // (commit_virtual_state DCRT/DUPD/DDEC handlers, lines 880-1004)
         // before writing to crest_store. Any tx with a fake DID signature
         // is rejected there and never mutates identity state.
+        // Enforce transaction version on all tx types including DID ops
+        // before any early return skips the check.
+        if tx.version > 1 {
+            return Err(TxRuleError::Message(format!("unsupported tx version: {}", tx.version)));
+        }
+
         if tx.payload.len() >= 4 {
             let p = &tx.payload[..4];
             if p == b"DCRT" || p == b"DUPD" || p == b"DDEC" {

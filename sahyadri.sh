@@ -31,7 +31,8 @@ CHECKPOINT_ROOT="${SAHYADRI_CHECKPOINT_ROOT:-}"
 INSECURE="${SAHYADRI_SYNC_INSECURE:-0}"
 APPDIR="${SAHYADRI_APPDIR:-$HOME/.sahyadri}"
 
-NODE_BIN=~/sahyadri-final/sahyadri/target/release/sahyadrid
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+NODE_BIN="$SCRIPT_DIR/target/release/sahyadrid"
 
 SYNC_FLAGS=()
 

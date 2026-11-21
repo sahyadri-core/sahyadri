@@ -1,5 +1,6 @@
 #!/bin/bash
-NODE_BIN=~/sahyadri-final/sahyadri/target/release/sahyadrid
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+NODE_BIN="$SCRIPT_DIR/target/release/sahyadrid"
 
 $NODE_BIN \
  --testnet \

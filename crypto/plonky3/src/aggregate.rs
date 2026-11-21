@@ -106,8 +106,11 @@ fn build_config() -> Result<RecursionConfig, AggregateError> {
         .map_err(|e| AggregateError::Config(format!("{e:?}")))
 }
 
-// ── Type-punning ────────────────────────────────────────────
-
+// Reinterprets a DilithiumStarkConfig proof as a RecursionConfig proof.
+// SAFETY: This relies on both Proof<C> instantiations having identical
+// memory layout. If the plonky3 crate changes field ordering, this will
+// silently corrupt data. Replace with bincode serialize/deserialize when
+// the recursion path is activated for production.
 fn proof_as_recursion(p: &Proof<DilithiumStarkConfig>) -> &Proof<RecursionConfig> {
     unsafe { &*(p as *const _ as *const Proof<RecursionConfig>) }
 }

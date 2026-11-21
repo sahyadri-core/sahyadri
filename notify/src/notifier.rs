@@ -290,7 +290,7 @@ where
         _sync: Option<Sender<()>>,
     ) -> Self {
         assert!(broadcasters > 0, "a notifier requires a minimum of one broadcaster");
-        let notification_channel = Channel::unbounded();
+        let notification_channel = Channel::bounded(10_000);
         let broadcasters = (0..broadcasters)
             .map(|idx| {
                 Arc::new(Broadcaster::new(
