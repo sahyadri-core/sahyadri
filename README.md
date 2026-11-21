@@ -19,7 +19,7 @@ This repository contains the full-node software, designed for maximum throughput
 - **State Proofs** — Inclusion and exclusion proofs against the committed root, verifiable in under 1 ms
 - **Recursive Proof Aggregation** — N transaction STARK proofs → 1 constant-size root proof (631 KB at N=2, 735 KB at N=8), verifiable in 35 ms
 - **SyncWave Bootstrap** — Fresh nodes catch up to the network in seconds, not hours
-- **Quantum Ready** — ML-DSA-65 (Dilithium3) signatures + cSHAKE256 PoW + Goldilocks/Poseidon2 STARKs
+- **Quantum Ready** — ML-DSA-65 (Dilithium3) signatures + BLAKE3 + Poseidon2 PoW + Goldilocks/Poseidon2 STARKs
 - **Sovereign Supply** — 21,000,000 CSM hard cap, no premine, fair launch
 
 ## The Genesis Phase
@@ -119,7 +119,7 @@ Testnet uses port suffix conventions (`16210`–`16213`).
 
 ## Mining on Sahyadri
 
-Sahyadri uses a memory-hard, ASIC-resistant PoW algorithm (**SahyadriX** — cSHAKE256 + 16 MB memory loop). Mining requires a running full node and a miner client.
+Sahyadri uses a memory-hard, ASIC-resistant PoW algorithm (**SahyadriX** — BLAKE3 chain + 16 MB memory loop + Poseidon2). Mining requires a running full node and a miner client.
 
 **1. Start the node** (in one terminal):
 

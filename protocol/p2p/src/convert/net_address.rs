@@ -47,7 +47,7 @@ impl TryFrom<protowire::NetAddress> for (IpAddress, u16) {
                     .chunks(size_of::<u16>())
                     .map(|chunk| u16::from_be_bytes(chunk.try_into().expect("We already checked the number of bytes")))
                     .collect_vec();
-                let ipv6 = Ipv6Addr::from(<[u16; 8]>::try_from(octets).unwrap());
+                let ipv6 = Ipv6Addr::from(<[u16; 8]>::try_from(octets).map_err(|_| ConversionError::IllegalIPLength(16))?);
                 Ok(ipv6.into())
             }
             len => Err(ConversionError::IllegalIPLength(len)),
