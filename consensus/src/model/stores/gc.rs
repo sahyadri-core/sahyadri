@@ -214,6 +214,12 @@ mod tests {
         assert_eq!(stats.deleted_nodes, 0);
         assert_eq!(stats.deleted_states, 0);
         assert_eq!(stats.deleted_roots, 0);
+        drop(smt);
+        drop(states);
+        drop(did_states);
+        drop(roots);
+        drop(headers);
+        drop(db);
         drop(lifetime);
     }
 

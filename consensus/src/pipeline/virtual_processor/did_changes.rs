@@ -357,7 +357,8 @@ mod tests {
     fn duplicate_create_is_skipped() {
         let mut smt = MemStore::default();
         let ok = |_: &[u8], _: &[u8], _: &[u8]| true;
-        let ops = vec![create_op("csm1a"), create_op("csm1a")];
+        let addr = derive_csm_address(&vec![7u8; PUBKEY_BYTES], Prefix::Testnet);
+        let ops = vec![create_op(&addr), create_op(&addr)];
         let (root, changed) =
             compute_block_did_changes(EMPTY, &mut smt, &MockStates::default(), &ops, 10, Prefix::Testnet, &ok).unwrap();
         assert_eq!(changed.len(), 1);

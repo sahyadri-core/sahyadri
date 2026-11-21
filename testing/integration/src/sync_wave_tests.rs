@@ -42,6 +42,11 @@ async fn test_sync_wave_export_verify_load() {
         "declared account count must match actual"
     );
     assert_eq!(
+        snapshot.metadata.total_did_states,
+        snapshot.did_states.len() as u64,
+        "declared DID state count must match actual"
+    );
+    assert_eq!(
         snapshot.metadata.total_smt_nodes,
         snapshot.smt_nodes.len() as u64,
         "declared SMT node count must match actual"
@@ -113,4 +118,25 @@ async fn test_sync_wave_verify_rejects_corruption() {
     snapshot.metadata.account_root = sahyadri_hashes::Hash::from_bytes([0xab; 32]);
     let result = SyncWaveExporter::verify(&snapshot);
     assert!(result.is_err(), "verification must reject a wrong account root");
+}
+
+#[tokio::test]
+async fn test_sync_wave_verify_rejects_state_count_mismatch() {
+    let tc = build_simnet_consensus();
+    let tip = tc.consensus_clone().get_headers_selected_tip();
+    let snapshot = tc.consensus_clone().export_sync_wave(tip).unwrap();
+
+    let mut bad_accounts = snapshot.clone();
+    bad_accounts.metadata.total_accounts += 1;
+    assert!(
+        SyncWaveExporter::verify(&bad_accounts).is_err(),
+        "verification must reject an incorrect account count"
+    );
+
+    let mut bad_dids = snapshot;
+    bad_dids.metadata.total_did_states += 1;
+    assert!(
+        SyncWaveExporter::verify(&bad_dids).is_err(),
+        "verification must reject an incorrect DID state count"
+    );
 }

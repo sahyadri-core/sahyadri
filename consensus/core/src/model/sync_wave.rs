@@ -157,6 +157,8 @@ pub enum SyncWaveError {
     MissingNode(H256),
     RootMismatch { expected: Hash, computed: Hash },
     NodeCountMismatch { declared: u64, actual: u64 },
+    AccountCountMismatch { declared: u64, actual: u64 },
+    DidStateCountMismatch { declared: u64, actual: u64 },
     NodeHashMismatch(H256),
     StateHashMismatch(Hash),
     DanglingReference(H256),
@@ -173,6 +175,12 @@ impl std::fmt::Display for SyncWaveError {
             }
             Self::NodeCountMismatch { declared, actual } => {
                 write!(f, "node count mismatch: declared={declared} actual={actual}")
+            }
+            Self::AccountCountMismatch { declared, actual } => {
+                write!(f, "account count mismatch: declared={declared} actual={actual}")
+            }
+            Self::DidStateCountMismatch { declared, actual } => {
+                write!(f, "DID state count mismatch: declared={declared} actual={actual}")
             }
             Self::NodeHashMismatch(h) => write!(f, "node content-address mismatch: {h:?}"),
             Self::StateHashMismatch(h) => write!(f, "state content-hash mismatch: {h}"),

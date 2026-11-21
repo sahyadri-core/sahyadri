@@ -2196,6 +2196,13 @@ mod root_proof_tests {
         );
 
         let block_hash = Hash::from_bytes([7u8; 32]);
+        // An empty block has a stored, empty body.
+        crate::model::stores::block_transactions::BlockTransactionsStore::insert(
+            &txs_store,
+            block_hash,
+            std::sync::Arc::new(Vec::new()),
+        )
+        .unwrap();
 
         let result = super::generate_root_proof_for_block(
             block_hash,

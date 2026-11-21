@@ -133,6 +133,7 @@ pub async fn bootstrap_from_peer(
     const MAX_ACCOUNTS: u64 = 50_000_000;
     const MAX_DID_STATES: u64 = 10_000_000;
     const MAX_CHUNKS: u32 = 10_000;
+    const MAX_CHUNK_ITEMS: u32 = 8_192;
 
     if metadata.total_smt_nodes > MAX_SMT_NODES
         || metadata.total_accounts > MAX_ACCOUNTS
@@ -160,25 +161,98 @@ pub async fn bootstrap_from_peer(
                 got: metadata.block_hash,
             });
         }
+
+        // Authenticate the account root through the trusted checkpoint header.
+        // The peer cannot substitute another root without finding a header hash
+        // collision against the independently trusted checkpoint hash.
+        let rpc_block = client
+            .get_block(expected_hash, false)
+            .await
+            .map_err(|e| {
+                SyncWaveBootstrapError::Rpc(format!(
+                    "checkpoint header retrieval: {e:?}"
+                ))
+            })?;
+
+        if rpc_block.header.hash != expected_hash {
+            return Err(SyncWaveBootstrapError::CheckpointMismatch {
+                expected: expected_hash,
+                got: rpc_block.header.hash,
+            });
+        }
+
+        let checkpoint_header: sahyadri_consensus_core::header::Header =
+            rpc_block.header.try_into().map_err(|e| {
+                SyncWaveBootstrapError::Verify(format!(
+                    "checkpoint header conversion: {e:?}"
+                ))
+            })?;
+
+        let computed_hash =
+            sahyadri_consensus_core::hashing::header::hash(&checkpoint_header);
+
+        if computed_hash != expected_hash {
+            return Err(SyncWaveBootstrapError::CheckpointMismatch {
+                expected: expected_hash,
+                got: computed_hash,
+            });
+        }
+
+        if checkpoint_header.account_commitment != metadata.account_root {
+            return Err(SyncWaveBootstrapError::CheckpointMismatch {
+                expected: checkpoint_header.account_commitment,
+                got: metadata.account_root,
+            });
+        }
+
         if let Some(expected_root) = config.checkpoint_root {
-            if metadata.account_root != expected_root {
+            if checkpoint_header.account_commitment != expected_root {
                 return Err(SyncWaveBootstrapError::CheckpointMismatch {
                     expected: expected_root,
-                    got: metadata.account_root,
+                    got: checkpoint_header.account_commitment,
                 });
             }
         }
-        log::info!("SyncWave: checkpoint hash verified ✓ (block={})", expected_hash);
-        if config.checkpoint_root.is_some() {
-            log::info!("SyncWave: account root verified ✓");
-        }
+
+        log::info!(
+            "SyncWave: checkpoint header hash and account root authenticated ✓ (block={})",
+            expected_hash
+        );
     }
 
     // ─── 3. Download chunks ───
     info!("SyncWave: downloading {} chunks", metadata.total_chunks);
-    let mut all_smt_nodes = Vec::with_capacity(metadata.total_smt_nodes as usize);
-    let mut all_states = Vec::with_capacity(metadata.total_accounts as usize);
-    let mut all_did_states = Vec::with_capacity(metadata.total_did_states as usize);
+    // Do not preallocate from peer-controlled counts. Grow only after
+    // validating each bounded chunk and its cumulative item counts.
+    let mut all_smt_nodes = Vec::new();
+    let mut all_states = Vec::new();
+    let mut all_did_states = Vec::new();
+
+    if metadata.chunk_size == 0 || metadata.chunk_size > MAX_CHUNK_ITEMS {
+        return Err(SyncWaveBootstrapError::Rpc(format!(
+            "metadata chunk size outside allowed range: {}",
+            metadata.chunk_size
+        )));
+    }
+
+    let mut downloaded_smt_nodes = 0u64;
+    let mut downloaded_accounts = 0u64;
+    let mut downloaded_did_states = 0u64;
+
+    let total_items = metadata
+        .total_smt_nodes
+        .checked_add(metadata.total_accounts)
+        .and_then(|count| count.checked_add(metadata.total_did_states))
+        .ok_or_else(|| {
+            SyncWaveBootstrapError::Rpc("metadata item count overflow".into())
+        })?;
+    let expected_chunks = total_items.div_ceil(metadata.chunk_size as u64);
+    if expected_chunks != metadata.total_chunks as u64 {
+        return Err(SyncWaveBootstrapError::Rpc(format!(
+            "metadata chunk count mismatch: declared {}, expected {}",
+            metadata.total_chunks, expected_chunks
+        )));
+    }
 
     for i in 0..metadata.total_chunks {
         let resp = client
@@ -186,8 +260,68 @@ pub async fn bootstrap_from_peer(
             .await
             .map_err(|e| SyncWaveBootstrapError::Rpc(format!("chunk {i}: {e:?}")))?;
 
+        if resp.chunk_index != i || resp.total_chunks != metadata.total_chunks {
+            return Err(SyncWaveBootstrapError::Rpc(format!(
+                "chunk {i} response envelope mismatch: index={}, total_chunks={}",
+                resp.chunk_index, resp.total_chunks
+            )));
+        }
+
         let chunk: SyncWaveChunkWire = bincode::deserialize(&resp.data)
             .map_err(|e| SyncWaveBootstrapError::Rpc(format!("chunk {i} deser: {e:?}")))?;
+
+        if chunk.chunk_index != i || chunk.total_chunks != metadata.total_chunks {
+            return Err(SyncWaveBootstrapError::Rpc(format!(
+                "chunk {i} payload mismatch: index={}, total_chunks={}",
+                chunk.chunk_index, chunk.total_chunks
+            )));
+        }
+
+        let chunk_smt = chunk.smt_nodes.len() as u64;
+        let chunk_accounts = chunk.account_states.len() as u64;
+        let chunk_dids = chunk.did_states.len() as u64;
+
+        let chunk_items = chunk_smt
+            .checked_add(chunk_accounts)
+            .and_then(|n| n.checked_add(chunk_dids))
+            .ok_or_else(|| {
+                SyncWaveBootstrapError::Rpc(
+                    format!("chunk {i} item count overflow")
+                )
+            })?;
+
+        if chunk_items > metadata.chunk_size as u64 {
+            return Err(SyncWaveBootstrapError::Rpc(format!(
+                "chunk {i} exceeds declared chunk size: {} > {}",
+                chunk_items, metadata.chunk_size
+            )));
+        }
+
+        let next_smt = downloaded_smt_nodes.checked_add(chunk_smt)
+            .ok_or_else(|| SyncWaveBootstrapError::Rpc(
+                "downloaded SMT count overflow".into()
+            ))?;
+        let next_accounts = downloaded_accounts.checked_add(chunk_accounts)
+            .ok_or_else(|| SyncWaveBootstrapError::Rpc(
+                "downloaded account count overflow".into()
+            ))?;
+        let next_dids = downloaded_did_states.checked_add(chunk_dids)
+            .ok_or_else(|| SyncWaveBootstrapError::Rpc(
+                "downloaded DID count overflow".into()
+            ))?;
+
+        if next_smt > metadata.total_smt_nodes
+            || next_accounts > metadata.total_accounts
+            || next_dids > metadata.total_did_states
+        {
+            return Err(SyncWaveBootstrapError::Rpc(format!(
+                "chunk {i} exceeds advertised cumulative item counts"
+            )));
+        }
+
+        downloaded_smt_nodes = next_smt;
+        downloaded_accounts = next_accounts;
+        downloaded_did_states = next_dids;
 
         all_smt_nodes.extend(chunk.smt_nodes);
         all_states.extend(chunk.account_states);
@@ -219,10 +353,25 @@ pub async fn bootstrap_from_peer(
         account_root: metadata.account_root,
         total_smt_nodes: metadata.total_smt_nodes,
         total_accounts: metadata.total_accounts,
-        total_did_states: 0,
+        total_did_states: metadata.total_did_states,
         chunk_size: metadata.chunk_size,
         total_chunks: metadata.total_chunks,
     };
+
+    if all_smt_nodes.len() as u64 != metadata.total_smt_nodes
+        || all_states.len() as u64 != metadata.total_accounts
+        || all_did_states.len() as u64 != metadata.total_did_states
+    {
+        return Err(SyncWaveBootstrapError::Rpc(format!(
+            "downloaded item count mismatch: smt {}/{}, accounts {}/{}, DID states {}/{}",
+            all_smt_nodes.len(),
+            metadata.total_smt_nodes,
+            all_states.len(),
+            metadata.total_accounts,
+            all_did_states.len(),
+            metadata.total_did_states
+        )));
+    }
 
     let snapshot = SyncWaveSnapshot {
         metadata: core_metadata,

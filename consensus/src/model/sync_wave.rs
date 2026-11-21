@@ -23,7 +23,9 @@ use sahyadri_smt::EMPTY as SMT_EMPTY;
 
 use crate::model::stores::did_store::DidDocument;
 use crate::model::stores::did_states::{DbDidStatesStore, DidStatesStoreReader};
-use crate::pipeline::virtual_processor::did_changes::did_content_hash;
+use crate::pipeline::virtual_processor::did_changes::{
+    did_content_hash, did_key_hash,
+};
 use crate::model::stores::account_states::{AccountStatesStoreReader, DbAccountStatesStore};
 use crate::model::stores::account_store::{AccountState, FlashEntry};
 use crate::model::stores::headers::{DbHeadersStore, HeaderStoreReader};
@@ -62,6 +64,23 @@ pub struct SyncWaveExporter {
     pub did_states_store: Arc<DbDidStatesStore>,
     pub account_roots_store: Arc<crate::model::stores::account_roots::DbAccountRootsStore>,
     pub headers_store: Arc<DbHeadersStore>,
+}
+
+fn consume_leaf_value(
+    remaining: &mut HashMap<H256, u64>,
+    state_hash: Hash,
+) -> SyncWaveResult<()> {
+    let leaf_hash = hash_to_h256(state_hash);
+    match remaining.get_mut(&leaf_hash) {
+        Some(count) if *count > 0 => {
+            *count -= 1;
+            if *count == 0 {
+                remaining.remove(&leaf_hash);
+            }
+            Ok(())
+        }
+        _ => Err(SyncWaveError::StateHashMismatch(state_hash)),
+    }
 }
 
 impl SyncWaveExporter {
@@ -177,6 +196,20 @@ impl SyncWaveExporter {
     // ─────────────────────────────────────────────────────────────
 
     pub fn verify(snapshot: &SyncWaveSnapshot) -> SyncWaveResult<()> {
+        if snapshot.account_states.len() as u64 != snapshot.metadata.total_accounts {
+            return Err(SyncWaveError::AccountCountMismatch {
+                declared: snapshot.metadata.total_accounts,
+                actual: snapshot.account_states.len() as u64,
+            });
+        }
+
+        if snapshot.did_states.len() as u64 != snapshot.metadata.total_did_states {
+            return Err(SyncWaveError::DidStateCountMismatch {
+                declared: snapshot.metadata.total_did_states,
+                actual: snapshot.did_states.len() as u64,
+            });
+        }
+
         let root = hash_to_h256(snapshot.metadata.account_root);
 
         let mut index: HashMap<H256, &SyncWaveNode> =
@@ -211,12 +244,26 @@ impl SyncWaveExporter {
         // checkpoint, and account_root == trusted root) MUST be enforced by the
         // caller: see `sync_wave_bootstrap::bootstrap_from_peer`.
 
+        // Every reachable SMT leaf must have exactly one corresponding
+        // account or DID state. Use counts because content-addressed values
+        // may legitimately appear in more than one leaf.
+        let mut remaining_leaf_values: HashMap<H256, u64> = HashMap::new();
+        let mut leaf_key_values: HashMap<H256, H256> = HashMap::new();
+
+        for node_hash in visited.keys() {
+            if let Some(SyncWaveNode::Leaf { key, value }) = index.get(node_hash) {
+                *remaining_leaf_values.entry(*value).or_insert(0) += 1;
+                leaf_key_values.insert(*key, *value);
+            }
+        }
+
         // Account states
         for (state_hash, state) in &snapshot.account_states {
             let s = from_sync_state(state);
             if s.content_hash() != *state_hash {
                 return Err(SyncWaveError::StateHashMismatch(*state_hash));
             }
+            consume_leaf_value(&mut remaining_leaf_values, *state_hash)?;
         }
 
         // DID states
@@ -225,6 +272,22 @@ impl SyncWaveExporter {
             if did_content_hash(&doc) != *state_hash {
                 return Err(SyncWaveError::StateHashMismatch(*state_hash));
             }
+
+            // Bind the DID document identity to its authenticated SMT leaf.
+            let expected_key = did_key_hash(&doc.did);
+            let expected_value = hash_to_h256(*state_hash);
+
+            if leaf_key_values.get(&expected_key) != Some(&expected_value) {
+                return Err(SyncWaveError::StateHashMismatch(*state_hash));
+            }
+
+            consume_leaf_value(&mut remaining_leaf_values, *state_hash)?;
+        }
+
+        if let Some((unmatched_leaf, _)) = remaining_leaf_values.into_iter().next() {
+            return Err(SyncWaveError::StateHashMismatch(
+                h256_to_hash(unmatched_leaf),
+            ));
         }
 
         Ok(())
@@ -470,5 +533,63 @@ mod tests {
         snapshot.smt_nodes.pop();
         let r = SyncWaveExporter::verify(&snapshot);
         assert!(matches!(r, Err(SyncWaveError::NodeCountMismatch { .. }) | Err(SyncWaveError::DanglingReference(_))));
+    }
+
+    #[test]
+    fn test_snapshot_verify_rejects_did_leaf_key_mismatch() {
+        let mut smt = MemStore::default();
+
+        let doc = DidDocument {
+            did: "did:sahyadri:document-b".to_string(),
+            csm_address: "test-address".to_string(),
+            public_key: "test-public-key".to_string(),
+            document: "{}".to_string(),
+            purposes: vec![],
+            services: vec![],
+            active: true,
+            created_at: 1,
+            updated_at: 1,
+            version: 1,
+        };
+
+        let state_hash = did_content_hash(&doc);
+
+        // Deliberately store the valid document hash under another DID's key.
+        let wrong_key = did_key_hash("did:sahyadri:document-a");
+        let root = update(
+            &mut smt,
+            EMPTY,
+            &wrong_key,
+            Some(state_hash.as_bytes()),
+        )
+        .unwrap();
+
+        let mut nodes = HashMap::new();
+        collect_mem(&smt, root, &mut nodes).unwrap();
+        let smt_nodes: Vec<_> = nodes.into_iter().collect();
+
+        let snapshot = SyncWaveSnapshot {
+            metadata: SyncWaveMetadata {
+                block_hash: Hash::default(),
+                block_height: 0,
+                account_root: h256_to_hash(root),
+                total_smt_nodes: smt_nodes.len() as u64,
+                total_accounts: 0,
+                total_did_states: 1,
+                chunk_size: 2048,
+                total_chunks: 1,
+            },
+            smt_nodes,
+            account_states: vec![],
+            did_states: vec![(state_hash, to_sync_did_state(&doc))],
+        };
+
+        assert!(
+            matches!(
+                SyncWaveExporter::verify(&snapshot),
+                Err(SyncWaveError::StateHashMismatch(hash)) if hash == state_hash
+            ),
+            "verifier must reject a DID state stored under another DID's SMT key"
+        );
     }
 }
