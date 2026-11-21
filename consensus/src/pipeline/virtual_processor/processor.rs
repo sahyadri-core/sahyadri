@@ -801,13 +801,49 @@ impl VirtualStateProcessor {
                         .filter_map(|tx| sahyadri_consensus_core::tx::FlashTransaction::from_transaction(tx))
                         .collect();
                     if !flash_txs.is_empty() {
-                        if let Err(e) = crate::pipeline::virtual_processor::flash_tx::reorg_flash_block(
+                        match crate::pipeline::virtual_processor::flash_tx::reorg_flash_block(
                             &self.account_store,
                             &mut batch,
                             hash,
                             &flash_txs,
                         ) {
-                            log::error!("SAHYADRI: flash reorg failed for block {:?}: {:?}", hash, e);
+                            Ok(fee_reversed) if fee_reversed > 0 => {
+                                // Reverse the fee split that was credited to
+                                // miner and treasury when this block was added.
+                                // Only the fees actually unwound (per-sender
+                                // block-tag check) are reversed here.
+                                let (miner_fee, treasury_fee) = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() {
+                                    (fee_reversed, 0)
+                                } else {
+                                    crate::processes::coinbase::split_transaction_fees(fee_reversed)
+                                };
+                                if let Ok(cb) = self.coinbase_manager.deserialize_coinbase_payload(&txs[0].payload) {
+                                    if let Err(e) = self.account_store.update_balance_batch(
+                                        &mut batch,
+                                        &cb.miner_data.script_public_key,
+                                        -(i64::try_from(miner_fee).unwrap_or(i64::MAX)),
+                                    ) {
+                                        log::error!("SAHYADRI: failed to reverse miner flash fee on reorg: {:?}", e);
+                                    }
+                                }
+                                if treasury_fee > 0 {
+                                    let mut tbytes = vec![0u8; PUBKEY_SIZE];
+                                    if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut tbytes).is_ok() {
+                                        let tspk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, tbytes);
+                                        if let Err(e) = self.account_store.update_balance_batch(
+                                            &mut batch,
+                                            &tspk,
+                                            -(i64::try_from(treasury_fee).unwrap_or(i64::MAX)),
+                                        ) {
+                                            log::error!("SAHYADRI: failed to reverse treasury flash fee on reorg: {:?}", e);
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!("SAHYADRI: flash reorg failed for block {:?}: {:?}", hash, e);
+                            }
                         }
                     }
                 }
@@ -844,20 +880,19 @@ impl VirtualStateProcessor {
                         &self.coinbase_manager,
                         SAHYADRI_TREASURY_PUBKEY_HEX,
                     );
-                    // apply the SAME flash filter
-                    // that verify_block_state used, so the committed SMT root
-                    // matches the header commitment even when some flash txs
-                    // are rejected (expired / replayed / duplicate in batch).
-                    // On error (should be unreachable — verify would have
-                    // rejected the block already), log CRITICAL and fall back
-                    // to empty, matching the previous live-store behavior.
+                    let fee_sinks = crate::pipeline::virtual_processor::account_changes::fee_sinks_for_block(
+                        &txs,
+                        &self.coinbase_manager,
+                        SAHYADRI_TREASURY_PUBKEY_HEX,
+                    );
+                    // Apply the same flash filter that the verify path uses, so the
+                    // committed SMT root matches the header commitment even when some
+                    // flash txs are rejected (expired, duplicate, bad signature).
+                    // On error (unreachable: verify rejects such a block) use an empty set.
                     let flash_txs = self
                         .validated_flash_for_block(&raw_flash, daa)
                         .unwrap_or_else(|e| {
-                            log::error!(
-                                "commit-path flash validation failed for {}: {:?} — empty set",
-                                hash, e
-                            );
+                            log::error!("commit-path flash validation failed for {}: {:?} - empty set", hash, e);
                             Vec::new()
                         });
 
@@ -890,6 +925,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
     &flash_txs,
     &rewards,
     daa,
+    fee_sinks.as_ref(),
 ) {
     Ok((accounts_root, changes)) => {
         match crate::pipeline::virtual_processor::did_changes::compute_block_did_changes(
@@ -948,7 +984,12 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                                 "payload subsidy divergence — validator should have rejected"
                             );
                             if total_reward > 0 {
-                                // 2.
+                                // Reward split (subsidy only).
+                                //
+                                // `total_reward` is the block subsidy from
+                                // `calc_block_subsidy`. Flash transaction fees
+                                // are credited separately, after batch
+                                // validation, from the flash txs that were actually applied.
                                 let dev_fee = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() { 0 } else { total_reward / 20 };
                                 let miner_reward = total_reward - dev_fee;
 
@@ -999,35 +1040,14 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         );
 
                         if is_did_tx && tx.payload.len() >= 20 {
-                            // Charge gas fee from sender before DID SMT processing.
-                            // Sender SPK is output[0] (set by RPC builder).
-                            let gas = tx.gas;
-                            if gas > 0 {
-                                let sender_spk = &tx.outputs[0].script_public_key;
-                                let balance = match self.account_store.get_balance(sender_spk) {
-                                    Ok(b) => b,
-                                    Err(e) => {
-                                        log::debug!("DID tx skipped — failed to read balance: {:?}", e);
-                                        continue;
-                                    }
-                                };
-                                if balance < gas {
-                                    log::debug!(
-                                        "DID tx skipped — insufficient balance for gas (have {}, need {})",
-                                        balance, gas
-                                    );
-                                    continue;
-                                }
-                                if let Err(e) = self.account_store.update_balance_batch(
-                                    &mut batch,
-                                    sender_spk,
-                                    -(i64::try_from(gas).unwrap_or(i64::MAX)),
-                                ) {
-                                    log::error!("DID tx — failed to debit gas: {:?}", e);
-                                    continue;
-                                }
-                            }
-                            // SAHYADRI Phase B: DID ab SMT path se handle hota hai (did_changes.rs)
+                            // DID ops are applied through the SMT path (did_changes.rs).
+                            continue;
+                        }
+
+                        // The SMT state transition does not apply plain account transfers. Applying
+                        // them to the live store only would desync it and burn their gas.
+                        const PLAIN_ACCOUNT_TX_APPLIED: bool = false;
+                        if !PLAIN_ACCOUNT_TX_APPLIED {
                             continue;
                         }
 
@@ -1158,6 +1178,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         match self.transaction_validator.validate_flash_batch(&flash_txs, current_daa) {
                             Ok(valid_flash_txs) => {
                                 let mut affected_spks: Vec<sahyadri_consensus_core::tx::ScriptPublicKey> = Vec::new();
+                                let mut applied_fee_total: u64 = 0;
                                 for flash_tx in &valid_flash_txs {
                                     if let Err(e) = crate::pipeline::virtual_processor::flash_tx::apply_flash_tx(
                                         &self.account_store,
@@ -1174,6 +1195,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                                     affected_spks.push(
                                         crate::pipeline::virtual_processor::flash_tx::hash20_to_p2pkh_spk(&flash_tx.recipient),
                                     );
+                                    applied_fee_total = applied_fee_total.saturating_add(flash_tx.fee);
                                 }
 
                                 // Prune expired flash entries on affected accounts
@@ -1184,6 +1206,41 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                                     current_daa,
                                 ) {
                                     log::error!("SAHYADRI: flash prune failed in block {:?}: {:?}", hash, e);
+                                }
+
+                                // Credit accumulated flash transaction fees
+                                // from the txs that were actually applied. Sender was
+                                // debited by `amount + fee` in apply_flash_tx,
+                                // so this split conserves total supply.
+                                let flash_fee_total: u64 = applied_fee_total;
+                                if flash_fee_total > 0 {
+                                    if let Ok(cb) = self.coinbase_manager.deserialize_coinbase_payload(&txs[0].payload) {
+                                        let (miner_fee, treasury_fee) = if SAHYADRI_TREASURY_PUBKEY_HEX.is_empty() {
+                                            (flash_fee_total, 0)
+                                        } else {
+                                            crate::processes::coinbase::split_transaction_fees(flash_fee_total)
+                                        };
+                                        if let Err(e) = self.account_store.update_balance_batch(
+                                            &mut batch,
+                                            &cb.miner_data.script_public_key,
+                                            i64::try_from(miner_fee).unwrap_or(i64::MAX),
+                                        ) {
+                                            log::error!("SAHYADRI: failed to credit miner flash fee: {:?}", e);
+                                        }
+                                        if treasury_fee > 0 {
+                                            let mut tbytes = vec![0u8; PUBKEY_SIZE];
+                                            if faster_hex::hex_decode(SAHYADRI_TREASURY_PUBKEY_HEX.as_bytes(), &mut tbytes).is_ok() {
+                                                let tspk = sahyadri_consensus_core::tx::ScriptPublicKey::from_vec(0, tbytes);
+                                                if let Err(e) = self.account_store.update_balance_batch(
+                                                    &mut batch,
+                                                    &tspk,
+                                                    i64::try_from(treasury_fee).unwrap_or(i64::MAX),
+                                                ) {
+                                                    log::error!("SAHYADRI: failed to credit treasury flash fee: {:?}", e);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             Err(e) => {
@@ -1712,7 +1769,11 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
 
         let (template_flash_txs, template_rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
             &txs,
-
+            &self.coinbase_manager,
+            SAHYADRI_TREASURY_PUBKEY_HEX,
+        );
+        let fee_sinks = crate::pipeline::virtual_processor::account_changes::fee_sinks_for_block(
+            &txs,
             &self.coinbase_manager,
             SAHYADRI_TREASURY_PUBKEY_HEX,
         );
@@ -1739,6 +1800,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                 &actual_flash_txs,
                 &template_rewards,
                 virtual_state.daa_score,
+                fee_sinks.as_ref(),
             ) {
                 Ok((root, _changes)) => break root,
                 Err(e) => {

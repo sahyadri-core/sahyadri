@@ -83,7 +83,7 @@ pub type Perm = Poseidon2Goldilocks<8>;
 pub type MyHash = PaddingFreeSponge<Perm, 8, 4, 4>;
 
 /// Build the hasher with deterministic round constants.
-/// Seed 42 matches the STARK config, so the same hash is reproducible
+/// Seed 1 matches the STARK config, so the same hash is reproducible
 /// across prover / verifier.
 fn make_poseidon2_hasher() -> MyHash {
     let mut rng = Xoshiro256PlusPlus::seed_from_u64(1);

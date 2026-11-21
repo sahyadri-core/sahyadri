@@ -172,7 +172,13 @@ pub fn verify(tx: &impl VerifiableTransaction) -> Result<(), Error> {
         if actual_hash != expected_hash {
             return Err(Error::Message(format!("Public key hash mismatch for input: {i}")));
         }
-        let sig_hash = calc_signature_hash(tx, i, SIG_HASH_ALL, &reused_values);
+        // Parse the sighash type byte from the signature script (last byte after sig).
+        let type_byte = data[PUBKEY_SIZE + SIG_SIZE];
+        let sighash_type = match type_byte {
+            0x01 => SIG_HASH_ALL,
+            _ => SIG_HASH_ALL, // Unknown types default to ALL
+        };
+        let sig_hash = calc_signature_hash(tx, i, sighash_type, &reused_values);
         let dilithium_sig = DilithiumSignature::from_slice(sig);
         let valid = DilithiumKeyPair::verify(pk, &dilithium_sig, &sig_hash.as_bytes(), b"", SAHYADRI_MODE);
         if !valid {

@@ -95,7 +95,9 @@ fn read_account_state(
 /// - `smt_overlay`: an `OverlayStore` on top of the persistent SMT node store
 /// - `state_store`: content-addressed state snapshots (read-only)
 /// - `flash_txs`: FlashTransactions accepted by this block, in canonical order
-/// - `rewards`: coinbase rewards: `(miner_spk, subsidy + fee_sum)` per merged block
+/// - `rewards`: block subsidy shares: `(spk, amount)`
+/// - `fee_sinks`: miner and treasury accounts that receive the fees of the flash txs
+///   applied by this call (90% / 10%)
 /// - `daa_score`: current DAA score (for flash pruning)
 ///
 /// Returns:
@@ -113,10 +115,13 @@ pub fn compute_block_account_changes(
     flash_txs: &[FlashTransaction],
     rewards: &[(ScriptPublicKey, u64)],
     daa_score: u64,
+    fee_sinks: Option<&FeeSinks>,
 ) -> Result<(H256, Vec<(ScriptPublicKey, AccountState)>), AccountError> {
     use std::collections::HashMap;
 
     let mut touched: HashMap<ScriptPublicKey, AccountState> = HashMap::new();
+
+    let mut applied_fee_total: u64 = 0;
 
     // ── 1. Apply flash txs ─────────────────────────────────────
     for tx in flash_txs {
@@ -176,6 +181,36 @@ pub fn compute_block_account_changes(
                 .checked_add(tx.amount)
                 .ok_or(AccountError::ArithmeticOverflow)?;
         }
+        applied_fee_total = applied_fee_total
+            .checked_add(tx.fee)
+            .ok_or(AccountError::ArithmeticOverflow)?;
+    }
+
+    // ── 1b. Credit the fees of the flash txs applied above ────
+    // Only txs that were actually applied contribute (replayed txs are skipped
+    // above and pay nothing), so the sender debit of amount + fee is matched
+    // exactly by the miner and treasury credits: nothing is minted or burned.
+    if applied_fee_total > 0 {
+        if let Some(sinks) = fee_sinks {
+            let (miner_fee, treasury_fee) = if sinks.treasury.is_some() {
+                split_transaction_fees(applied_fee_total)
+            } else {
+                (applied_fee_total, 0)
+            };
+            let credits = [(Some(&sinks.miner), miner_fee), (sinks.treasury.as_ref(), treasury_fee)];
+            for (spk, amount) in credits {
+                let Some(spk) = spk else { continue };
+                if amount == 0 {
+                    continue;
+                }
+                if !touched.contains_key(spk) {
+                    let s = read_account_state(smt_overlay, state_store, parent_root, spk)?;
+                    touched.insert(spk.clone(), s);
+                }
+                let acct = touched.get_mut(spk).unwrap();
+                acct.balance = acct.balance.checked_add(amount).ok_or(AccountError::ArithmeticOverflow)?;
+            }
+        }
     }
 
     // ── 2. Apply coinbase rewards ──────────────────────────────
@@ -212,7 +247,7 @@ pub fn compute_block_account_changes(
 // Block effects extraction — existing commit logic ko pure karo
 // ═══════════════════════════════════════════════════════════════
 
-use crate::processes::coinbase::CoinbaseManager;
+use crate::processes::coinbase::{CoinbaseManager, split_block_subsidy, split_transaction_fees};
 use sahyadri_consensus_core::tx::Transaction;
 
 /// Treasury pubkey hex ko SPK me convert karo.
@@ -252,16 +287,18 @@ pub fn extract_block_effects(
         return (flash_txs, rewards);
     }
 
-    // ── Coinbase reward split: 95% miner / 5% treasury ──
+    // Coinbase reward split: 95% miner / 5% treasury.
+    //
+    // Only the block subsidy is split here. Flash transaction fees are split in
+    // compute_block_account_changes, from the txs that were actually applied.
     if let Ok(cb) = coinbase_manager.deserialize_coinbase_payload(&txs[0].payload) {
         let total = cb.subsidy;
         if total > 0 {
-            let dev_fee = if treasury_hex.is_empty() {
-                0
+            let (miner_reward, dev_fee) = if treasury_hex.is_empty() {
+                (total, 0)
             } else {
-                total / 20
+                split_block_subsidy(total)
             };
-            let miner_reward = total - dev_fee;
 
             rewards.push((cb.miner_data.script_public_key.clone(), miner_reward));
 
@@ -361,6 +398,26 @@ pub fn prove_account<S: NodeStore>(
     })
 }
 
+
+/// Accounts that receive the flash transaction fees of one block.
+#[derive(Clone, Debug)]
+pub struct FeeSinks {
+    pub miner: ScriptPublicKey,
+    pub treasury: Option<ScriptPublicKey>,
+}
+
+/// Builds the fee recipients of a block from its coinbase payload. Returns
+/// `None` when the payload cannot be decoded (coinbase validation rejects
+/// such a block anyway).
+pub fn fee_sinks_for_block(
+    txs: &[Transaction],
+    coinbase_manager: &CoinbaseManager,
+    treasury_hex: &str,
+) -> Option<FeeSinks> {
+    let cb = coinbase_manager.deserialize_coinbase_payload(&txs.first()?.payload).ok()?;
+    let treasury = if treasury_hex.is_empty() { None } else { treasury_spk_from_hex(treasury_hex) };
+    Some(FeeSinks { miner: cb.miner_data.script_public_key.clone(), treasury })
+}
 
 #[cfg(test)]
 mod proof_generation_tests {
@@ -489,5 +546,27 @@ mod proof_generation_tests {
 
         let smt_proof = to_smt_proof(&proof.proof);
         assert!(sahyadri_smt::verify_exclusion(&root, &proof.key, &smt_proof));
+    }
+}
+
+#[cfg(test)]
+mod fee_policy_tests {
+    use crate::processes::coinbase::split_transaction_fees;
+
+    #[test]
+    fn fee_split_is_ninety_ten_and_conserves_every_kana() {
+        assert_eq!(split_transaction_fees(1000), (900, 100));
+        for f in [0u64, 1, 9, 10, 11, 999, 1001, 123_456_789, u64::MAX] {
+            let (miner, treasury) = split_transaction_fees(f);
+            assert_eq!(miner.checked_add(treasury), Some(f));
+        }
+    }
+
+    #[test]
+    fn treasury_key_is_decodable() {
+        let hex = super::super::processor::SAHYADRI_TREASURY_PUBKEY_HEX;
+        if !hex.is_empty() {
+            assert!(super::treasury_spk_from_hex(hex).is_some());
+        }
     }
 }

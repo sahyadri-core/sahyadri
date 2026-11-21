@@ -304,6 +304,10 @@ impl AddressManager {
         self.address_store.iterate_prioritized_random_addresses(exceptions)
     }
 
+    /// Bans a single IP address. Note: IPv6 /64 subnet-level banning is not
+    /// implemented — an attacker on a /64 subnet can use millions of IPs.
+    /// Concurrent handshake limiting is also not enforced. Both are
+    /// inherited Kaspa limitations to address before mainnet.
     pub fn ban(&mut self, ip: IpAddress) {
         self.banned_address_store.set(ip.into(), ConnectionBanTimestamp(unix_now())).unwrap();
         self.address_store.remove_by_ip(ip.into());

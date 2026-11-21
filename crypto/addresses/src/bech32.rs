@@ -138,6 +138,9 @@ impl Address {
         }
 
         let payload_u8 = conv5to8(payload_u5);
+        if payload_u8.is_empty() {
+            return Err(AddressError::BadPayload);
+        }
         Ok(Self::new(prefix, payload_u8[0].try_into()?, payload_u8[1..].into()))
     }
 }

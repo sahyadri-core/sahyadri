@@ -242,6 +242,8 @@ impl PrvKeyData {
         let mut prv_key_data = PrvKeyData::new(key_data_payload_id, name, key_data_payload);
         if let Some(payment_secret) = payment_secret {
             prv_key_data.encrypt(payment_secret, encryption_kind)?;
+        } else {
+            log::warn!("Wallet keys stored WITHOUT encryption — file compromise equals total key loss");
         }
 
         Ok(prv_key_data)
@@ -265,6 +267,8 @@ impl PrvKeyData {
         let mut prv_key_data = PrvKeyData::new(key_data_payload_id, name, key_data_payload);
         if let Some(payment_secret) = payment_secret {
             prv_key_data.encrypt(payment_secret, encryption_kind)?;
+        } else {
+            log::warn!("Wallet keys stored WITHOUT encryption — file compromise equals total key loss");
         }
 
         Ok(prv_key_data)

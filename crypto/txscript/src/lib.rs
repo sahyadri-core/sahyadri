@@ -581,8 +581,23 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
         }
     }
 
-    fn check_dilithium_signature_legacy(&mut self, _hash_type: SigHashType, key: &[u8], sig: &[u8]) -> Result<bool, TxScriptError> {
-        // Fallback for legacy script patterns, redirects to dilithium
+    fn check_dilithium_signature_legacy(&mut self, hash_type: SigHashType, key: &[u8], sig: &[u8]) -> Result<bool, TxScriptError> {
+        // The signature blob ends with the sighash type that was used at
+        // signing time. If that type differs from the type expected by the
+        // calling script, the signature was produced under a different
+        // commitment regime and must be rejected. Without this cross-check,
+        // a signature created for a weaker commitment (for example
+        // SIGHASH_NONE) would validate in a context that expects a stronger
+        // one (for example SIGHASH_ALL), allowing outputs to be rewritten
+        // after signing.
+        let embedded = match sig.last() {
+            Some(&b) => SigHashType::from_u8(b)
+                .map_err(|_| TxScriptError::InvalidSigHashType(b))?,
+            None => return Err(TxScriptError::InvalidSignature("empty sig blob".into())),
+        };
+        if embedded.to_u8() != hash_type.to_u8() {
+            return Ok(false);
+        }
         self.check_dilithium_signature(key, sig)
     }
 }

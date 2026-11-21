@@ -734,8 +734,11 @@ opcode_list! {
     }
 
     opcode OpBlake2b<0xaa, 1>(self, vm) {
+        // Despite the opcode name, this computes SHA3-256 (not BLAKE2b).
+        // This matches the consensus account-key derivation which uses
+        // SHA3-256 throughout. The name is retained for wire-format
+        // compatibility — do not change the opcode number (0xaa).
         let [last] = vm.dstack.pop_raw()?;
-        //let hash = blake2b(last.as_slice());
         let hash = Sha3_256::digest(&last);
         vm.dstack.push(hash.as_slice().to_vec());
         Ok(())

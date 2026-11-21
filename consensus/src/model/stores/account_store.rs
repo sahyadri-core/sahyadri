@@ -162,10 +162,15 @@ impl AccountStore for DbAccountStore {
         let mut state = self.get(script_public_key).unwrap_or_default();
 
         if balance_change >= 0 {
-            state.balance = state.balance.saturating_add(balance_change as u64);
+            state.balance = state
+                .balance
+                .checked_add(balance_change as u64)
+                .ok_or_else(|| sahyadri_database::prelude::StoreError::DataInconsistency("balance overflow".to_string()))?;
         } else {
-            let decrement = balance_change.unsigned_abs();
-            state.balance = state.balance.saturating_sub(decrement);
+            state.balance = state
+                .balance
+                .checked_sub(balance_change.unsigned_abs())
+                .ok_or_else(|| sahyadri_database::prelude::StoreError::DataInconsistency("balance underflow".to_string()))?;
         }
 
         self.set_batch(batch, script_public_key, state)

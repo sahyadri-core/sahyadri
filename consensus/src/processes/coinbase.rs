@@ -14,7 +14,29 @@ const LENGTH_OF_BLUE_SCORE: usize = size_of::<u64>();
 const LENGTH_OF_SUBSIDY: usize = size_of::<u64>();
 const LENGTH_OF_SCRIPT_PUB_KEY_VERSION: usize = size_of::<u16>();
 const LENGTH_OF_SCRIPT_PUB_KEY_LENGTH: usize = size_of::<u8>();
+/// Bech32 form of the treasury address.
+///
+/// Vestigial: the account-model commit path identifies the treasury by its
+/// raw Dilithium public key (`SAHYADRI_TREASURY_PUBKEY_HEX` in
+/// `pipeline::virtual_processor::processor`). Only the unused
+/// `expected_coinbase_transaction` helper below uses this string form.
+/// New reward credits must go through `SAHYADRI_TREASURY_PUBKEY_HEX`.
+#[allow(dead_code)]
 pub const SAHYADRI_TREASURY_ADDRESS: &str = "csm1sxh5at56p0c6s9gwtj0mumwcly258gexk5zxp0xvj6";
+
+/// Split a block subsidy into `(miner_share, treasury_share)`.
+/// The treasury receives one twentieth (5%) of the subsidy.
+pub fn split_block_subsidy(subsidy: u64) -> (u64, u64) {
+    let treasury = subsidy / 20;
+    (subsidy - treasury, treasury)
+}
+
+/// Split transaction fees into `(miner_share, treasury_share)`.
+/// The treasury receives one tenth (10%) of the fees.
+pub fn split_transaction_fees(fees: u64) -> (u64, u64) {
+    let treasury = fees / 10;
+    (fees - treasury, treasury)
+}
 
 const MIN_PAYLOAD_LENGTH: usize =
     LENGTH_OF_BLUE_SCORE + LENGTH_OF_SUBSIDY + LENGTH_OF_SCRIPT_PUB_KEY_VERSION + LENGTH_OF_SCRIPT_PUB_KEY_LENGTH;
@@ -86,7 +108,15 @@ impl CoinbaseManager {
         self._bps_history.clone()
     }
 
-    // The new Account-Based expected_coinbase_transaction function
+    // Legacy mergeset-based reward helper.
+    //
+    // Not called by the current pipeline: `commit_virtual_state` walks a
+    // linear `chain_path` and computes rewards from `calc_block_subsidy`,
+    // so this function's `mergeset_rewards` and `mergeset_non_daa` inputs
+    // have no producer in the live path. Kept for reference only; the
+    // authoritative split logic lives in `split_block_subsidy` and
+    // `split_transaction_fees` above.
+    #[allow(dead_code)]
     pub fn expected_coinbase_transaction<T: AsRef<[u8]>>(
         &self,
         _daa_score: u64,
@@ -119,13 +149,8 @@ impl CoinbaseManager {
             let total_reward = reward_data.subsidy + reward_data.total_fees;
 
             if total_reward > 0 {
-                // 95-5 split for Block Subsidy -> 5% to treasury
-                let subsidy_dev_fee = reward_data.subsidy / 20;
-
-                // 90-10 split for Transaction Fees -> 10% to treasury (unchanged)
-                let tx_dev_fee = reward_data.total_fees / 10;
-
-                // Total dev fee and remaining for miner
+                let (_, subsidy_dev_fee) = split_block_subsidy(reward_data.subsidy);
+                let (_, tx_dev_fee) = split_transaction_fees(reward_data.total_fees);
                 let total_dev_fee = subsidy_dev_fee + tx_dev_fee;
                 let miner_reward = total_reward - total_dev_fee;
 
@@ -157,13 +182,8 @@ impl CoinbaseManager {
         let total_red_reward = red_subsidy + red_fees;
 
         if total_red_reward > 0 {
-            // 95-5 split for Block Subsidy -> 5% to treasury
-            let subsidy_dev_fee = red_subsidy / 20;
-
-            // 90-10 split for Tx Fees -> 10% to treasury (unchanged)
-            let tx_dev_fee = red_fees / 10;
-
-            // Total dev fee and remaining for miner
+            let (_, subsidy_dev_fee) = split_block_subsidy(red_subsidy);
+            let (_, tx_dev_fee) = split_transaction_fees(red_fees);
             let total_dev_fee = subsidy_dev_fee + tx_dev_fee;
             let miner_reward = total_red_reward - total_dev_fee;
 
@@ -255,23 +275,7 @@ impl CoinbaseManager {
     }
 
         pub fn calc_block_subsidy(&self, blue_score: u64) -> u64 {
-        // 1. Sahyadri Base Reward: 8,318,123 Kana (0.08318123 CSM)
-        let base_reward: u64 = 8_318_123;
-        // 2. Halving Interval: ~4 years wall-clock time, scaled by actual network BPS.
-        // Base math assumes 1 bps: 60*60*24*365.25*4 = 126,230,400 blocks.
-        // At 10 bps, we need 10x more blocks to cover the same 4 real-world years.
-        let halving_interval: u64 = 126_230_400 * self._bps_history.after();
-
-        // 3. Check kitne 4-saal (halvings) beet chuke hain
-        let halvings = blue_score / halving_interval;
-
-        // 4. Safety: 64 halvings ke baad reward hamesha 0
-        if halvings >= 64 {
-            return 0;
-        }
-
-        // 5. Safe division: Har halving pe reward aadha (2 se divide)
-        base_reward.checked_shr(halvings as u32).unwrap_or(0)
+        subsidy_for(blue_score, self._bps_history.after())
     }
     /// Get the subsidy month as function of the current DAA score.
     ///
@@ -343,5 +347,45 @@ mod tests {
         use std::collections::HashMap;
         let account_rewards: HashMap<String, u64> = HashMap::new();
         assert!(account_rewards.is_empty(), "Account ledger should start empty");
+    }
+}
+
+/// Block subsidy in kana for a blue score and network block rate.
+/// The per-block reward is divided by `bps`, so the total emission over all
+/// halvings stays below the 21,000,000 CSM cap at any block rate.
+pub(crate) fn subsidy_for(blue_score: u64, bps: u64) -> u64 {
+    const BASE_REWARD_KANA: u64 = 8_318_123;
+    const BLOCKS_PER_HALVING_AT_1_BPS: u64 = 126_230_400;
+    let bps = bps.max(1);
+    let halving_interval = BLOCKS_PER_HALVING_AT_1_BPS.saturating_mul(bps);
+    let halvings = blue_score / halving_interval;
+    if halvings >= 64 {
+        return 0;
+    }
+    (BASE_REWARD_KANA / bps).checked_shr(halvings as u32).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod emission_tests {
+    use super::subsidy_for;
+
+    const CAP_KANA: u128 = 21_000_000u128 * 100_000_000u128;
+
+    #[test]
+    fn total_emission_never_exceeds_21m_csm() {
+        for bps in [1u64, 2, 5, 10, 20, 32] {
+            let interval = 126_230_400u128 * bps as u128;
+            let mut total: u128 = 0;
+            for h in 0..64u128 {
+                let reward = subsidy_for((h * interval) as u64, bps) as u128;
+                total += reward * interval;
+            }
+            assert!(total <= CAP_KANA, "bps={} emits {} kana, cap is {}", bps, total, CAP_KANA);
+        }
+    }
+
+    #[test]
+    fn reward_is_zero_after_last_halving() {
+        assert_eq!(subsidy_for(u64::MAX, 1), 0);
     }
 }

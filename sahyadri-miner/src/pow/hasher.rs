@@ -40,10 +40,15 @@ impl PowHasher {
 }
 
 // --- 2. THE SAHYADRIX 16MB ENGINE (ASIC-Killer) ---
-/// Poseidon2 finalization — ported from crypto/hashes/src/pow_hashers.rs:52.
-/// Compresses the 64-byte tail of the 16 MB memory pad plus the BLAKE3 state
-/// into a 32-byte output via Poseidon2 over Goldilocks. This is the stage the
-/// standalone miner was missing (consensus added it in commit 01223a4).
+/// Poseidon2 finalization stage. Compresses the 64-byte tail of the 16 MB
+/// memory pad plus the BLAKE3 state into a 32-byte output via the Poseidon2
+/// permutation over the Goldilocks field.
+///
+/// The round constants come from `p3_goldilocks::default_goldilocks_poseidon2_12`,
+/// which uses the standard Plonky3 Goldilocks Poseidon2 constants. This must
+/// match the consensus implementation in `crypto/hashes/src/pow_hashers.rs`
+/// exactly; any divergence causes the miner to produce hashes that the
+/// network rejects.
 #[inline]
 fn poseidon2_output(buffer: &[u8], state: &blake3::Hash) -> [u8; 32] {
     let mut inputs = [Goldilocks::default(); 12];

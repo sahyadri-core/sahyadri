@@ -296,8 +296,41 @@ impl HeaderProcessor {
         Ok(ctx)
     }
 
-    // Runs partial header validation for trusted blocks (currently validates only header-in-isolation and computes SAHYADRI_CONSENSUS).
+    /// Runs partial header validation for trusted blocks.
+    ///
+    /// Trusted headers arrive exclusively from pruning proofs. They are
+    /// accepted without parent-relation validation, pre-PoW validation, or
+    /// post-PoW validation because the pruning proof itself is the trust
+    /// anchor. Once a PoW-mined descendant chains on top of a trusted
+    /// header, the ancestor is indirectly validated; trusted headers that
+    /// never receive such a descendant remain unspent state and are pruned
+    /// normally.
+    ///
+    /// Because this path skips the primary security check, every trusted
+    /// header is counted. The first acceptance after startup and every
+    /// ten-thousandth acceptance are logged at warn level so that accidental
+    /// or excessive use of this path is visible to operators even when
+    /// debug logging is disabled.
     fn validate_trusted_header(&self, header: &Arc<Header>) -> BlockProcessResult<HeaderProcessingContext> {
+        use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+        static TRUSTED_HEADER_COUNT: AtomicU64 = AtomicU64::new(0);
+
+        let count = TRUSTED_HEADER_COUNT.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+        if count == 1 || count % 10_000 == 0 {
+            log::warn!(
+                "trusted header accepted without PoW validation: hash={} daa_score={} cumulative={}",
+                header.hash,
+                header.daa_score,
+                count
+            );
+        } else {
+            log::trace!(
+                "trusted header accepted: hash={} cumulative={}",
+                header.hash,
+                count
+            );
+        }
+
         let block_level = self.validate_header_in_isolation(header)?;
         let mut ctx = self.build_processing_context(header, block_level);
         self.sahyadri_consensus(&mut ctx);

@@ -219,6 +219,11 @@ impl VirtualStateProcessor {
             &self.coinbase_manager,
             super::processor::SAHYADRI_TREASURY_PUBKEY_HEX,
         );
+        let fee_sinks = crate::pipeline::virtual_processor::account_changes::fee_sinks_for_block(
+            &txs_for_effects,
+            &self.coinbase_manager,
+            super::processor::SAHYADRI_TREASURY_PUBKEY_HEX,
+        );
         let flash_txs = self.validated_flash_for_block(&raw_flash, header.daa_score)?;
 
         let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
@@ -252,6 +257,7 @@ impl VirtualStateProcessor {
             &flash_txs,
             &rewards,
             header.daa_score,
+            fee_sinks.as_ref(),
         )
         .map_err(|e| {
             log::error!("SAHYADRI: account commitment compute failed during verify: {:?}", e);
