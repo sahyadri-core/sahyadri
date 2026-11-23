@@ -118,6 +118,9 @@ impl RpcApi for RpcCoreMock {
     async fn get_block_proof_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::GetBlockProofRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::GetBlockProofResponse> {
         unimplemented!()
     }
+    async fn get_chain_proof_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::GetChainProofRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::GetChainProofResponse> {
+        Err(sahyadri_rpc_core::RpcError::NotImplemented)
+    }
     async fn resolve_did_call(&self, _connection: Option<&sahyadri_rpc_core::api::connection::DynRpcConnection>, _request: sahyadri_rpc_core::ResolveDidRequest) -> sahyadri_rpc_core::RpcResult<sahyadri_rpc_core::ResolveDidResponse> {
         unimplemented!()
     }

@@ -75,13 +75,6 @@ pub(crate) fn read_account_state(
             let state_hash = Hash::from_bytes(state_hash_bytes);
             match state_store.get(state_hash) {
                 Ok(state) => Ok(state),
-                Err(StoreError::KeyNotFound(_)) => {
-                    log::debug!(
-    "state_hash {:?} NOT FOUND in account_states_store — returning balance=0. This causes spurious InsufficientFunds in build/verify. Parent root may be stale or state store race.",
-                        state_hash
-                    );
-                    Ok(AccountState::default())
-                },
                 Err(e) => Err(AccountError::Store(e)),
             }
         }
@@ -149,41 +142,44 @@ pub fn compute_block_account_changes(
             .iter()
             .any(|f| f.flash_id == flash_id)
         {
-            log::warn!(
+            log::debug!(
                 "flash_id already in parent chain state, skipping: {:?}",
                 flash_id
             );
             continue;
         }
 
-        // checked arithmetic. Previously saturating_* silently clamped
-        // overflow and underflow, letting u64::MAX amounts mint out of thin air.
-        let total_debit = tx
-            .amount
-            .checked_add(tx.fee)
-            .ok_or(AccountError::ArithmeticOverflow)?;
+        // Checked arithmetic. A tx whose sender cannot fund amount + fee is skipped
+        // deterministically (like a replayed tx) instead of invalidating the block.
+        // Verify, commit and template all run this same function, so they agree.
+        let Some(total_debit) = tx.amount.checked_add(tx.fee) else { continue };
+        let sender_after = match touched.get(&sender_spk).unwrap().balance.checked_sub(total_debit) {
+            Some(v) => v,
+            None => {
+                log::debug!("flash tx skipped, insufficient balance: {:?}", flash_id);
+                continue;
+            }
+        };
+        let recipient_before =
+            if sender_spk == recipient_spk { sender_after } else { touched.get(&recipient_spk).unwrap().balance };
+        if recipient_before.checked_add(tx.amount).is_none() {
+            continue;
+        }
+        let Some(new_fee_total) = applied_fee_total.checked_add(tx.fee) else { continue };
         {
             let sender = touched.get_mut(&sender_spk).unwrap();
-            sender.balance = sender
-                .balance
-                .checked_sub(total_debit)
-                .ok_or(AccountError::InsufficientFunds)?;
+            sender.balance = sender_after;
             sender.recent_flashes.push(FlashEntry {
-                flash_id: tx.flash_id(),
+                flash_id,
                 expiry_daa_score: tx.expiry_daa_score,
                 block_hash: Hash::default(),
             });
         }
         {
             let recipient = touched.get_mut(&recipient_spk).unwrap();
-            recipient.balance = recipient
-                .balance
-                .checked_add(tx.amount)
-                .ok_or(AccountError::ArithmeticOverflow)?;
+            recipient.balance = recipient_before + tx.amount;
         }
-        applied_fee_total = applied_fee_total
-            .checked_add(tx.fee)
-            .ok_or(AccountError::ArithmeticOverflow)?;
+        applied_fee_total = new_fee_total;
     }
 
     // ── 1b. Credit the fees of the flash txs applied above ────
@@ -220,7 +216,10 @@ pub fn compute_block_account_changes(
             touched.insert(miner_spk.clone(), s);
         }
         let miner = touched.get_mut(miner_spk).unwrap();
-        miner.balance = miner.balance.saturating_add(*amount);
+        miner.balance = miner
+            .balance
+            .checked_add(*amount)
+            .ok_or(AccountError::ArithmeticOverflow)?;
     }
 
     // ── 3. Prune expired flashes on all touched accounts ───────
@@ -244,13 +243,13 @@ pub fn compute_block_account_changes(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Block effects extraction — existing commit logic ko pure karo
+// Block effects extraction — existing commit logic pure it
 // ═══════════════════════════════════════════════════════════════
 
 use crate::processes::coinbase::{CoinbaseManager, split_block_subsidy, split_transaction_fees};
 use sahyadri_consensus_core::tx::Transaction;
 
-/// Treasury pubkey hex ko SPK me convert karo.
+/// Convert treasury pubkey hex ko SPK.
 /// Existing `commit_virtual_state` jaisa — `ScriptPublicKey::from_vec(0, raw_pubkey)`.
 fn treasury_spk_from_hex(hex: &str) -> Option<ScriptPublicKey> {
     if hex.is_empty() {

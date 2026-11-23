@@ -236,9 +236,17 @@ impl StratumListener {
         debug!("[CLIENT_LISTENER] Starting client listener for {}:{}", ctx.remote_addr, ctx.remote_port);
         let mut buffer = [0u8; 1024];
         let mut line_buffer = String::new();
+        let mut last_activity = tokio::time::Instant::now();
         let mut first_message = true;
 
         loop {
+            // Drop idle connections: short deadline before the handshake, longer after.
+            let idle_limit_secs: u64 = if ctx.worker_name.lock().is_empty() { 30 } else { 900 };
+            if last_activity.elapsed() > std::time::Duration::from_secs(idle_limit_secs) {
+                debug!("[CLIENT_LISTENER] Idle timeout for {}:{}", ctx.remote_addr, ctx.remote_port);
+                break;
+            }
+
             // Check if disconnected
             if !ctx.connected() {
                 debug!("[CLIENT_LISTENER] Client {}:{} disconnected", ctx.remote_addr, ctx.remote_port);
@@ -292,6 +300,7 @@ impl StratumListener {
                 }
                 Ok(Ok(n)) => {
                     debug!("[CLIENT_LISTENER] Read {} bytes from {}:{}", n, ctx.remote_addr, ctx.remote_port);
+                    last_activity = tokio::time::Instant::now();
 
                     // Remove null bytes and process
                     let data: Vec<u8> = buffer[..n].iter().copied().filter(|&b| b != 0).collect();
@@ -447,6 +456,11 @@ impl StratumListener {
                     }
 
                     line_buffer.push_str(&String::from_utf8_lossy(&data));
+                    const MAX_LINE_BYTES: usize = 64 * 1024;
+                    if line_buffer.len() > MAX_LINE_BYTES {
+                        debug!("[CLIENT_LISTENER] Line buffer cap exceeded for {}:{}", ctx.remote_addr, ctx.remote_port);
+                        break;
+                    }
 
                     // Process complete lines
                     while let Some(newline_pos) = line_buffer.find('\n') {

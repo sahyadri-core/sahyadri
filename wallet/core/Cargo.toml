@@ -32,6 +32,7 @@ default = ["wasm32-sdk"]
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+log.workspace = true
 aes.workspace = true
 ahash.workspace = true
 argon2.workspace = true

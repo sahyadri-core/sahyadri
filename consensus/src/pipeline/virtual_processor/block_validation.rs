@@ -278,7 +278,18 @@ impl VirtualStateProcessor {
             AccountCommitmentComputeFailed
         })?;
 
-        // SAHYADRI: sync-persist SMT nodes AND state snapshots
+        let expected_commitment = sahyadri_hashes::Hash::from_bytes(my_root);
+
+        if expected_commitment != header.account_commitment {
+            log::warn!(
+                "SAHYADRI: ACCOUNT COMMITMENT MISMATCH — block {} header={} calc={}",
+                header.hash, header.account_commitment, expected_commitment
+            );
+            return Err(BadAccountCommitment(header.hash, header.account_commitment, expected_commitment));
+        }
+
+        // Persist content-addressed nodes and state snapshots only after
+        // the block's account commitment has been verified.
         let pending: Vec<_> = smt_overlay.into_pending().collect();
         if let Err(e) = self.smt_nodes_store.insert_sync_many(pending) {
             log::error!("SAHYADRI: sync SMT write failed in verify: {:?}", e);
@@ -296,16 +307,6 @@ impl VirtualStateProcessor {
             if let Err(e) = self.did_states_store.insert_sync(doc_hash, doc) {
                 log::error!("SAHYADRI: sync DID state write failed in verify: {:?}", e);
             }
-        }
-
-        let expected_commitment = sahyadri_hashes::Hash::from_bytes(my_root);
-
-        if expected_commitment != header.account_commitment {
-            log::warn!(
-                "SAHYADRI: ACCOUNT COMMITMENT MISMATCH — block {} header={} calc={}",
-                header.hash, header.account_commitment, expected_commitment
-            );
-            return Err(BadAccountCommitment(header.hash, header.account_commitment, expected_commitment));
         }
 
         trace!("correct commitment: {}, {}", header.hash, expected_commitment);

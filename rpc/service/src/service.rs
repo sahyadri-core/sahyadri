@@ -642,8 +642,8 @@ impl RpcCoreService {
         // The new public key and purposes are embedded in the document JSON.
         let document = format!(
             r#"{{"publicKey":"{}","purposes":"{}"}}"#,
-            request.new_public_key_hex,
-            request.purposes
+            json_escape(&request.new_public_key_hex),
+            json_escape(&request.purposes)
         );
         let doc_bytes = document.as_bytes();
         payload.extend_from_slice(&(doc_bytes.len() as u32).to_le_bytes());
@@ -657,7 +657,9 @@ impl RpcCoreService {
         payload.extend_from_slice(&timestamp.to_le_bytes());
 
         // Signature (raw 3309 bytes at end, NO length prefix — matches parser)
-        let sig_bytes = request.signature.as_bytes().to_vec();
+        let Some(sig_bytes) = did_sig_bytes(&request.signature) else {
+            return Ok(SubmitDidUpdateResponse { transaction_id: String::new(), error: Some("Invalid signature encoding".to_string()) });
+        };
         payload.extend_from_slice(&sig_bytes);
         
         // Create transaction
@@ -699,9 +701,12 @@ impl RpcCoreService {
         payload.extend_from_slice(&(did_bytes.len() as u32).to_le_bytes());
         payload.extend_from_slice(did_bytes);
         
-        // Signature
-        let sig_bytes = request.signature.as_bytes().to_vec();
-        payload.extend_from_slice(&(sig_bytes.len() as u32).to_le_bytes());
+        // Timestamp (8 bytes LE), then the raw signature at the end with no length prefix.
+        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+        payload.extend_from_slice(&timestamp.to_le_bytes());
+        let Some(sig_bytes) = did_sig_bytes(&request.signature) else {
+            return Ok(SubmitDidDeactivateResponse { transaction_id: String::new(), error: Some("Invalid signature encoding".to_string()) });
+        };
         payload.extend_from_slice(&sig_bytes);
         
         // Create transaction
@@ -2480,4 +2485,47 @@ impl RpcCoreService {
         DilithiumKeyPair::verify(&pubkey_bytes, &sig, &msg, b"sahyadri-relay", SAHYADRI_MODE)
     }
 
+}
+
+
+/// Accepts a signature as hex (2 x SIG_SIZE chars) or as raw bytes (SIG_SIZE); returns the raw bytes.
+fn did_sig_bytes(sig: &str) -> Option<Vec<u8>> {
+    let want = sahyadri_dilithium::SIG_SIZE;
+    let raw = sig.as_bytes();
+    if raw.len() == want {
+        return Some(raw.to_vec());
+    }
+    if raw.len() != want * 2 {
+        return None;
+    }
+    let nib = |c: u8| -> Option<u8> {
+        match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(c - b'a' + 10),
+            b'A'..=b'F' => Some(c - b'A' + 10),
+            _ => None,
+        }
+    };
+    let mut out = Vec::with_capacity(want);
+    for pair in raw.chunks(2) {
+        out.push((nib(pair[0])? << 4) | nib(pair[1])?);
+    }
+    Some(out)
+}
+
+/// Escapes a string for embedding inside a JSON string literal.
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
 }

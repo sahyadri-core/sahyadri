@@ -282,7 +282,10 @@ pub fn compute_block_did_changes(
                     continue;
                 }
                 let Some(pk) = hex_to_bytes(&cur.public_key) else { continue };
-                let new_version = cur.version + 1;
+                let Some(new_version) = cur.version.checked_add(1) else {
+                    log::debug!("SAHYADRI DID: version overflow on update, skipping");
+                    continue;
+                };
                 let binding = did_binding_hash(
                     &cur.did,
                     &cur.csm_address,
@@ -297,7 +300,7 @@ pub fn compute_block_did_changes(
                 }
                 cur.document = document.clone();
                 cur.updated_at = daa_score;
-                cur.version += 1;
+                cur.version = new_version;
                 touched.insert(did.clone(), cur);
             }
             DidOp::Deactivate { did, timestamp: _timestamp, sig } => {
@@ -306,14 +309,17 @@ pub fn compute_block_did_changes(
                     continue;
                 }
                 let Some(pk) = hex_to_bytes(&cur.public_key) else { continue };
-                let new_version = cur.version + 1;
+                let Some(new_version) = cur.version.checked_add(1) else {
+                    log::debug!("SAHYADRI DID: version overflow on deactivate, skipping");
+                    continue;
+                };
                 let msg = format!("did:deactivate:{}:{}", cur.csm_address, new_version);
                 if !verify(&pk, sig, msg.as_bytes()) {
                     continue;
                 }
                 cur.active = false;
                 cur.updated_at = daa_score;
-                cur.version += 1;
+                cur.version = new_version;
                 touched.insert(did.clone(), cur);
             }
         }

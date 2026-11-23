@@ -329,24 +329,26 @@ impl TransactionValidator {
             return Ok(Vec::new());
         }
 
-        // ── 2. Aggregate sender debits over eligible txs ──
-        let mut sender_debits: HashMap<ScriptPublicKey, u64> = HashMap::new();
-        for tx in &eligible {
+        // ── 2. Reserve balance per sender in order; a tx that no longer fits is dropped ──
+        let mut remaining: HashMap<ScriptPublicKey, u64> = HashMap::new();
+        let mut funded = Vec::with_capacity(eligible.len());
+        for tx in eligible {
             let spk = pubkey_to_p2pkh_spk(&tx.pubkey);
-            let entry = sender_debits.entry(spk).or_insert(0);
-            *entry = entry
-                .checked_add(tx.amount)
-                .and_then(|v| v.checked_add(tx.fee))
-                .ok_or(TxRuleError::InputAmountOverflow)?;
-        }
-
-        // ── 3. Cumulative balance check (all-or-nothing per sender) ──
-        for (spk, total_debit) in sender_debits.iter() {
-            let account = self.account_store.get(spk).map_err(|_| TxRuleError::Unknown)?;
-            if account.balance < *total_debit {
-                return Err(TxRuleError::SpendTooHigh(*total_debit, account.balance));
+            let Some(debit) = tx.amount.checked_add(tx.fee) else { continue };
+            if !remaining.contains_key(&spk) {
+                let account = self.account_store.get(&spk).map_err(|_| TxRuleError::Unknown)?;
+                remaining.insert(spk.clone(), account.balance);
+            }
+            let left = remaining.get_mut(&spk).unwrap();
+            match left.checked_sub(debit) {
+                Some(v) => {
+                    *left = v;
+                    funded.push(tx);
+                }
+                None => log::debug!("SAHYADRI: flash tx dropped, insufficient balance"),
             }
         }
+        let eligible = funded;
 
         // ── 4. Per-tx validation on eligible: fee, signature, individual balance ──
         // Expiry and replay were already filtered in step 1, so this loop

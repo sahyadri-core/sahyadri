@@ -770,7 +770,17 @@ impl VirtualStateProcessor {
 
         // 2. NEW BLOCKS: Process Miners & User Transactions
         for &hash in chain_path.added.iter() {
-            if let Ok(txs) = self.block_transactions_store.get(hash) {
+            let txs = match self.block_transactions_store.get(hash) {
+                Ok(txs) => txs,
+                Err(e) => {
+                    log::error!(
+                        "SAHYADRI: commit aborted; transactions unavailable for {}: {:?}",
+                        hash, e
+                    );
+                    return;
+                }
+            };
+            {
                 // ─── SMT commitment persist (per added block) ───
                 {
                     // Block ka selected parent nikaalo
@@ -781,16 +791,34 @@ impl VirtualStateProcessor {
                         .map(|d| d.selected_parent);
 
                     // SAHYADRI: read from the parent header — guaranteed available.
-                    let parent_root: sahyadri_smt::H256 = selected_parent
-                        .and_then(|sp| {
-                            self.headers_store
-                                .get_header(sp)
-                                .ok()
-                                .map(|h| self.parent_account_root(sp, &h))
-                        })
-                        .unwrap_or(sahyadri_smt::EMPTY);
+                    let selected_parent = match selected_parent {
+                        Some(parent) => parent,
+                        None => {
+                            log::error!("SAHYADRI: selected parent metadata missing for {}", hash);
+                            return;
+                        }
+                    };
 
-                    let daa = self.headers_store.get_daa_score(hash).unwrap_or(0);
+                    let parent_header = match self.headers_store.get_header(selected_parent) {
+                        Ok(header) => header,
+                        Err(e) => {
+                            log::error!(
+                                "SAHYADRI: parent header unavailable for {} (parent {}): {:?}",
+                                hash, selected_parent, e
+                            );
+                            return;
+                        }
+                    };
+                    let parent_root: sahyadri_smt::H256 =
+                        self.parent_account_root(selected_parent, &parent_header);
+
+                    let daa = match self.headers_store.get_daa_score(hash) {
+                        Ok(daa) => daa,
+                        Err(e) => {
+                            log::error!("SAHYADRI: DAA score unavailable for {}: {:?}", hash, e);
+                            return;
+                        }
+                    };
 
                     let (raw_flash, rewards) = crate::pipeline::virtual_processor::account_changes::extract_block_effects(
                         &txs,
@@ -802,16 +830,19 @@ impl VirtualStateProcessor {
                         &self.coinbase_manager,
                         SAHYADRI_TREASURY_PUBKEY_HEX,
                     );
-                    // Apply the same flash filter that the verify path uses, so the
-                    // committed SMT root matches the header commitment even when some
-                    // flash txs are rejected (expired, duplicate, bad signature).
-                    // On error (unreachable: verify rejects such a block) use an empty set.
-                    let flash_txs = self
-                        .validated_flash_for_block(&raw_flash, daa)
-                        .unwrap_or_else(|e| {
-                            log::error!("commit-path flash validation failed for {}: {:?} - empty set", hash, e);
-                            Vec::new()
-                        });
+                    // Verification rejects a block when deterministic FlashTx
+                    // validation fails. Commit must abort as well; never substitute
+                    // an empty transaction set for a rejected batch.
+                    let flash_txs = match self.validated_flash_for_block(&raw_flash, daa) {
+                        Ok(flash_txs) => flash_txs,
+                        Err(e) => {
+                            log::error!(
+                                "SAHYADRI: commit aborted; FlashTx validation failed for {}: {:?}",
+                                hash, e
+                            );
+                            return;
+                        }
+                    };
 
                     let db_base = crate::model::stores::smt_nodes::DbSmtNodeStoreBase::new(&*self.smt_nodes_store);
                     let mut overlay = sahyadri_smt::OverlayStore::new(&db_base);
@@ -855,9 +886,34 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
             &did_verify,
         ) {
             Ok((final_root, did_docs)) => {
+                // Defence in depth: the commit replay must reproduce the exact
+                // account commitment accepted by block verification.
+                let header = match self.headers_store.get_header(hash) {
+                    Ok(header) => header,
+                    Err(e) => {
+                        log::error!(
+                            "SAHYADRI: commit aborted; block header unavailable for {}: {:?}",
+                            hash, e
+                        );
+                        return;
+                    }
+                };
+                let calculated_commitment = sahyadri_hashes::Hash::from_bytes(final_root);
+                if calculated_commitment != header.account_commitment {
+                    log::error!(
+                        "SAHYADRI: commit aborted; account commitment mismatch for {}: header={:?}, calculated={:?}",
+                        hash, header.account_commitment, calculated_commitment
+                    );
+                    return;
+                }
+
                 let pending_nodes: Vec<_> = overlay.into_pending().collect();
                 if let Err(e) = self.smt_nodes_store.insert_sync_many(pending_nodes) {
-                    log::error!("SAHYADRI: sync SMT write failed in commit for {}: {:?}", hash, e);
+                    log::error!(
+                        "SAHYADRI: commit aborted; SMT node persistence failed for {}: {:?}",
+                        hash, e
+                    );
+                    return;
                 }
                 // Persist FINAL root (DID included)
                 if let Err(e) = self.account_roots_store.insert_batch(&mut batch, hash, final_root) {
@@ -884,12 +940,20 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                 }
             }
             Err(e) => {
-                log::error!("SAHYADRI: DID compute failed for {}: {:?}", hash, e);
+                log::error!(
+                    "SAHYADRI: commit aborted; DID computation failed for {}: {:?}",
+                    hash, e
+                );
+                return;
             }
         }
     }
     Err(e) => {
-        log::error!("SAHYADRI: account commitment compute failed for {}: {:?}", hash, e);
+        log::error!(
+            "SAHYADRI: commit aborted; account commitment computation failed for {}: {:?}",
+            hash, e
+        );
+        return;
     }
 }
 }
@@ -1388,10 +1452,14 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         let parents_by_level = self.parents_manager.calc_block_parents(pruning_point, &virtual_state.parents);
         let _hash_merkle_root_full = calc_hash_merkle_root(txs.iter());  // recomputed below over truncated txs
 
-        let accepted_id_merkle_root = self.calc_accepted_id_merkle_root(
-            virtual_state.accepted_tx_ids.iter().copied(),
-            virtual_state.sahyadri_consensus_data.selected_parent,
-        );
+        let accepted_id_merkle_root = {
+            let mut accept_ctx = BlockProcessingContext::new((&virtual_state.sahyadri_consensus_data).into());
+            self.calculate_block_state(&mut accept_ctx, virtual_state.daa_score);
+            self.calc_accepted_id_merkle_root(
+                accept_ctx.accepted_tx_ids.iter().copied(),
+                virtual_state.sahyadri_consensus_data.selected_parent,
+            )
+        };
         // ─── Account commitment ───
         // Parent root + block ke effects → naya root → header me daalo
         let selected_parent = virtual_state.sahyadri_consensus_data.selected_parent;
@@ -1429,9 +1497,44 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         // template on failure (coinbase-only template is always valid since
         // rewards are bounded u64). This lets the chain progress with empty
         // blocks instead of halting on a bad flash tx in mempool.
-        let mut actual_flash_txs = template_flash_txs.clone();
-        // deterministic order so build and verify paths converge on the
-        // same surviving subset after incremental drops
+        // Apply the same deterministic fee/signature/expiry rules used
+        // by block verification. Never build a commitment from an invalid
+        // FlashTx that the verifier would reject.
+        //
+        // Deduplicate across the complete batch while preserving the first
+        // occurrence, then canonicalize the accepted transactions by flash_id.
+        let mut actual_flash_txs = Vec::with_capacity(template_flash_txs.len());
+        let mut seen_flash_ids = std::collections::HashSet::with_capacity(
+            template_flash_txs.len(),
+        );
+
+        for flash in &template_flash_txs {
+            let flash_id = flash.flash_id();
+
+            if !seen_flash_ids.insert(flash_id) {
+                log::debug!(
+                    "SAHYADRI: duplicate FlashTx excluded from template: {:?}",
+                    flash_id
+                );
+                continue;
+            }
+
+            match self.transaction_validator.filter_flash_deterministic(
+                std::slice::from_ref(flash),
+                virtual_state.daa_score,
+            ) {
+                Ok(mut accepted) => actual_flash_txs.append(&mut accepted),
+                Err(e) => {
+                    log::debug!(
+                        "SAHYADRI: invalid FlashTx excluded from template: {:?}: {:?}",
+                        flash_id,
+                        e
+                    );
+                }
+            }
+        }
+
+        // Both builder and verifier now process the same canonical order.
         actual_flash_txs.sort_by_key(|tx| tx.flash_id());
         let accounts_root_h256 = loop {
             match crate::pipeline::virtual_processor::account_changes::compute_block_account_changes(
@@ -1460,8 +1563,11 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
                         smt_overlay = sahyadri_smt::OverlayStore::new(&db_base);
                         continue;
                     }
-                    log::error!("coinbase-only template still fails: {:?}", e);
-                    break sahyadri_smt::EMPTY;
+                    log::error!(
+                        "SAHYADRI: coinbase-only account commitment computation failed: {:?}",
+                        e
+                    );
+                    return Err(RuleError::AccountCommitmentComputeFailed);
                 }
             }
         };
@@ -1477,10 +1583,8 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
         // Fix: rebuild txs as [coinbase] + [surviving flash txs] + [non-flash non-coinbase]
         // and recompute hash_merkle_root over the truncated list.
         //
-        // accepted_id_merkle_root is left as computed at line 1665 over the full txs list.
-        // Verify path does not enforce it ( disabled the check), and it participates
-        // only in the header hash which remains self-consistent. Recompute when the check
-        // is re-enabled in block_validation.rs.
+        // accepted_id_merkle_root derives from the mergeset acceptance, not from this block's own
+        // transactions, so truncating the list does not change it.
         let is_flash_payload_m01 = |tx: &sahyadri_consensus_core::tx::Transaction| -> bool {
             tx.payload.len() >= 8 && &tx.payload[..8] == b"FLASH_V1"
         };
@@ -1548,7 +1652,7 @@ match crate::pipeline::virtual_processor::account_changes::compute_block_account
             }
             Err(e) => {
                 log::error!("SAHYADRI: DID compute failed in build: {:?}", e);
-                accounts_root_h256
+                return Err(RuleError::AccountCommitmentComputeFailed);
             }
         };
 
